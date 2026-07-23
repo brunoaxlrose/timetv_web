@@ -1,0 +1,310 @@
+<?php
+$item = $this->item;
+$episodes = $this->episodes;
+$progress = $this->progress;
+$cast = $this->cast;
+$nextUnwatched = $this->nextUnwatched;
+$userId = $this->userId;
+?>
+
+<!-- Cinematic Background Banner with Blur -->
+<div class="refract-detail-banner-bg" style="background-image: url('<?= htmlspecialchars($item['banner_url']) ?>');"></div>
+
+<!-- detail page container -->
+<div class="refract-detail-container">
+    
+    <!-- Top Bar with Back Button -->
+    <div class="refract-top-bar">
+        <a href="javascript:history.back()" class="refract-back-btn">
+            <i class="bi bi-chevron-left"></i>
+        </a>
+    </div>
+
+    <!-- Poster Section -->
+    <div class="refract-poster-wrapper text-center">
+        <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-detail-poster shadow-lg" alt="<?= htmlspecialchars($item['title']) ?>">
+        <div class="mt-3">
+            <span class="refract-type-tag text-uppercase"><?= htmlspecialchars($item['type'] === 'series' ? 'Série' : ($item['type'] === 'anime' ? 'Anime' : 'Filme')) ?></span>
+        </div>
+    </div>
+
+    <!-- Title and Meta Info -->
+    <div class="text-center px-4 mt-3">
+        <h2 class="fw-extrabold text-white text-3xl mb-1" style="font-weight: 800; font-size: 1.8rem; letter-spacing: -0.5px;"><?= htmlspecialchars($item['title']) ?></h2>
+        <div class="small d-flex justify-content-center align-items-center gap-2" style="color: #b0b0cc !important; font-weight: 500;">
+            <span><?= $item['release_year'] ?></span>
+            <span>&bull;</span>
+            <span><?= $item['type'] === 'movie' ? 'Filme' : 'Terminada' ?></span>
+            <span>&bull;</span>
+            <span class="text-warning"><i class="bi bi-star-fill text-warning me-1"></i> 8.5</span>
+        </div>
+    </div>
+
+    <!-- Tabs Switcher (Sobre / Episódios) -->
+    <div class="tvtime-tabs refract-tabs mt-4">
+        <div class="tvtime-tab active" id="tabSobreBtn" onclick="switchDetailTab('sobre')">Sobre</div>
+        <?php if ($item['type'] !== 'movie'): ?>
+            <div class="tvtime-tab" id="tabEpisodiosBtn" onclick="switchDetailTab('episodios')">Episódios</div>
+        <?php endif; ?>
+    </div>
+
+    <div class="p-3 pb-5">
+        <!-- TAB 1: SOBRE -->
+        <div id="tabSobreContent" class="tab-content-panel">
+            
+            <!-- Creator info -->
+            <?php if (!empty($cast)): ?>
+                <?php 
+                    $creator = $cast[0]['person'] ?? null;
+                    $creatorPhoto = $creator['image']['medium'] ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop';
+                    $creatorName = $creator['name'] ?? 'Criador desconhecido';
+                ?>
+                <div class="refract-creator-row d-flex align-items-center justify-content-between p-3 mb-4 mt-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <img src="<?= htmlspecialchars($creatorPhoto) ?>" class="refract-creator-avatar" alt="<?= htmlspecialchars($creatorName) ?>">
+                        <div>
+                            <div class="text-white fw-bold" style="font-size: 0.85rem;"><?= htmlspecialchars($creatorName) ?></div>
+                            <div class="text-muted" style="font-size: 0.75rem;">Criador</div>
+                        </div>
+                    </div>
+                    <a href="#" class="text-decoration-none refract-purple-text fw-bold" style="font-size: 0.8rem;">Equipa <i class="bi bi-chevron-right"></i></a>
+                </div>
+            <?php endif; ?>
+
+            <!-- Synopsis / Description -->
+            <p class="text-white small mb-4 px-1" style="line-height: 1.6; font-size: 0.82rem; font-weight: 400; color: #ced4da !important;">
+                <?= htmlspecialchars($item['description']) ?>
+            </p>
+
+            <!-- Cast / Elenco Section -->
+            <?php if (!empty($cast)): ?>
+                <h6 class="fw-bold text-gray small text-uppercase mb-3 mt-4" style="font-size: 0.65rem; letter-spacing: 0.5px;">Elenco</h6>
+                <div class="horizontal-carousel mb-4">
+                    <?php foreach (array_slice($cast, 0, 10) as $actor): ?>
+                        <?php 
+                            $actorPhoto = $actor['person']['image']['medium'] ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop';
+                            $actorName = $actor['person']['name'] ?? 'Nome';
+                            $charName = $actor['character']['name'] ?? 'Personagem';
+                        ?>
+                        <div class="refract-cast-card text-center">
+                            <img src="<?= htmlspecialchars($actorPhoto) ?>" class="refract-cast-img shadow" alt="<?= htmlspecialchars($actorName) ?>">
+                            <div class="text-white text-truncate mt-1 px-1" style="font-size: 0.7rem; font-weight: 600;"><?= htmlspecialchars($actorName) ?></div>
+                            <div class="text-muted text-truncate" style="font-size: 0.6rem;"><?= htmlspecialchars($charName) ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Rating Pills -->
+            <div class="d-flex justify-content-center gap-2 mb-4">
+                <span class="refract-rating-pill imdb"><span class="badge text-bg-warning me-1 fw-bold">IMDb</span> 8.5</span>
+                <span class="refract-rating-pill tmdb"><span class="badge text-bg-info me-1 text-white fw-bold">TMDB</span> 8.4</span>
+                <span class="refract-rating-pill community"><i class="bi bi-chevron-up text-accent me-1"></i> 8.1 (836)</span>
+            </div>
+
+            <!-- Awards / Achievements -->
+            <div class="refract-awards-card p-3 mb-4 d-flex align-items-center gap-3">
+                <i class="bi bi-trophy-fill text-warning fs-4"></i>
+                <div class="text-white small" style="font-weight: 500; font-size: 0.78rem;">
+                    Venceu 4 Primetime Emmys. 26 vitórias & 97 indicações no total.
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: EPISÓDIOS (only for non-movies) -->
+        <?php if ($item['type'] !== 'movie'): ?>
+        <div id="tabEpisodiosContent" class="tab-content-panel d-none">
+            
+            <!-- Season Progress and List Header with Check All Show toggle -->
+            <div class="d-flex align-items-center justify-content-between mb-3 mt-2">
+                <h6 class="fw-bold text-gray small text-uppercase mb-0" style="font-size: 0.65rem; letter-spacing: 0.5px;">Temporadas & Episódios</h6>
+            </div>
+            
+            <?php
+                // Group episodes by season
+                $seasons = [];
+                foreach ($episodes as $episode) {
+                    $seasons[$episode['season_number']][] = $episode;
+                }
+
+                // allWatched: only consider non-upcoming released episodes
+                $releasedEpisodes = array_filter($episodes, function($e) {
+                    return empty($e['air_date']) || strtotime($e['air_date']) <= time();
+                });
+                $releasedCount  = count($releasedEpisodes);
+                $watchedReleased = count(array_filter($releasedEpisodes, function($e) { return $e['watched']; }));
+                $allWatched = $releasedCount > 0 && ($watchedReleased === $releasedCount);
+            ?>
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                <?php foreach (array_keys($seasons) as $seasonNum): ?>
+                    <?php 
+                        $seasonEpisodes = $seasons[$seasonNum];
+                        $seasonTotal = count($seasonEpisodes);
+                        $seasonWatched = count(array_filter($seasonEpisodes, function($e) { return $e['watched']; }));
+                        $isSeasonComplete = ($seasonWatched === $seasonTotal);
+                    ?>
+                    <button class="refract-season-pill btn <?= $isSeasonComplete ? 'complete' : '' ?>" onclick="switchSeasonView(<?= $seasonNum ?>)">
+                        <?= $isSeasonComplete ? '<i class="bi bi-check-lg me-1 text-success"></i>' : '' ?>S<?= $seasonNum ?>
+                    </button>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Season Pulse (Graph Placeholder as in Image 1) -->
+            <div class="refract-pulse-card p-3 mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-white fw-bold small">Pulso da Temporada</span>
+                    <span class="text-muted small">Média <strong class="text-danger">6.3</strong></span>
+                </div>
+                <!-- Mini sparkline styled with SVG -->
+                <div class="py-2" style="height: 60px;">
+                    <svg viewBox="0 0 100 20" class="w-100 h-100" preserveAspectRatio="none">
+                        <path d="M 0 10 Q 15 5, 30 7 T 60 12 T 90 9 T 100 11" fill="none" stroke="#e056fd" stroke-width="1.5"></path>
+                        <circle cx="5" cy="10" r="1.5" fill="#e056fd"></circle>
+                        <circle cx="30" cy="7" r="1.5" fill="#e056fd"></circle>
+                        <circle cx="60" cy="12" r="1.5" fill="#e056fd"></circle>
+                        <circle cx="90" cy="9" r="1.5" fill="#e056fd"></circle>
+                    </svg>
+                </div>
+                <div class="d-flex justify-content-between text-muted" style="font-size: 0.58rem;">
+                    <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+                </div>
+            </div>
+
+            <?php
+                foreach ($seasons as $seasonNum => $seasonEpisodes):
+                    $seasonTotal   = count($seasonEpisodes);
+                    $seasonWatched = count(array_filter($seasonEpisodes, function($e) { return $e['watched']; }));
+                    $seasonPercent = round(($seasonWatched / $seasonTotal) * 100);
+                    // Season is fully watched only considering released episodes
+                    $seasonReleased = count(array_filter($seasonEpisodes, function($e) {
+                        return empty($e['air_date']) || strtotime($e['air_date']) <= time();
+                    }));
+                    $seasonAllWatched = $seasonReleased > 0 && ($seasonWatched >= $seasonReleased);
+                    // Start collapsed if fully watched
+                    $accordionCollapsed = $seasonAllWatched;
+                ?>
+                <!-- Season Accordion Box -->
+                <div class="refract-season-view-box mb-3" id="refractSeasonBox<?= $seasonNum ?>">
+                    <!-- Season Accordion Button -->
+                    <div class="season-accordion-btn mb-2 d-flex align-items-center justify-content-between position-relative overflow-hidden" onclick="toggleSeasonAccordion(<?= $seasonNum ?>, event)" style="padding-bottom: 16px; border-radius: 12px; background-color: #1a1a24; border: 1px solid #2a2a3a;">
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            <span class="text-white font-bold">Temporada <?= $seasonNum ?></span>
+                            <span class="text-gray small fw-normal"><?= $seasonWatched ?> / <?= $seasonTotal ?> eps</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <?php if ($item['track_status']): ?>
+                                <!-- Mark all series button (compact, icon-only) -->
+                                <button class="btn btn-check-all-show <?= $allWatched ? 'checked' : '' ?>" 
+                                        data-item-id="<?= $item['id_item'] ?>"
+                                        title="<?= $allWatched ? 'Desmarcar toda a série' : 'Marcar toda a série' ?>"
+                                        style="font-size: 0.6rem; border-radius: 6px; padding: 2px 7px; font-weight: 700; text-transform: uppercase; border: 1px solid <?= $allWatched ? '#2ed573' : '#7c4dff' ?>; color: <?= $allWatched ? '#2ed573' : '#a88beb' ?>; background: transparent; white-space: nowrap;"
+                                        onclick="event.stopPropagation();">
+                                    <i class="bi <?= $allWatched ? 'bi-check-all' : 'bi-list-check' ?>"></i>
+                                    <?= $allWatched ? 'Desmarcar tudo' : 'Marcar tudo' ?>
+                                </button>
+                                <!-- Season check circle -->
+                                <button class="tvtime-circle-check btn-check-season <?= $seasonAllWatched ? 'checked' : '' ?>" 
+                                        data-season-number="<?= $seasonNum ?>" 
+                                        data-item-id="<?= $item['id_item'] ?>"
+                                        style="width: 28px; height: 28px; font-size: 0.9rem;">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            <?php endif; ?>
+                            <i class="bi <?= $accordionCollapsed ? 'bi-chevron-down' : 'bi-chevron-up' ?> text-gray ms-1" id="accordionArrow<?= $seasonNum ?>"></i>
+                        </div>
+                        <!-- Bottom Progress Bar -->
+                        <div class="position-absolute bottom-0 start-0" style="height: 3px; width: <?= $seasonPercent ?>%; background-color: <?= $seasonAllWatched ? '#2ed573' : '#a55eea' ?>; transition: width 0.3s;"></div>
+                    </div>
+
+                    <div id="seasonContent<?= $seasonNum ?>" class="season-accordion-content" <?= $accordionCollapsed ? 'style="display:none;"' : '' ?>>
+                        <?php foreach ($seasonEpisodes as $ep): ?>
+                            <?php 
+                                $isUpcoming = false;
+                                $daysLeft = 0;
+                                if (!empty($ep['air_date'])) {
+                                    $diff = strtotime($ep['air_date']) - strtotime(date('Y-m-d'));
+                                    $daysLeft = ceil($diff / 86400);
+                                    if ($daysLeft > 0) {
+                                        $isUpcoming = true;
+                                    }
+                                }
+                            ?>
+                            <div class="detail-episode-row refract-episode-row">
+                                <div class="detail-episode-body">
+                                    <div class="text-white fw-bold" style="font-size: 0.78rem;">
+                                        <?= $ep['episode_number'] ?>. <?= htmlspecialchars($ep['title']) ?>
+                                    </div>
+                                    <div style="font-size: 0.72rem; margin-top: 1px; color: #a5a5c0 !important; font-weight: 500;">
+                                        <?= !empty($ep['air_date']) ? date('d/m/Y', strtotime($ep['air_date'])) : 'Brevemente' ?> 
+                                        &bull; <?= $ep['runtime_minutes'] ?? 45 ?>m 
+                                        <?php if (!empty($ep['rating'])): ?>
+                                            &bull; <i class="bi bi-star-fill text-warning" style="font-size: 0.6rem;"></i> <?= number_format($ep['rating'], 1) ?>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="text-gray text-truncate" style="font-size: 0.68rem; margin-top: 3px;" title="<?= htmlspecialchars($ep['description'] ?? '') ?>">
+                                        <?= htmlspecialchars($ep['description'] ?? 'Nenhuma sinopse disponível.') ?>
+                                    </div>
+                                </div>
+                                <?php if ($isUpcoming): ?>
+                                    <span class="upcoming-countdown" style="font-size: 0.6rem; color: #aaa;">Falta <?= $daysLeft ?> dias</span>
+                                <?php else: ?>
+                                    <button class="tvtime-circle-check btn-check-episode <?= $ep['watched'] ? 'checked' : '' ?>" 
+                                            data-episode-id="<?= $ep['id_episodio'] ?>" 
+                                            data-item-id="<?= $item['id_item'] ?>"
+                                            style="width: 30px; height: 30px; font-size: 0.95rem;">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Bottom Floating Yellow Action Bar in Refract Purple -->
+<div class="bottom-floating-bar refract-floating-bar-purple">
+    <?php if ($item['track_status']): ?>
+        <?php 
+            $nextEpStr = "SÉRIE";
+            if ($item['type'] !== 'movie') {
+                if ($nextUnwatched) {
+                    $nextEpStr = "T" . $nextUnwatched['season_number'] . "E" . $nextUnwatched['episode_number'];
+                }
+            }
+        ?>
+        <?php if ($item['type'] === 'movie' && $item['track_status'] === 'completed'): ?>
+            <button class="btn-floating-action remove btn-track-toggle" 
+                    data-item-id="<?= $item['id_item'] ?>" 
+                    data-action="remove">
+                REMOVER FILME
+            </button>
+        <?php elseif ($item['type'] === 'movie'): ?>
+            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+                    data-item-id="<?= $item['id_item'] ?>" 
+                    data-action="add"
+                    data-status="completed">
+                <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
+            </button>
+        <?php else: ?>
+            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+                    data-item-id="<?= $item['id_item'] ?>" 
+                    data-action="add"
+                    data-status="completed">
+                <i class="bi bi-check-circle-fill me-2"></i> Marcar <?= $nextEpStr ?> como visto
+            </button>
+        <?php endif; ?>
+    <?php else: ?>
+        <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+                data-item-id="<?= $item['id_item'] ?? '' ?>" 
+                data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
+                data-action="add">
+            + ADICIONAR <?= $item['type'] === 'movie' ? 'FILME' : 'SÉRIE' ?>
+        </button>
+    <?php endif; ?>
+</div>
+
+<script src="/js/app/catalog/detail.js"></script>

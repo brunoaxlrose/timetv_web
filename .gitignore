@@ -1,0 +1,6 @@
+vendor/
+cookie.txt
+config/autoload/local.php
+.idea/
+.vscode/
+.DS_Store

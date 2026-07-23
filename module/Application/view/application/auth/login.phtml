@@ -1,0 +1,133 @@
+<div class="px-4 py-5 d-flex flex-column min-vh-100 justify-content-center position-relative">
+    <div class="text-center mb-5">
+        <!-- TV Time Logo Icon -->
+        <div class="mx-auto mb-3" style="width: 55px; height: 55px; font-size: 24px; display: flex; align-items: center; justify-content: center; background-color: #7c4dff; border-radius: 12px; box-shadow: 0 0 15px rgba(124, 77, 255, 0.4);">
+            <i class="bi bi-play-fill text-white fs-3"></i>
+        </div>
+        <h2 class="fw-bold text-white mb-2">Entrar no <span style="color: #a88beb;">Time View</span></h2>
+        <p class="text-gray small px-3">Acompanhe suas séries, animes e filmes favoritos</p>
+    </div>
+
+    <div id="authAlert" class="alert alert-danger d-none border-0 rounded-3 text-center small" role="alert" style="background-color: #ff3b30; color: white;"></div>
+
+    <form id="authForm" action="/login" method="POST" class="mb-3">
+        <div class="mb-3">
+            <label for="email" class="form-label text-gray small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">E-mail</label>
+            <div class="input-group">
+                <span class="input-group-text border-0" style="background-color: #1c1c1e !important; color: #a88beb !important;"><i class="bi bi-envelope"></i></span>
+                <input type="email" class="form-control border-0 text-white" id="email" name="email" required placeholder="seu@email.com" style="background-color: #1c1c1e !important; font-size: 0.85rem; padding: 12px 10px;">
+            </div>
+        </div>
+        
+        <div class="mb-4">
+            <label for="password" class="form-label text-gray small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">Senha</label>
+            <div class="input-group">
+                <span class="input-group-text border-0" style="background-color: #1c1c1e !important; color: #a88beb !important;"><i class="bi bi-lock"></i></span>
+                <input type="password" class="form-control border-0 text-white" id="password" name="password" required placeholder="Sua senha" style="background-color: #1c1c1e !important; font-size: 0.85rem; padding: 12px 10px;">
+            </div>
+        </div>
+
+        <button type="submit" class="btn w-100 py-3 rounded-pill fw-bold text-white d-flex align-items-center justify-content-center gap-2" style="background-color: #7c4dff; font-size: 0.85rem;">
+            <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+            <span>Entrar</span>
+        </button>
+    </form>
+
+    <!-- Google Login Button -->
+    <div class="position-relative d-flex align-items-center justify-content-center my-3">
+        <hr class="w-100 border-secondary opacity-20">
+        <span class="position-absolute px-2 text-muted small" style="background-color: var(--bg-black); font-size: 0.7rem;">OU</span>
+    </div>
+
+    <button type="button" onclick="toggleGoogleModal(true)" class="btn w-100 py-3 rounded-pill fw-bold text-white d-flex align-items-center justify-content-center gap-2 mb-4" style="background-color: #1c1c1e; border: 1px solid var(--border-light); font-size: 0.85rem;">
+        <i class="bi bi-google text-danger"></i>
+        <span>Entrar com Google</span>
+    </button>
+
+    <div class="text-center mt-3">
+        <p class="mb-0 text-gray small">Não tem uma conta? <a href="/register" class="text-decoration-none fw-bold" style="color: #a88beb;">Cadastre-se</a></p>
+    </div>
+</div>
+
+<!-- Simulated Google Chrome Accounts Chooser Overlay -->
+<div id="googleChooserModal" class="position-fixed top-50 start-50 translate-middle w-100 h-100 d-none align-items-center justify-content-center" style="max-width: 480px; background-color: rgba(0,0,0,0.85); z-index: 3000; padding: 15px;">
+    <div class="chrome-window w-100">
+        <!-- Title bar -->
+        <div class="chrome-titlebar d-flex justify-content-between align-items-center">
+            <span class="text-white" style="font-size: 0.7rem; font-weight: 500;"><i class="bi bi-google me-1"></i> Fazer login nas Contas do Google - Google Chrome</span>
+            <div class="chrome-window-controls" onclick="toggleGoogleModal(false)" style="display: flex; gap: 4px;">
+                <span style="width: 10px; height: 10px; background-color: #5f6368; border-radius: 50%; display: inline-block;"></span>
+                <span style="width: 10px; height: 10px; background-color: #5f6368; border-radius: 50%; display: inline-block;"></span>
+                <span style="width: 10px; height: 10px; background-color: #ff3b30; border-radius: 50%; display: inline-block;"></span>
+            </div>
+        </div>
+        <!-- Body -->
+        <div class="google-chooser-container text-start">
+            <!-- Main Chooser Panel -->
+            <div id="googleChooserMain">
+                <div class="text-center mb-4">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google" style="height: 20px;" class="mb-3">
+                    <h5 class="fw-bold text-white mb-1" style="font-size: 1.1rem;">Escolha uma conta</h5>
+                    <p class="text-muted small">Prosseguir para <span class="fw-bold text-accent" style="color: #a88beb !important;">Time View</span></p>
+                </div>
+                
+                <!-- Accounts List -->
+                <div class="d-flex flex-column mb-4" style="border-top: 1px solid #3c4043;">
+                    <!-- Account 1 -->
+                    <div class="google-account-item py-3 d-flex align-items-center" onclick="submitGoogleOAuth('oliveira')" style="border-bottom: 1px solid #3c4043; cursor: pointer;">
+                        <div class="google-avatar text-white fw-bold d-flex align-items-center justify-content-center" style="background-color: #3b5998; width: 36px; height: 36px; border-radius: 50%; margin-right: 12px;">
+                            BO
+                        </div>
+                        <div>
+                            <div class="text-white fw-bold small" style="font-size: 0.8rem;">Bruno Oliveira</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">brunoaxlrose8@gmail.com</div>
+                        </div>
+                    </div>
+                    <!-- Account 2 -->
+                    <div class="google-account-item py-3 d-flex align-items-center" onclick="submitGoogleOAuth('alcantara')" style="border-bottom: 1px solid #3c4043; cursor: pointer;">
+                        <div class="google-avatar text-white fw-bold d-flex align-items-center justify-content-center" style="background-color: #e91e63; width: 36px; height: 36px; border-radius: 50%; margin-right: 12px;">
+                            B
+                        </div>
+                        <div>
+                            <div class="text-white fw-bold small" style="font-size: 0.8rem;">Bruno Alcantara</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">alcantarablao019@gmail.com</div>
+                        </div>
+                    </div>
+                    <!-- Usar outra conta -->
+                    <div class="google-account-item py-3 d-flex align-items-center" onclick="promptCustomGoogleAccount()" style="border-bottom: 1px solid #3c4043; cursor: pointer;">
+                        <div class="google-avatar bg-secondary text-white d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; border-radius: 50%; margin-right: 12px;">
+                            <i class="bi bi-person-plus-fill"></i>
+                        </div>
+                        <div>
+                            <div class="text-white fw-bold small" style="font-size: 0.8rem;">Usar outra conta</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disclaimer footer -->
+                <p class="text-muted mb-0" style="font-size: 0.65rem; line-height: 1.4;">
+                    Consulte a <a href="#" class="text-decoration-none" style="color: #a88beb !important;">Política de Privacidade</a> e os <a href="#" class="text-decoration-none" style="color: #a88beb !important;">Termos de Serviço</a> do app Time View antes de usá-lo.
+                </p>
+            </div>
+
+            <!-- Custom Input Panel (replaces prompt) -->
+            <div id="googleCustomInputContainer" class="d-none p-2">
+                <div class="text-center mb-4">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google" style="height: 20px;" class="mb-3">
+                    <h5 class="fw-bold text-white mb-2" style="font-size: 1.1rem;">Fazer login</h5>
+                    <p class="text-muted small">Ir para <span class="fw-bold text-accent" style="color: #a88beb !important;">Time View</span></p>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label text-gray small fw-bold text-uppercase mb-1" style="font-size: 0.65rem;">E-mail ou Telefone</label>
+                    <input type="text" id="googleCustomEmailInput" class="form-control border-0 text-white" placeholder="exemplo@gmail.com" style="background-color: #1c1c1e !important; font-size: 0.9rem; padding: 12px 10px; border-radius: 8px;">
+                </div>
+                <div class="d-flex align-items-center justify-content-end gap-2">
+                    <button type="button" class="btn text-muted small fw-bold" onclick="showGoogleAccountList(true)">Voltar</button>
+                    <button type="button" class="btn btn-primary py-2 px-4 small fw-bold" style="background-color: #7c4dff !important; border: none; border-radius: 20px;" onclick="submitCustomGoogleAccount()">Avançar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/app/auth/login.js"></script>

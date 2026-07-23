@@ -1,0 +1,111 @@
+<?php
+$trackedItems = $this->trackedItems;
+$currentType = $this->currentType;
+?>
+<!-- Refract Dashboard Header -->
+<div class="refract-header px-3 py-3 d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-2">
+        <svg viewBox="0 0 100 100" style="width: 28px; height: 28px;" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="50,15 90,85 10,85" fill="url(#prismGrad)" />
+            <defs>
+                <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#a88beb" />
+                    <stop offset="50%" stop-color="#f8a5c2" />
+                    <stop offset="100%" stop-color="#f7d794" />
+                </linearGradient>
+            </defs>
+        </svg>
+        <span class="refract-logo-text">Time View</span>
+    </div>
+</div>
+
+<!-- Top Navigation Sub-Tabs -->
+<div class="tvtime-tabs refract-dashboard-tabs">
+    <a href="/dashboard" class="tvtime-tab <?= $currentType !== 'movie' ? 'active' : '' ?>">
+        Séries e Animes
+    </a>
+    <a href="/dashboard?type=movie" class="tvtime-tab <?= $currentType === 'movie' ? 'active' : '' ?>">
+        Filmes
+    </a>
+</div>
+
+<!-- Continue Section (Continuar) -->
+<div class="px-3 mt-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="refract-section-title d-flex align-items-center gap-2 mb-0">
+            <i class="bi bi-play-circle-fill refract-purple-text"></i> Continuar
+        </h5>
+        <i class="bi bi-chevron-right text-muted"></i>
+    </div>
+
+    <?php if (empty($trackedItems)): ?>
+        <div class="text-center py-5 my-2 refract-card-dark rounded-4">
+            <div class="mb-3 text-muted" style="font-size: 2.5rem;">
+                <i class="bi bi-bookmark-plus"></i>
+            </div>
+            <h6 class="text-white fw-bold">Sua lista de exibição está vazia</h6>
+            <p class="text-gray small px-4 mb-3">Adicione algo para assistir a partir do catálogo.</p>
+            <a href="/catalog" class="btn btn-accent refract-btn-purple rounded-pill px-4 py-2 small fw-bold">
+                Explorar Catálogo
+            </a>
+        </div>
+    <?php else: ?>
+        <!-- Horizontal List of Show Cards -->
+        <div class="refract-continue-scroll">
+            <?php foreach ($trackedItems as $item): ?>
+                <?php if ($item['type'] !== 'movie'): ?>
+                    <!-- Series Continue Card -->
+                    <div class="refract-continue-card">
+                        <div class="position-relative">
+                            <img src="<?= htmlspecialchars($item['banner_url']) ?>" class="refract-continue-img" alt="banner">
+                            <span class="refract-continue-status">EM CURSO</span>
+                        </div>
+                        <div class="refract-continue-body">
+                            <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
+                                <div class="text-white fw-bold text-truncate" style="font-size: 0.8rem;"><?= htmlspecialchars($item['title']) ?></div>
+                            </a>
+                            <?php if ($item['next_episode']): ?>
+                                <?php 
+                                    $nextEp = $item['next_episode'];
+                                    $seasonStr = str_pad($nextEp['season_number'], 2, '0', STR_PAD_LEFT);
+                                    $episodeStr = str_pad($nextEp['episode_number'], 2, '0', STR_PAD_LEFT);
+                                ?>
+                                <div class="text-muted text-truncate mt-1" style="font-size: 0.65rem;">S<?= $seasonStr ?> &bull; E<?= $episodeStr ?></div>
+                                <div class="text-gray text-truncate" style="font-size: 0.65rem;"><?= htmlspecialchars($nextEp['title']) ?></div>
+                            <?php else: ?>
+                                <div class="text-accent text-truncate mt-1" style="font-size: 0.65rem;">Tudo em dia!</div>
+                                <div class="text-muted text-truncate" style="font-size: 0.65rem;">Você está atualizado.</div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <?php if ($item['next_episode']): ?>
+                            <button class="refract-continue-check btn-check-episode" 
+                                    data-episode-id="<?= $item['next_episode']['id_episodio'] ?>" 
+                                    data-item-id="<?= $item['id_item'] ?>">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                        <?php else: ?>
+                            <button class="refract-continue-check checked" style="pointer-events: none;">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- Watch List Section (Para ver) -->
+<div class="px-3 mt-4 mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="refract-section-title d-flex align-items-center gap-2 mb-0">
+            <i class="bi bi-bookmark-fill text-info"></i> Para ver
+        </h5>
+        <i class="bi bi-chevron-right text-muted"></i>
+    </div>
+    <div class="refract-card-dark p-4 rounded-4 text-center">
+        <div class="text-muted small mb-3">A tua lista de visualização está vazia.</div>
+        <a href="/catalog" class="text-decoration-none refract-purple-text fw-bold small">Adiciona algo para ver <i class="bi bi-arrow-right"></i></a>
+    </div>
+</div>

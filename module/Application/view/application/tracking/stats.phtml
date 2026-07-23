@@ -1,0 +1,349 @@
+<?php
+$totalEpisodesWatched = $this->totalEpisodesWatched;
+$seriesCount = $this->seriesCount;
+$animeCount = $this->animeCount;
+$moviesCount = $this->moviesCount;
+$days = $this->days;
+$hours = $this->hours;
+$minutes = $this->minutes;
+?>
+
+<!-- Refract Profile Header -->
+<div class="refract-profile-header px-3 py-3 d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center gap-3">
+        <!-- Default Robot avatar as in Image 4 -->
+        <div class="refract-profile-avatar-wrapper shadow">
+            <i class="bi bi-robot fs-3 text-muted"></i>
+        </div>
+        <div>
+            <h4 class="text-white mb-0" style="font-weight: 800; font-size: 1.25rem;"><?= htmlspecialchars($_SESSION['username']) ?></h4>
+            <div class="text-muted small">@<?= strtolower(str_replace(' ', '', htmlspecialchars($_SESSION['username']))) ?></div>
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 refract-profile-icons">
+        <i class="bi bi-chat-left-text-fill text-warning fs-5" onclick="openFeedbackModal()" title="Reportar Bug / Sugestão" style="cursor: pointer;"></i>
+        <i class="bi bi-gear fs-5" data-bs-toggle="modal" data-bs-target="#editProfileModal" title="Definições" style="cursor: pointer;"></i>
+    </div>
+</div>
+
+<!-- Profile Navigation Tabs -->
+<div class="refract-profile-tabs px-3 mb-3 d-flex gap-2 scrollable-horizontal-tabs">
+    <span class="refract-profile-tab active" onclick="switchProfileTab(this, 'overview')">Visão geral</span>
+    <span class="refract-profile-tab" onclick="switchProfileTab(this, 'time')">Tempo</span>
+    <span class="refract-profile-tab" onclick="switchProfileTab(this, 'genres')">Géneros</span>
+    <span class="refract-profile-tab" onclick="switchProfileTab(this, 'platforms')">Plataformas</span>
+</div>
+
+<div class="px-3 pb-5">
+    <!-- TAB CONTENT: OVERVIEW -->
+    <div id="profileTabOverview" class="profile-tab-content">
+        <!-- Visualisation Time Panel (Roxo) -->
+        <div class="refract-time-panel p-3 mb-3 text-center">
+            <h3 class="text-white font-extrabold mb-1" style="font-weight: 800; font-size: 1.6rem;">
+                <?= $days ?>d <?= $hours ?>h <?= $minutes ?>m
+            </h3>
+            <div class="text-muted small" style="font-size: 0.72rem;">Tempo de visualização <i class="bi bi-chevron-down ms-1"></i></div>
+        </div>
+
+        <!-- 3 Main Statistics Cards (Grid Layout) -->
+        <div class="row g-2 mb-4">
+            <div class="col-4">
+                <div class="refract-stat-box p-3 text-center">
+                    <i class="bi bi-film text-info fs-4"></i>
+                    <h4 class="text-white mt-2 mb-1" style="font-weight: 800;"><?= $moviesCount ?></h4>
+                    <div class="text-muted" style="font-size: 0.65rem;">Movies</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="refract-stat-box p-3 text-center">
+                    <i class="bi bi-tv text-warning fs-4"></i>
+                    <h4 class="text-white mt-2 mb-1" style="font-weight: 800;"><?= $seriesCount ?></h4>
+                    <div class="text-muted" style="font-size: 0.65rem;">TV Shows</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="refract-stat-box p-3 text-center">
+                    <i class="bi bi-flower1 refract-pink-text fs-4"></i>
+                    <h4 class="text-white mt-2 mb-1" style="font-weight: 800;"><?= $animeCount ?></h4>
+                    <div class="text-muted" style="font-size: 0.65rem;">Anime</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Breakdown (watching, seen, in day, etc.) -->
+        <div class="refract-status-grid p-3 rounded-4 mb-4">
+            <div class="row g-3">
+                <div class="col-6 d-flex align-items-center gap-2">
+                    <span class="refract-dot orange"></span>
+                    <span class="text-white small fw-bold"><?= $seriesCount + $animeCount ?></span>
+                    <span class="text-muted small">A ver</span>
+                </div>
+                <div class="col-6 d-flex align-items-center gap-2">
+                    <span class="refract-dot purple"></span>
+                    <span class="text-white small fw-bold"><?= $totalEpisodesWatched ?></span>
+                    <span class="text-muted small">Visto</span>
+                </div>
+                <div class="col-6 d-flex align-items-center gap-2">
+                    <span class="refract-dot green"></span>
+                    <span class="text-white small fw-bold">1</span>
+                    <span class="text-muted small">Em dia</span>
+                </div>
+                <div class="col-6 d-flex align-items-center gap-2">
+                    <span class="refract-dot red"></span>
+                    <span class="text-white small fw-bold">0</span>
+                    <span class="text-muted small">Em pausa</span>
+                </div>
+                <div class="col-6 d-flex align-items-center gap-2">
+                    <span class="refract-dot blue"></span>
+                    <span class="text-white small fw-bold">0</span>
+                    <span class="text-muted small">Para ver</span>
+                </div>
+                <div class="col-6 d-flex align-items-center gap-2">
+                    <span class="refract-dot dark-red"></span>
+                    <span class="text-white small fw-bold">0</span>
+                    <span class="text-muted small">Abandonado</span>
+                </div>
+                <div class="col-6 d-flex align-items-center gap-2">
+                    <span class="refract-dot cyan"></span>
+                    <span class="text-white small fw-bold">0</span>
+                    <span class="text-muted small">Revisto</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Map Panel -->
+        <div class="refract-card-dark p-3 rounded-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-white fw-bold small text-uppercase" style="letter-spacing: 0.5px;">Atividade</span>
+                <span class="text-muted" style="font-size: 0.65rem;">1 dia ativo &bull; 🔥 1 dias</span>
+            </div>
+            <!-- Simple year selector as in Image 4 -->
+            <span class="badge refract-year-badge py-2 px-3 mb-3">2026</span>
+            <!-- Simulated activity blocks -->
+            <div class="d-flex gap-1 justify-content-between overflow-hidden py-1">
+                <?php for ($i=0; $i<24; $i++): ?>
+                    <span class="refract-activity-block <?= $i == 18 ? 'active' : '' ?>"></span>
+                <?php endfor; ?>
+            </div>
+            <div class="d-flex justify-content-between text-muted mt-2" style="font-size: 0.58rem;">
+                <span>jun.</span><span>jul.</span><span>ago.</span><span>set.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB CONTENT: TEMPO -->
+    <div id="profileTabTime" class="profile-tab-content d-none py-4 text-center">
+        <i class="bi bi-clock-history fs-1 text-muted mb-3 d-block"></i>
+        <h5 class="text-white fw-bold">Detalhamento de Tempo</h5>
+        <p class="text-gray small px-4">Aqui você verá a distribuição de tempo assistido ao longo dos últimos meses.</p>
+    </div>
+
+    <!-- TAB CONTENT: GÊNEROS -->
+    <div id="profileTabGenres" class="profile-tab-content d-none py-4 text-center">
+        <i class="bi bi-pie-chart-fill fs-1 text-muted mb-3 d-block"></i>
+        <h5 class="text-white fw-bold">Distribuição de Gêneros</h5>
+        <p class="text-gray small px-4">Drama, Comédia e Animação são seus gêneros mais assistidos de acordo com suas avaliações.</p>
+    </div>
+
+    <!-- TAB CONTENT: PLATAFORMAS -->
+    <div id="profileTabPlatforms" class="profile-tab-content d-none py-3 text-start">
+        <!-- OS TEUS PAÍSES -->
+        <h6 class="text-gray small fw-bold text-uppercase px-2 mb-3" style="font-size: 0.68rem; letter-spacing: 0.5px; color: #a5a5c0 !important;">Os teus países</h6>
+        <div class="refract-card-dark p-3 rounded-4 mb-4">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <span class="text-white small d-flex align-items-center gap-2"><span style="font-size: 1.1rem;">🇧🇷</span> Brazil</span>
+                <i class="bi bi-lock-fill text-muted" style="font-size: 0.8rem;"></i>
+            </div>
+            <div class="d-flex align-items-center gap-2 text-primary" style="font-size: 0.78rem; cursor: pointer; color: #7c4dff !important; font-weight: 600;">
+                <i class="bi bi-plus-lg"></i> Adicionar um segundo país
+            </div>
+        </div>
+
+        <!-- MOSTRAR DISPONIBILIDADE PARA -->
+        <h6 class="text-gray small fw-bold text-uppercase px-2 mb-3" style="font-size: 0.68rem; letter-spacing: 0.5px; color: #a5a5c0 !important;">Mostrar disponibilidade para</h6>
+        <div class="refract-card-dark p-3 rounded-4 mb-4 d-flex flex-column gap-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <span class="text-white small fw-bold d-flex align-items-center gap-2"><i class="bi bi-play-circle-fill" style="color: #7c4dff;"></i> Streaming</span>
+                    <div class="text-muted" style="font-size: 0.65rem; margin-top: 1px;">Netflix, Disney+...</div>
+                </div>
+                <div class="form-check form-switch p-0 m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" checked style="width: 38px; height: 18px;">
+                </div>
+            </div>
+            <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #1c1c28; padding-top: 12px;">
+                <div>
+                    <span class="text-white small fw-bold d-flex align-items-center gap-2"><i class="bi bi-cart-fill" style="color: #ffb142;"></i> Aluguer & Compra</span>
+                    <div class="text-muted" style="font-size: 0.65rem; margin-top: 1px;">Apple TV, Amazon...</div>
+                </div>
+                <div class="form-check form-switch p-0 m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" checked style="width: 38px; height: 18px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- AS TUAS PLATAFORMAS -->
+        <div class="d-flex align-items-center justify-content-between px-2 mb-3">
+            <h6 class="text-gray small fw-bold text-uppercase m-0" style="font-size: 0.68rem; letter-spacing: 0.5px; color: #a5a5c0 !important;">As tuas plataformas</h6>
+            <span class="text-primary small" style="font-size: 0.72rem; cursor: pointer; color: #7c4dff !important; font-weight: 600;">Selecionar tudo</span>
+        </div>
+        
+        <!-- Search platforms input -->
+        <div class="mb-3 px-1">
+            <input type="text" class="form-control discover-search-input" placeholder="Pesquisar plataformas..." style="background-color: #12121a !important; font-size: 0.78rem; padding: 10px 14px;">
+        </div>
+
+        <!-- List of platforms -->
+        <div class="refract-card-dark p-3 rounded-4 d-flex flex-column gap-3 mb-4">
+            <!-- Netflix -->
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="https://assets.nflxext.com/us/ffe/siteui/common/icons/nficon2016.ico" class="rounded" style="width: 24px; height: 24px;" alt="Netflix" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=40'; this.onerror=null;">
+                    <span class="text-white small fw-bold">Netflix</span>
+                </div>
+                <div class="form-check form-switch p-0 m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" checked style="width: 38px; height: 18px;">
+                </div>
+            </div>
+            <!-- Prime Video -->
+            <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #1c1c28; padding-top: 12px;">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="https://www.primevideo.com/favicon.ico" class="rounded" style="width: 24px; height: 24px;" alt="Prime Video" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=40'; this.onerror=null;">
+                    <span class="text-white small fw-bold">Amazon Prime Video</span>
+                </div>
+                <div class="form-check form-switch p-0 m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" checked style="width: 38px; height: 18px;">
+                </div>
+            </div>
+            <!-- Apple TV -->
+            <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #1c1c28; padding-top: 12px;">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="https://www.apple.com/favicon.ico" class="rounded" style="width: 24px; height: 24px;" alt="Apple TV" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=40'; this.onerror=null;">
+                    <span class="text-white small fw-bold">Apple TV</span>
+                </div>
+                <div class="form-check form-switch p-0 m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" checked style="width: 38px; height: 18px;">
+                </div>
+            </div>
+            <!-- Google Play -->
+            <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #1c1c28; padding-top: 12px;">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="https://www.gstatic.com/android/market_images/web/favicon_v2.ico" class="rounded" style="width: 24px; height: 24px;" alt="Google Play" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=40'; this.onerror=null;">
+                    <span class="text-white small fw-bold">Google Play Movies</span>
+                </div>
+                <div class="form-check form-switch p-0 m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" checked style="width: 38px; height: 18px;">
+                </div>
+            </div>
+            <!-- Disney Plus -->
+            <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #1c1c28; padding-top: 12px;">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="https://static-assets.bamgrid.com/product/disneyplus/images/favicon.62eb29b3504fb49dfdb8d7d91df881f1.ico" class="rounded" style="width: 24px; height: 24px;" alt="Disney Plus" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=40'; this.onerror=null;">
+                    <span class="text-white small fw-bold">Disney Plus</span>
+                </div>
+                <div class="form-check form-switch p-0 m-0">
+                    <input class="form-check-input" type="checkbox" role="switch" checked style="width: 38px; height: 18px;">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="editProfileModal" tabindex="-1" aria-labelledby="editProfileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content text-white" style="border-radius: 16px; background-color: #1a1a24 !important; border: 1px solid #2b2b3c !important;">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-bold" id="editProfileModalLabel">Editar Perfil</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editProfileForm" action="/api/update-profile">
+                <div class="modal-body">
+                    <div id="profileAlert" class="alert alert-danger d-none small text-white bg-danger border-0"></div>
+                    <div class="mb-4">
+                        <label for="profileUsername" class="form-label text-gray small" style="color: #a5a5c0 !important;">Nome de Usuário</label>
+                        <input type="text" class="form-control text-white rounded-pill px-3" id="profileUsername" name="username" value="<?= htmlspecialchars($_SESSION['username']) ?>" style="background-color: #0c0c12 !important; border: 1px solid #2d2d3e !important;" required>
+                    </div>
+                    
+                    <!-- Danger Zone (Zona Perigosa) -->
+                    <div class="mt-4 pt-3" style="border-top: 1px solid #2d2d3e;">
+                        <h6 class="text-danger small fw-bold text-uppercase mb-3" style="letter-spacing: 0.5px;">Zona Perigosa</h6>
+                        
+                        <div class="d-flex flex-column gap-2">
+                            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between" onclick="confirmClearLibrary()">
+                                <span><i class="bi bi-trash3 me-2"></i> Limpar biblioteca</span>
+                                <i class="bi bi-chevron-right small"></i>
+                            </button>
+                            
+                            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between" onclick="confirmDeleteAccount()">
+                                <span><i class="bi bi-person-x me-2"></i> Eliminar conta</span>
+                                <i class="bi bi-chevron-right small"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Fechar</button>
+                    <button type="submit" class="btn rounded-pill px-4 text-white fw-bold" style="background-color: #7c4dff !important; border: none;">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Enviar Feedback Modal Overlay (Reportar Bug / Sugestão) -->
+<div id="feedbackModal" class="tvtime-modal-overlay">
+    <div class="tvtime-modal-sheet text-start" style="border-radius: 20px 20px 0 0; background-color: #1e1e2d; border-top: 1px solid #2d2d3e; max-width: 440px;">
+        
+        <!-- Header title -->
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <i class="bi bi-chat-left-dots-fill text-warning fs-5"></i>
+            <span class="text-white fw-bold" style="font-size: 1.1rem;">Enviar feedback</span>
+        </div>
+        <div class="text-muted small mb-4" style="font-size: 0.8rem;">O que se passa pela tua cabeça?</div>
+
+        <!-- Bug vs Suggestion tabs -->
+        <div class="d-flex gap-2 mb-3">
+            <button class="btn refract-feedback-tab active w-50 py-2.5 d-flex align-items-center justify-content-center gap-2 small fw-bold" id="feedbackTabBug" onclick="switchFeedbackTab('bug')">
+                <i class="bi bi-bug"></i> Bug
+            </button>
+            <button class="btn refract-feedback-tab w-50 py-2.5 d-flex align-items-center justify-content-center gap-2 small fw-bold" id="feedbackTabSuggest" onclick="switchFeedbackTab('suggest')">
+                <i class="bi bi-lightbulb"></i> Sugestão
+            </button>
+        </div>
+
+        <!-- Feedback Form -->
+        <form id="feedbackForm">
+            <input type="hidden" name="feedback_type" id="feedbackType" value="bug">
+            <input type="hidden" name="screenshot_base64" id="feedbackScreenshotBase64" value="">
+            <input type="file" id="feedbackScreenshotInput" accept="image/*" class="d-none" onchange="handleScreenshotUpload(this)">
+            
+            <div class="mb-3">
+                <textarea class="form-control text-white border-0 p-3" id="feedbackContent" name="content" rows="5" style="background-color: #12121a; border-radius: 12px; font-size: 0.82rem; line-height: 1.5; color: #e2e2e9 !important;" placeholder="Descreve o bug: o que fizeste, o que aconteceu, o que esperavas. Para uma resposta mais rápida, junta-te ao nosso Discord — a equipa é muito mais reativa por lá." required></textarea>
+            </div>
+
+            <!-- Screenshot Image Preview Container -->
+            <div id="screenshotPreviewContainer" class="d-none mb-3 text-center position-relative p-2" style="background-color: #12121a; border-radius: 10px; border: 1px solid #2d2d3e;">
+                <img id="screenshotPreviewImg" src="" style="max-height: 120px; max-width: 100%; border-radius: 6px;" alt="Screenshot Preview">
+                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px; font-size: 0.75rem;" onclick="removeScreenshotPreview()">&times;</button>
+            </div>
+
+            <!-- Attach Screenshot button -->
+            <button type="button" id="btnAttachScreenshot" onclick="triggerScreenshotUpload()" class="btn w-100 py-2.5 mb-4 d-flex align-items-center justify-content-center gap-2 text-white small" style="background-color: #12121a; border: 1px dashed #7c4dff; border-radius: 10px; font-size: 0.78rem;">
+                <span id="screenshotSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                <i id="screenshotIcon" class="bi bi-image" style="color: #a88beb;"></i>
+                <span id="screenshotBtnText">Anexar screenshot</span>
+            </button>
+
+            <!-- Bottom Action Buttons -->
+            <div class="d-flex align-items-center justify-content-end gap-2">
+                <button type="button" class="btn text-muted small fw-bold px-3" onclick="closeFeedbackModal()">Cancelar</button>
+                <button type="submit" class="btn btn-warning py-2.5 px-4 text-dark small fw-bold d-flex align-items-center gap-2" style="background-color: #7c4dff !important; color: white !important; border-radius: 10px; font-size: 0.78rem;">
+                    <i class="bi bi-send-fill"></i> Enviar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/js/app/tracking/stats.js"></script>

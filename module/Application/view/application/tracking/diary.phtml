@@ -1,0 +1,87 @@
+<?php
+function getDateGroup($dateStr) {
+    $timestamp = strtotime($dateStr);
+    $diff = time() - $timestamp;
+    $days = floor($diff / 86400);
+    if ($days <= 0) {
+        return "HOJE";
+    } elseif ($days == 1) {
+        return "ONTEM";
+    } else {
+        return "HÁ " . $days . " DIAS";
+    }
+}
+?>
+
+<!-- Header Section with Back Button -->
+<div class="px-3 py-3 d-flex align-items-center justify-content-between" style="border-bottom: 1px solid #1c1c28;">
+    <a href="/catalog" class="text-decoration-none text-white d-flex align-items-center gap-2">
+        <i class="bi bi-arrow-left fs-5"></i>
+    </a>
+    <h5 class="text-white fw-bold mb-0 d-flex align-items-center gap-2">
+        <i class="bi bi-journal-text text-warning"></i> O meu diário
+    </h5>
+    <div style="width: 20px;"></div>
+</div>
+
+<div class="px-3 py-2">
+    <?php if (empty($this->history)): ?>
+        <div class="text-center py-5">
+            <i class="bi bi-calendar-x fs-1 text-muted mb-3 d-block"></i>
+            <h6 class="text-white fw-bold">Diário vazio</h6>
+            <p class="text-gray small px-4">Aqui irá ver a lista das séries e episódios que marcou como vistos recentemente.</p>
+        </div>
+    <?php else: ?>
+        <?php 
+        // Group history by relative date groups
+        $groups = [];
+        foreach ($this->history as $record) {
+            $groupName = getDateGroup($record['watched_at']);
+            $groups[$groupName][] = $record;
+        }
+        ?>
+
+        <?php foreach ($groups as $groupName => $records): ?>
+            <!-- Date Group Header -->
+            <div class="text-muted fw-bold small text-uppercase mb-3 mt-4" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                <?= $groupName ?>
+            </div>
+
+            <!-- List of activities under this day -->
+            <div class="d-flex flex-column gap-2.5">
+                <?php foreach ($records as $rec): ?>
+                    <div class="refract-card-dark p-2.5 rounded-4 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-3">
+                            <!-- Show/Movie Poster -->
+                            <img src="<?= htmlspecialchars($rec['poster_url']) ?>" class="rounded-2" style="width: 44px; height: 62px; object-fit: cover;" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
+                            
+                            <div class="text-start">
+                                <div class="text-white fw-bold" style="font-size: 0.88rem; line-height: 1.2;">
+                                    <?= htmlspecialchars($rec['show_title']) ?>
+                                </div>
+                                
+                                <div class="text-muted small mt-1.5 d-flex align-items-center gap-2" style="font-size: 0.72rem;">
+                                    <span class="refract-dot" style="width: 6px; height: 6px; background-color: #ff3b30;"></span>
+                                    <?= $rec['type'] === 'anime' ? 'Anime' : ($rec['type'] === 'movie' ? 'Filme' : 'Série') ?>
+                                    
+                                    <?php if ($rec['media_type'] === 'episode'): ?>
+                                        &bull; T<?= $rec['season_number'] ?>:E<?= $rec['episode_number'] ?>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <div class="text-success small mt-1 d-flex align-items-center gap-1 fw-semibold" style="font-size: 0.72rem; color: #2ed573 !important;">
+                                    <i class="bi bi-check-circle-fill"></i> Concluído
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Watched Time -->
+                        <div class="text-muted small px-2" style="font-size: 0.72rem; font-weight: 500;">
+                            <?= date('H:i', strtotime($rec['watched_at'])) ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
+</div>
