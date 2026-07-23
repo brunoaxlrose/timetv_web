@@ -1,0 +1,285 @@
+/* Detail Page specific styles */
+
+.refract-detail-banner-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 250px;
+    background-size: cover;
+    background-position: center;
+    filter: blur(12px) brightness(0.4);
+    z-index: 0;
+    opacity: 0.75;
+}
+.refract-detail-container {
+    position: relative;
+    z-index: 1;
+}
+.refract-top-bar {
+    padding: 15px;
+}
+.refract-back-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: rgba(0,0,0,0.5);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.1rem;
+    text-decoration: none;
+}
+.refract-detail-poster {
+    width: 130px;
+    height: 190px;
+    object-fit: cover;
+    border-radius: 14px;
+    border: 2px solid rgba(255,255,255,0.15);
+}
+.refract-type-tag {
+    background-color: rgba(255,255,255,0.08);
+    color: var(--text-gray);
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.refract-tabs {
+    background-color: transparent;
+    border-bottom: 1px solid #1c1c28;
+}
+.refract-creator-row {
+    background-color: #161622;
+    border-radius: 14px;
+    border: 1px solid #242436;
+}
+.refract-creator-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.refract-cast-card {
+    flex: 0 0 70px;
+}
+.refract-cast-img {
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1.5px solid rgba(255,255,255,0.1);
+}
+.refract-rating-pill {
+    background-color: #161622;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: white;
+    border: 1px solid #242436;
+    display: inline-flex;
+    align-items: center;
+}
+.refract-awards-card {
+    background-color: rgba(255, 210, 0, 0.05);
+    border: 1px solid rgba(255, 210, 0, 0.15);
+    border-radius: 12px;
+}
+.refract-season-pill {
+    background-color: #161622;
+    color: var(--text-gray);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid #242436;
+}
+.refract-season-pill.complete {
+    background-color: rgba(46, 213, 115, 0.1);
+    color: #2ed573;
+    border-color: rgba(46, 213, 115, 0.2);
+}
+.refract-pulse-card {
+    background-color: #13131c;
+    border: 1px solid #20202e;
+    border-radius: 14px;
+}
+.refract-episode-row {
+    background-color: #12121a;
+    border: 1px solid #1c1c28;
+    border-radius: 12px;
+    margin-bottom: 6px;
+    transition: background-color 0.2s;
+}
+.refract-episode-row:hover {
+    background-color: #161624;
+}
+
+.refract-floating-bar-purple {
+    background: linear-gradient(to top, rgba(8,8,10,0.95) 75%, rgba(8,8,10,0) 100%);
+    bottom: 85px;
+}
+.refract-action-btn {
+    background-color: #7c4dff !important;
+    color: white !important;
+    box-shadow: 0 4px 20px rgba(124, 77, 255, 0.4);
+    border-radius: 14px;
+    font-weight: 700;
+}
+.refract-action-btn:hover {
+    background-color: #651fff !important;
+}
+
+.bottom-floating-bar {
+    position: fixed;
+    bottom: 95px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 430px;
+    z-index: 950;
+    padding: 0;
+    background: transparent;
+}
+.btn-floating-action {
+    width: 100%;
+    border: none;
+    border-radius: 30px;
+    font-weight: 800;
+    font-size: 0.88rem;
+    padding: 14px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.horizontal-carousel {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding: 4px 0 16px 0;
+    scroll-behavior: smooth;
+}
+.horizontal-carousel::-webkit-scrollbar {
+    height: 4px;
+}
+.horizontal-carousel::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.tvtime-circle-check {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1.5px solid var(--text-muted);
+    background-color: transparent;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.tvtime-circle-check:hover {
+    border-color: var(--accent-yellow);
+    color: var(--accent-yellow);
+    transform: scale(1.08);
+}
+.tvtime-circle-check.checked {
+    background-color: #2ed573 !important;
+    border-color: #2ed573 !important;
+    color: #000000 !important;
+}
+
+/* Desktop overrides */
+@media (min-width: 992px) {
+    .refract-detail-container {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 40px;
+        align-items: start;
+        padding-top: 20px;
+    }
+    
+    .refract-top-bar {
+        grid-column: 1 / -1;
+        padding: 0;
+        margin-bottom: -15px;
+    }
+    
+    .refract-poster-wrapper {
+        text-align: left !important;
+        grid-column: 1;
+    }
+    
+    .refract-detail-poster {
+        width: 100%;
+        max-width: 280px;
+        height: auto;
+    }
+    
+    .refract-poster-wrapper + div {
+        text-align: left !important;
+        padding: 0 !important;
+        grid-column: 2;
+    }
+    
+    .refract-poster-wrapper + div h2 {
+        font-size: 2.2rem;
+        margin-top: 0;
+    }
+    
+    .refract-poster-wrapper + div .d-flex {
+        justify-content: flex-start !important;
+    }
+    
+    .tvtime-tabs.refract-tabs {
+        grid-column: 1 / -1;
+        margin-top: 20px;
+    }
+    
+    .tvtime-tabs.refract-tabs + .p-3 {
+        grid-column: 1 / -1;
+        padding: 0 !important;
+    }
+    
+    .season-accordion-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        padding: 10px 0;
+    }
+    
+    .refract-episode-row {
+        margin-bottom: 0;
+    }
+    
+    .bottom-floating-bar,
+    .refract-floating-bar-purple {
+        position: static !important;
+        transform: none !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 20px 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+    }
+
+    .horizontal-carousel {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        overflow-x: visible;
+        gap: 20px;
+        padding-bottom: 20px;
+    }
+    .refract-cast-card {
+        flex: none;
+        width: 100%;
+    }
+}

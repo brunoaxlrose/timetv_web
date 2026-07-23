@@ -12,7 +12,8 @@
         "laminas/laminas-session": "^2.16.0",
         "laminas/laminas-router": "^3.12.0",
         "laminas/laminas-view": "^2.33.0",
-        "laminas/laminas-servicemanager": "^3.22.0"
+        "laminas/laminas-servicemanager": "^3.22.0",
+        "laminas/laminas-inputfilter": "^2.35"
     },
     "autoload": {
         "psr-4": {

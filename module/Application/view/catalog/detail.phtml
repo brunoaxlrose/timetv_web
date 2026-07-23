@@ -5,6 +5,9 @@ $progress = $this->progress;
 $cast = $this->cast;
 $nextUnwatched = $this->nextUnwatched;
 $userId = $this->userId;
+
+$this->partial('catalog/css.phtml', ['page' => 'detail']);
+$this->partial('catalog/js.phtml', ['page' => 'detail']);
 ?>
 
 <!-- Cinematic Background Banner with Blur -->
@@ -32,7 +35,11 @@ $userId = $this->userId;
     <div class="text-center px-4 mt-3">
         <h2 class="fw-extrabold text-white text-3xl mb-1" style="font-weight: 800; font-size: 1.8rem; letter-spacing: -0.5px;"><?= htmlspecialchars($item['title']) ?></h2>
         <div class="small d-flex justify-content-center align-items-center gap-2" style="color: #b0b0cc !important; font-weight: 500;">
-            <span><?= $item['release_year'] ?></span>
+            <?php if ($item['status'] === 'Upcoming' && !empty($item['release_date'])): ?>
+                <span class="text-info fw-bold">Lançamento: <?= date('d/m/Y', strtotime($item['release_date'])) ?></span>
+            <?php else: ?>
+                <span><?= $item['release_year'] ?></span>
+            <?php endif; ?>
             <span>&bull;</span>
             <span><?= $item['type'] === 'movie' ? 'Filme' : 'Terminada' ?></span>
             <span>&bull;</span>
@@ -149,27 +156,6 @@ $userId = $this->userId;
                 <?php endforeach; ?>
             </div>
 
-            <!-- Season Pulse (Graph Placeholder as in Image 1) -->
-            <div class="refract-pulse-card p-3 mb-4">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-white fw-bold small">Pulso da Temporada</span>
-                    <span class="text-muted small">Média <strong class="text-danger">6.3</strong></span>
-                </div>
-                <!-- Mini sparkline styled with SVG -->
-                <div class="py-2" style="height: 60px;">
-                    <svg viewBox="0 0 100 20" class="w-100 h-100" preserveAspectRatio="none">
-                        <path d="M 0 10 Q 15 5, 30 7 T 60 12 T 90 9 T 100 11" fill="none" stroke="#e056fd" stroke-width="1.5"></path>
-                        <circle cx="5" cy="10" r="1.5" fill="#e056fd"></circle>
-                        <circle cx="30" cy="7" r="1.5" fill="#e056fd"></circle>
-                        <circle cx="60" cy="12" r="1.5" fill="#e056fd"></circle>
-                        <circle cx="90" cy="9" r="1.5" fill="#e056fd"></circle>
-                    </svg>
-                </div>
-                <div class="d-flex justify-content-between text-muted" style="font-size: 0.58rem;">
-                    <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
-                </div>
-            </div>
-
             <?php
                 foreach ($seasons as $seasonNum => $seasonEpisodes):
                     $seasonTotal   = count($seasonEpisodes);
@@ -217,19 +203,21 @@ $userId = $this->userId;
                     </div>
 
                     <div id="seasonContent<?= $seasonNum ?>" class="season-accordion-content" <?= $accordionCollapsed ? 'style="display:none;"' : '' ?>>
-                        <?php foreach ($seasonEpisodes as $ep): ?>
-                            <?php 
-                                $isUpcoming = false;
-                                $daysLeft = 0;
-                                if (!empty($ep['air_date'])) {
-                                    $diff = strtotime($ep['air_date']) - strtotime(date('Y-m-d'));
-                                    $daysLeft = ceil($diff / 86400);
-                                    if ($daysLeft > 0) {
-                                        $isUpcoming = true;
-                                    }
+                        <?php 
+                        $epIndex = 0;
+                        foreach ($seasonEpisodes as $ep): 
+                            $epIndex++;
+                            $isUpcoming = false;
+                            $daysLeft = 0;
+                            if (!empty($ep['air_date'])) {
+                                $diff = strtotime($ep['air_date']) - strtotime(date('Y-m-d'));
+                                $daysLeft = ceil($diff / 86400);
+                                if ($daysLeft > 0) {
+                                    $isUpcoming = true;
                                 }
-                            ?>
-                            <div class="detail-episode-row refract-episode-row">
+                            }
+                        ?>
+                            <div class="detail-episode-row refract-episode-row <?= $epIndex > 10 ? 'd-none' : '' ?>">
                                 <div class="detail-episode-body">
                                     <div class="text-white fw-bold" style="font-size: 0.78rem;">
                                         <?= $ep['episode_number'] ?>. <?= htmlspecialchars($ep['title']) ?>
@@ -257,6 +245,12 @@ $userId = $this->userId;
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
+                        
+                        <?php if (count($seasonEpisodes) > 10): ?>
+                            <div class="text-center w-100 mt-3 btn-show-more-eps-container">
+                                <button class="btn btn-sm btn-outline-secondary rounded-pill px-4" onclick="showMoreEpisodes(<?= $seasonNum ?>, this)" style="border-color: rgba(255,255,255,0.15) !important; color: var(--text-gray); font-weight: 600; font-size: 0.75rem; background-color: rgba(255,255,255,0.03);">Ver mais</button>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -267,7 +261,29 @@ $userId = $this->userId;
 
 <!-- Bottom Floating Yellow Action Bar in Refract Purple -->
 <div class="bottom-floating-bar refract-floating-bar-purple">
-    <?php if ($item['track_status']): ?>
+    <?php if ($item['status'] === 'Upcoming'): ?>
+        <?php if ($item['track_status']): ?>
+            <div class="d-flex w-100 gap-2">
+                <button class="btn-floating-action btn-track-toggle refract-action-btn disabled flex-grow-1" disabled style="background-color: #2c2c3e !important; color: #a5a5c0 !important; cursor: not-allowed; opacity: 0.7;">
+                    <i class="bi bi-clock me-1"></i> FILME EM BREVE
+                </button>
+                <button class="btn-floating-action remove btn-track-toggle px-3" 
+                        data-item-id="<?= $item['id_item'] ?>" 
+                        data-action="remove"
+                        style="width: auto; min-width: 100px;">
+                    REMOVER
+                </button>
+            </div>
+        <?php else: ?>
+            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+                    data-item-id="<?= $item['id_item'] ?? '' ?>" 
+                    data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
+                    data-action="add"
+                    data-status="plan_to_watch">
+                <i class="bi bi-plus-circle me-2"></i> QUERO ASSISTIR (EM BREVE)
+            </button>
+        <?php endif; ?>
+    <?php elseif ($item['track_status']): ?>
         <?php 
             $nextEpStr = "SÉRIE";
             if ($item['type'] !== 'movie') {
@@ -276,12 +292,21 @@ $userId = $this->userId;
                 }
             }
         ?>
-        <?php if ($item['type'] === 'movie' && $item['track_status'] === 'completed'): ?>
-            <button class="btn-floating-action remove btn-track-toggle" 
-                    data-item-id="<?= $item['id_item'] ?>" 
-                    data-action="remove">
-                REMOVER FILME
-            </button>
+        <?php if ($item['track_status'] === 'completed'): ?>
+            <div class="d-flex w-100 gap-2">
+                <button class="btn-floating-action btn-track-toggle refract-action-btn rewatch flex-grow-1" 
+                        data-item-id="<?= $item['id_item'] ?>" 
+                        data-action="rewatch"
+                        style="background-color: #2ed573 !important;">
+                    <i class="bi bi-arrow-repeat me-1"></i> REASSISTIR <?= $item['type'] === 'movie' ? 'FILME' : 'SÉRIE' ?>
+                </button>
+                <button class="btn-floating-action remove btn-track-toggle px-3" 
+                        data-item-id="<?= $item['id_item'] ?>" 
+                        data-action="remove"
+                        style="width: auto; min-width: 100px;">
+                    REMOVER
+                </button>
+            </div>
         <?php elseif ($item['type'] === 'movie'): ?>
             <button class="btn-floating-action btn-track-toggle refract-action-btn" 
                     data-item-id="<?= $item['id_item'] ?>" 
@@ -298,13 +323,23 @@ $userId = $this->userId;
             </button>
         <?php endif; ?>
     <?php else: ?>
-        <button class="btn-floating-action btn-track-toggle refract-action-btn" 
-                data-item-id="<?= $item['id_item'] ?? '' ?>" 
-                data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
-                data-action="add">
-            + ADICIONAR <?= $item['type'] === 'movie' ? 'FILME' : 'SÉRIE' ?>
-        </button>
+        <?php if ($item['type'] === 'movie'): ?>
+            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+                    data-item-id="<?= $item['id_item'] ?? '' ?>" 
+                    data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
+                    data-action="add"
+                    data-status="completed">
+                <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
+            </button>
+        <?php else: ?>
+            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+                    data-item-id="<?= $item['id_item'] ?? '' ?>" 
+                    data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
+                    data-action="add"
+                    data-status="watching">
+                + ADICIONAR SÉRIE
+            </button>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 
-<script src="/js/app/catalog/detail.js"></script>

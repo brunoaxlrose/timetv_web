@@ -1,0 +1,63 @@
+<div class="px-4 py-5 d-flex flex-column min-vh-100 justify-content-center position-relative">
+    <div class="text-center mb-5">
+        <!-- TV Time Logo Icon -->
+        <div class="mx-auto mb-3" style="width: 55px; height: 55px; font-size: 24px; display: flex; align-items: center; justify-content: center; background-color: #7c4dff; border-radius: 12px; box-shadow: 0 0 15px rgba(124, 77, 255, 0.4);">
+            <i class="bi bi-play-fill text-white fs-3"></i>
+        </div>
+        <h2 class="fw-bold text-white mb-2">Cadastre-se no <span style="color: #a88beb;">Time View</span></h2>
+        <p class="text-gray small px-3">Acompanhe suas séries, animes e filmes favoritos</p>
+    </div>
+
+    <div id="authAlert" class="alert alert-danger d-none border-0 rounded-3 text-center small" role="alert" style="background-color: #ff3b30; color: white;"></div>
+
+    <form id="authForm" action="/register" method="POST" class="mb-3">
+        <div class="mb-3">
+            <label for="username" class="form-label text-gray small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">Nome de Usuário</label>
+            <div class="input-group">
+                <span class="input-group-text border-0" style="background-color: #1c1c1e !important; color: #a88beb !important;"><i class="bi bi-person"></i></span>
+                <input type="text" class="form-control border-0 text-white" id="username" name="username" required placeholder="ex: bruno123" style="background-color: #1c1c1e !important; font-size: 0.85rem; padding: 12px 10px;">
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="email" class="form-label text-gray small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">E-mail</label>
+            <div class="input-group">
+                <span class="input-group-text border-0" style="background-color: #1c1c1e !important; color: #a88beb !important;"><i class="bi bi-envelope"></i></span>
+                <input type="email" class="form-control border-0 text-white" id="email" name="email" required placeholder="seu@email.com" style="background-color: #1c1c1e !important; font-size: 0.85rem; padding: 12px 10px;">
+            </div>
+        </div>
+        
+        <div class="mb-3">
+            <label for="password" class="form-label text-gray small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">Senha</label>
+            <div class="input-group">
+                <span class="input-group-text border-0" style="background-color: #1c1c1e !important; color: #a88beb !important;"><i class="bi bi-lock"></i></span>
+                <input type="password" class="form-control border-0 text-white" id="password" name="password" required placeholder="Crie uma senha (mín. 6 chars)" style="background-color: #1c1c1e !important; font-size: 0.85rem; padding: 12px 10px;">
+            </div>
+            <!-- Password Strength Progress Bar -->
+            <div class="progress mt-2" style="height: 6px; background-color: #2c2c3e; border-radius: 3px;">
+                <div id="passwordStrengthBar" class="progress-bar" role="progressbar" style="width: 0%; transition: width 0.3s, background-color 0.3s;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div id="passwordStrengthText" class="text-gray small mt-1" style="font-size: 0.68rem; font-weight: 500; color: #a5a5c0 !important;">Mínimo de 6 caracteres</div>
+        </div>
+
+        <div class="mb-4">
+            <label for="password_confirm" class="form-label text-gray small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">Confirmar Senha</label>
+            <div class="input-group">
+                <span class="input-group-text border-0" style="background-color: #1c1c1e !important; color: #a88beb !important;"><i class="bi bi-lock-fill"></i></span>
+                <input type="password" class="form-control border-0 text-white" id="password_confirm" name="password_confirm" required placeholder="Repita a senha" style="background-color: #1c1c1e !important; font-size: 0.85rem; padding: 12px 10px;">
+            </div>
+            <div id="passwordMatchText" class="small mt-1 d-none" style="font-size: 0.68rem; font-weight: 500; color: #a5a5c0 !important;"></div>
+        </div>
+
+        <button type="submit" class="btn w-100 py-3 rounded-pill fw-bold text-white d-flex align-items-center justify-content-center gap-2" style="background-color: #7c4dff; font-size: 0.85rem;">
+            <span id="btnSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+            <span>Criar Conta</span>
+        </button>
+    </form>
+
+    <div class="text-center mt-3">
+        <p class="mb-0 text-gray small">Já tem uma conta? <a href="/login" class="text-decoration-none fw-bold" style="color: #a88beb;">Entrar</a></p>
+    </div>
+</div>
+
+<script src="/js/app/auth/register.js"></script>

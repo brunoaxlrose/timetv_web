@@ -14,12 +14,87 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <!-- TV Time Mobile Layout Style -->
     <link rel="stylesheet" href="/css/style.css">
+    <?= $this->headLink() ?>
 </head>
 <body>
 
     <!-- Center Phone Screen Wrapper -->
     <div class="app-container">
         
+        <!-- ====== GLOBAL TOP BAR (logged-in only) ====== -->
+        <?php if (isset($_SESSION['user_id'])): ?>
+        <header class="app-top-bar" id="appTopBar">
+            <!-- Logo -->
+            <a href="/dashboard" class="app-top-bar__logo">
+                <svg viewBox="0 0 100 100" style="width:24px;height:24px;flex-shrink:0;" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="50,12 92,88 8,88" fill="url(#tbPrism)"/>
+                    <defs>
+                        <linearGradient id="tbPrism" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#a88beb"/>
+                            <stop offset="50%" stop-color="#f8a5c2"/>
+                            <stop offset="100%" stop-color="#f7d794"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <span class="app-top-bar__logo-text">Time View</span>
+            </a>
+
+            <!-- Right controls -->
+            <div class="app-top-bar__controls">
+
+                <!-- 🔔 Notification Bell -->
+                <button class="app-top-bar__icon-btn" id="notifBellBtn" title="Notificações" aria-label="Notificações">
+                    <i class="bi bi-bell-fill"></i>
+                    <span class="app-top-bar__badge d-none" id="notifBadge">0</span>
+                </button>
+
+                <!-- 👤 User Menu -->
+                <div class="app-top-bar__user-wrap" id="userMenuWrap">
+                    <button class="app-top-bar__icon-btn app-top-bar__user-btn" id="userMenuBtn" title="Minha conta" aria-label="Minha conta">
+                        <?php if (!empty($_SESSION['avatar_url'])): ?>
+                            <img src="<?= htmlspecialchars($_SESSION['avatar_url']) ?>" alt="Avatar" class="app-top-bar__avatar-img">
+                        <?php else: ?>
+                            <i class="bi bi-person-circle"></i>
+                        <?php endif; ?>
+                    </button>
+                    <!-- Dropdown -->
+                    <div class="app-top-bar__user-dropdown" id="userDropdown">
+                        <div class="app-top-bar__user-info">
+                            <span class="app-top-bar__user-name"><?= htmlspecialchars($_SESSION['username'] ?? '') ?></span>
+                            <span class="app-top-bar__user-handle">@<?= strtolower(str_replace(' ', '', htmlspecialchars($_SESSION['username'] ?? ''))) ?></span>
+                        </div>
+                        <div class="app-top-bar__dropdown-divider"></div>
+                        <!-- <a href="/stats" class="app-top-bar__dropdown-item">
+                            <i class="bi bi-person-fill"></i> Perfil &amp; Estatísticas
+                        </a> -->
+                        <a href="#" class="app-top-bar__dropdown-item" data-bs-toggle="modal" data-bs-target="#editProfileModal">
+                            <i class="bi bi-gear-fill"></i> Configurações
+                        </a>
+                        <div class="app-top-bar__dropdown-divider"></div>
+                        <a href="/logout" class="app-top-bar__dropdown-item app-top-bar__dropdown-item--danger" onclick="confirmLogout(event)">
+                            <i class="bi bi-box-arrow-right"></i> Sair
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 🔔 Notification Panel (slide-in) -->
+        <div class="notif-panel" id="notifPanel">
+            <div class="notif-panel__header">
+                <span class="notif-panel__title"><i class="bi bi-bell-fill me-2"></i>Notificações</span>
+                <button class="notif-panel__mark-read" id="markAllReadBtn">Marcar todas como lidas</button>
+            </div>
+            <div class="notif-panel__list" id="notifList">
+                <div class="notif-panel__empty" id="notifEmpty">
+                    <i class="bi bi-bell-slash"></i>
+                    <span>Nenhuma notificação nova</span>
+                </div>
+            </div>
+        </div>
+        <div class="notif-panel__overlay d-none" id="notifOverlay"></div>
+        <?php endif; ?>
+
         <!-- Main Content Area -->
         <div class="flex-grow-1">
             <!-- Toast notification container for AJAX responses -->
@@ -39,6 +114,7 @@
             <?= $this->content ?>
         </div>
 
+
         <?php if (isset($_SESSION['user_id'])): ?>
         <!-- Mobile Bottom Tab Bar (Refract Style Floating Glass Bar) -->
         <?php $requestUri = $_SERVER['REQUEST_URI'] ?? ''; ?>
@@ -46,8 +122,8 @@
             <a href="/dashboard" class="nav-item <?= (strpos($requestUri, '/dashboard') !== false || $requestUri === '/' || $requestUri === '') ? 'active' : '' ?>" title="Início">
                 <i class="bi bi-house-fill"></i>
             </a>
-            <a href="/catalog" class="nav-item <?= (strpos($requestUri, '/catalog') !== false || strpos($requestUri, '/detail') !== false) ? 'active' : '' ?>" title="Coleção">
-                <i class="bi bi-grid-fill"></i>
+            <a href="/catalog" class="nav-item <?= (strpos($requestUri, '/catalog') !== false || strpos($requestUri, '/detail') !== false) ? 'active' : '' ?>" title="Pesquisar">
+                <i class="bi bi-search"></i>
             </a>
             <a href="/stats" class="nav-item <?= (strpos($requestUri, '/stats') !== false) ? 'active' : '' ?>" title="Perfil">
                 <i class="bi bi-person-fill"></i>
@@ -59,6 +135,25 @@
         <div id="globalLoader" class="position-fixed top-0 start-50 translate-middle-x w-100 h-100 d-none d-flex align-items-center justify-content-center" style="max-width: 480px; background-color: rgba(0,0,0,0.65); z-index: 9999;">
             <div class="spinner-border" role="status" style="width: 3rem; height: 3rem; color: var(--accent-yellow) !important;">
                 <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+
+        <!-- 🟣 FLOATING BACKGROUND IMPORT WIDGET -->
+        <div class="import-widget d-none" id="importWidget">
+            <div class="import-widget__circle" id="importWidgetCircle" onclick="toggleImportWidget(true)">
+                <div class="spinner-border spinner-border-sm text-white" role="status"></div>
+                <i class="bi bi-cloud-arrow-down-fill"></i>
+            </div>
+            <div class="import-widget__panel d-none" id="importWidgetPanel">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="fw-bold text-white small"><i class="bi bi-clock-history me-1"></i> Importação Ativa</span>
+                    <button class="btn btn-sm btn-link text-muted p-0" onclick="toggleImportWidget(false)"><i class="bi bi-dash-lg"></i></button>
+                </div>
+                <div class="small text-gray mb-1" id="widgetFileName" style="font-size: 0.72rem; word-break: break-all;">arquivo.csv</div>
+                <div class="progress" style="height: 6px; background-color: #2c2c3e; border-radius: 3px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-purple" role="progressbar" style="width: 100%; background-color: #a88beb !important;"></div>
+                </div>
+                <div class="small text-muted mt-1" style="font-size: 0.68rem;">Processando em segundo plano...</div>
             </div>
         </div>
     </div>
@@ -77,11 +172,222 @@
         </div>
     </div>
 
+    <?php if (isset($_SESSION['user_id'])): ?>
+
+    <!-- ======== GLOBAL SETTINGS MODAL ======== -->
+    <div class="modal fade" id="editProfileModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 420px;">
+            <div class="modal-content text-white" style="border-radius: 20px; background-color: #1a1a24 !important; border: 1px solid #2b2b3c !important; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="settingsModalLabel">⚙️ Configurações</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <!-- Settings Tabs -->
+                <div class="d-flex gap-1 px-4 pt-3 pb-0">
+                    <button class="settings-tab active" id="settingsTabPerfil" onclick="switchSettingsTab('perfil')">
+                        <i class="bi bi-person-fill me-1"></i>Perfil
+                    </button>
+                    <button class="settings-tab" id="settingsTabDados" onclick="switchSettingsTab('dados')">
+                        <i class="bi bi-database-fill me-1"></i>Dados
+                    </button>
+                </div>
+
+                <!-- TAB: Perfil -->
+                <div id="settingsPanelPerfil">
+                    <form id="editProfileForm" action="/api/update-profile">
+                        <div class="modal-body pt-3">
+                            <div id="profileAlert" class="alert alert-danger d-none small text-white bg-danger border-0"></div>
+                            <div class="mb-4">
+                                <label for="profileUsername" class="form-label text-gray small" style="color: #a5a5c0 !important;">Nome de Usuário</label>
+                                <input type="text" class="form-control text-white rounded-pill px-3" id="profileUsername" name="username" value="<?= htmlspecialchars($_SESSION['username'] ?? '') ?>" style="background-color: #0c0c12 !important; border: 1px solid #2d2d3e !important;" required>
+                            </div>
+                            <div class="mb-3 text-start">
+                                <button type="button" class="btn btn-sm rounded-pill px-3" id="btnTogglePasswordChange" onclick="togglePasswordChangeFields()" style="border: 1px solid #7c4dff; color: #a88beb; font-size: 0.75rem; font-weight: 600; background: transparent;">
+                                    <i class="bi bi-key me-1"></i> Trocar Senha
+                                </button>
+                            </div>
+                            <div id="passwordChangeFields" class="d-none mt-3 pt-3" style="border-top: 1px solid #2d2d3e;">
+                                <h6 class="small fw-bold text-uppercase mb-3" style="color: #a5a5c0; font-size: 0.72rem;">Alterar Senha</h6>
+                                <div class="mb-3">
+                                    <label class="form-label small" style="color: #a5a5c0;">Senha Atual</label>
+                                    <input type="password" class="form-control text-white rounded-pill px-3" id="profileCurrentPassword" name="current_password" placeholder="Senha atual" style="background-color: #0c0c12 !important; border: 1px solid #2d2d3e !important;">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small" style="color: #a5a5c0;">Nova Senha</label>
+                                    <input type="password" class="form-control text-white rounded-pill px-3" id="profileNewPassword" name="new_password" placeholder="Mínimo 6 caracteres" style="background-color: #0c0c12 !important; border: 1px solid #2d2d3e !important;">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small" style="color: #a5a5c0;">Confirmar Nova Senha</label>
+                                    <input type="password" class="form-control text-white rounded-pill px-3" id="profileConfirmNewPassword" name="confirm_new_password" placeholder="Repita a nova senha" style="background-color: #0c0c12 !important; border: 1px solid #2d2d3e !important;">
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3" style="border-top: 1px solid #2d2d3e;">
+                                <h6 class="text-danger small fw-bold text-uppercase mb-3" style="letter-spacing: 0.5px;">Zona Perigosa</h6>
+                                <div class="d-flex flex-column gap-2">
+                                    <button type="button" class="btn btn-outline-danger btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between" onclick="confirmClearLibrary()">
+                                        <span><i class="bi bi-trash3 me-2"></i>Limpar biblioteca</span>
+                                        <i class="bi bi-chevron-right small"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between" onclick="confirmDeleteAccount()">
+                                        <span><i class="bi bi-person-x me-2"></i>Eliminar conta</span>
+                                        <i class="bi bi-chevron-right small"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer border-0 pt-0">
+                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Fechar</button>
+                            <button type="submit" class="btn rounded-pill px-4 text-white fw-bold" style="background-color: #7c4dff !important; border: none;">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- TAB: Dados (Import / Export) -->
+                <div id="settingsPanelDados" class="d-none">
+                    <div class="modal-body pt-3 pb-4">
+
+                        <!-- Import Section -->
+                        <div class="settings-data-section mb-4">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <i class="bi bi-upload text-accent" style="color: #a88beb;"></i>
+                                <h6 class="text-white mb-0 fw-bold">Importar do TV Time</h6>
+                            </div>
+                            <p class="small mb-3" style="color: #a5a5c0; font-size: 0.78rem; line-height: 1.5;">
+                                Importe seus dados de acompanhamento do TV Time. Faça o download do seu arquivo GDPR em <strong>tvtime.com/settings</strong> e selecione um dos CSVs abaixo.
+                            </p>
+
+                            <!-- File type guide -->
+                            <div class="settings-import-guide mb-3">
+                                <div class="settings-import-guide-item">
+                                    <i class="bi bi-camera-video-fill" style="color: #a88beb;"></i>
+                                    <div>
+                                        <div class="fw-bold" style="font-size: 0.8rem;">tracking-prod-records-v2.csv</div>
+                                        <div style="font-size: 0.72rem; color: #a5a5c0;">Episódios assistidos de séries</div>
+                                    </div>
+                                </div>
+                                <div class="settings-import-guide-item">
+                                    <i class="bi bi-film" style="color: #ffd200;"></i>
+                                    <div>
+                                        <div class="fw-bold" style="font-size: 0.8rem;">tracking-prod-records.csv</div>
+                                        <div style="font-size: 0.72rem; color: #a5a5c0;">Filmes assistidos/salvos</div>
+                                    </div>
+                                </div>
+                                <div class="settings-import-guide-item">
+                                    <i class="bi bi-tv-fill" style="color: #38ef7d;"></i>
+                                    <div>
+                                        <div class="fw-bold" style="font-size: 0.8rem;">user_tv_show_data.csv</div>
+                                        <div style="font-size: 0.72rem; color: #a5a5c0;">Lista de séries seguidas</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- File upload -->
+                            <label for="importCsvFile" class="settings-upload-label w-100" id="importUploadLabel">
+                                <i class="bi bi-cloud-upload-fill fs-4 mb-1" style="color: #a88beb;"></i>
+                                <span id="importFileName">Clique para selecionar o CSV</span>
+                                <input type="file" id="importCsvFile" accept=".csv" class="d-none">
+                            </label>
+
+                            <!-- Progress / Result -->
+                            <div id="importProgress" class="d-none mt-3 p-3 rounded-3 text-center" style="background: rgba(168,139,235,0.07); border: 1px solid rgba(168,139,235,0.15);">
+                                <div id="importSpinner" class="spinner-border spinner-border-sm me-2" style="color: #a88beb;" role="status"></div>
+                                <span id="importStatusText" style="font-size: 0.82rem; color: #a5a5c0;">Importando dados, aguarde...</span>
+                            </div>
+                            <div id="importResult" class="d-none mt-3"></div>
+
+                            <button type="button" id="btnStartImport" class="btn w-100 mt-3 py-2 rounded-pill fw-bold text-white d-none" style="background: linear-gradient(135deg, #a88beb, #7c4dff); border: none; font-size: 0.85rem;">
+                                <i class="bi bi-cloud-upload me-1"></i> Importar Arquivo
+                            </button>
+                        </div>
+
+                        <div class="settings-data-divider"></div>
+
+                        <!-- Export Section -->
+                        <div class="settings-data-section mt-4">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <i class="bi bi-download" style="color: #38ef7d;"></i>
+                                <h6 class="text-white mb-0 fw-bold">Exportar Meus Dados</h6>
+                            </div>
+                            <p class="small mb-3" style="color: #a5a5c0; font-size: 0.78rem; line-height: 1.5;">
+                                Baixe um CSV com toda a sua coleção: títulos, status, notas e episódios assistidos.
+                            </p>
+                            <a href="/api/export" id="btnExport" class="btn w-100 py-2 rounded-pill fw-bold text-white" style="background: linear-gradient(135deg, #38ef7d, #11998e); border: none; font-size: 0.85rem; text-decoration: none;">
+                                <i class="bi bi-download me-1"></i> Baixar CSV
+                            </a>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ======== FEEDBACK MODAL ======== -->
+    <div id="feedbackModal" class="tvtime-modal-overlay">
+        <div class="tvtime-modal-sheet text-start" style="border-radius: 20px 20px 0 0; background-color: #1e1e2d; border-top: 1px solid #2d2d3e; max-width: 440px;">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-chat-left-dots-fill text-warning fs-5"></i>
+                <span class="text-white fw-bold" style="font-size: 1.1rem;">Enviar feedback</span>
+            </div>
+            <div class="text-muted small mb-4" style="font-size: 0.8rem;">O que se passa pela tua cabeça?</div>
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn refract-feedback-tab active w-50 d-flex align-items-center justify-content-center gap-2 small fw-bold py-2" id="feedbackTabBug" onclick="switchFeedbackTab('bug')"><i class="bi bi-bug"></i> Bug</button>
+                <button class="btn refract-feedback-tab w-50 d-flex align-items-center justify-content-center gap-2 small fw-bold py-2" id="feedbackTabSuggest" onclick="switchFeedbackTab('suggest')"><i class="bi bi-lightbulb"></i> Sugestão</button>
+            </div>
+            <form id="feedbackForm">
+                <input type="hidden" name="feedback_type" id="feedbackType" value="bug">
+                <input type="hidden" name="screenshot_base64" id="feedbackScreenshotBase64" value="">
+                <input type="file" id="feedbackScreenshotInput" accept="image/*" class="d-none" onchange="handleScreenshotUpload(this)">
+                <div class="mb-3">
+                    <textarea class="form-control text-white border-0 p-3" id="feedbackContent" name="content" rows="4" style="background-color: #12121a; border-radius: 12px; font-size: 0.82rem; color: #e2e2e9 !important;" placeholder="Descreve o bug ou sugestão..." required></textarea>
+                </div>
+                <div id="screenshotPreviewContainer" class="d-none mb-3 text-center position-relative p-2" style="background-color: #12121a; border-radius: 10px; border: 1px solid #2d2d3e;">
+                    <img id="screenshotPreviewImg" src="" style="max-height: 120px; max-width: 100%; border-radius: 6px;" alt="Preview">
+                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2 rounded-circle" style="width: 24px; height: 24px; font-size: 0.75rem;" onclick="removeScreenshotPreview()">&times;</button>
+                </div>
+                <button type="button" id="btnAttachScreenshot" onclick="triggerScreenshotUpload()" class="btn w-100 mb-4 d-flex align-items-center justify-content-center gap-2 text-white small" style="background-color: #12121a; border: 1px dashed #7c4dff; border-radius: 10px; font-size: 0.78rem; padding: 10px;">
+                    <span id="screenshotSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    <i id="screenshotIcon" class="bi bi-image" style="color: #a88beb;"></i>
+                    <span id="screenshotBtnText">Anexar screenshot</span>
+                </button>
+                <div class="d-flex align-items-center justify-content-end gap-2">
+                    <button type="button" class="btn text-muted small fw-bold px-3" onclick="closeFeedbackModal()">Cancelar</button>
+                    <button type="submit" class="btn py-2 px-4 text-white small fw-bold d-flex align-items-center gap-2" style="background-color: #7c4dff; border-radius: 10px; border: none; font-size: 0.78rem;"><i class="bi bi-send-fill"></i> Enviar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ======== CUSTOM CONFIRM MODAL ======== -->
+    <div class="modal fade" id="customConfirmModal" tabindex="-1" aria-hidden="true" style="z-index: 4000;">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 360px;">
+            <div class="modal-content text-white text-center p-4" style="border-radius: 20px; background-color: #1a1a24; border: 1px solid #2d2d3e;">
+                <div class="mb-3">
+                    <div class="mx-auto d-flex align-items-center justify-content-center rounded-circle" id="confirmModalIconBg" style="width: 56px; height: 56px; background-color: rgba(255,59,48,0.1);">
+                        <i class="bi bi-exclamation-triangle-fill fs-4 text-danger" id="confirmModalIcon"></i>
+                    </div>
+                </div>
+                <h5 class="fw-bold mb-2 text-white" id="confirmModalTitle">Confirmação</h5>
+                <p class="small px-2 mb-4" id="confirmModalMessage" style="color: #a5a5c0; font-size: 0.8rem; line-height: 1.5;"></p>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-secondary rounded-pill w-50 small fw-bold py-2" data-bs-dismiss="modal" style="background-color: #2c2c3e; border: none; font-size: 0.78rem;">Cancelar</button>
+                    <button type="button" class="btn btn-danger rounded-pill w-50 small fw-bold py-2" id="btnConfirmAction" style="font-size: 0.78rem;">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?php endif; ?>
+
+
     <!-- jQuery 3.7.1 CDN -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Custom JavaScript App -->
     <script src="/js/app.js"></script>
+    <?= $this->inlineScript() ?>
 </body>
 </html>

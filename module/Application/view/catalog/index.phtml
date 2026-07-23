@@ -9,6 +9,9 @@ if ($this->search) {
         $totalCount = count($this->items);
     }
 }
+
+$this->partial('catalog/css.phtml', ['page' => 'catalog']);
+$this->partial('catalog/js.phtml', ['page' => 'catalog']);
 ?>
 
 <!-- Discover Search Bar -->
@@ -73,9 +76,9 @@ if ($this->search) {
                         <p class="text-gray small px-3">Tente pesquisar por outros termos na caixa de busca global acima.</p>
                     </div>
                 <?php else: ?>
-                    <div class="row row-cols-3 g-2">
-                    <?php foreach ($this->items as $item): ?>
-                        <div class="col mb-3">
+                    <div class="row row-cols-3 g-2" id="searchResultGrid">
+                    <?php $itemIndex = 0; foreach ($this->items as $item): $itemIndex++; ?>
+                        <div class="col mb-3 refract-search-row <?= $itemIndex > 20 ? 'd-none' : '' ?>">
                             <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
                                 <?php
                                     if ($item['id_item']) $detailLink = '/detail?id=' . $item['id_item'];
@@ -100,141 +103,93 @@ if ($this->search) {
                                 <a href="<?= $detailLink ?>" class="text-decoration-none">
                                     <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
                                 </a>
-                                <div class="text-muted" style="font-size: 0.62rem; margin-top: 1px;"><?= $item['release_year'] ?></div>
+                                <div style="font-size: 0.62rem; margin-top: 1px; color: #a5a5c0;"><?= $item['release_year'] ?></div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    </div>
+                    <?php if (count($this->items) > 20): ?>
+                        <div class="text-center w-100 mt-4 py-3 btn-show-more-search-container">
+                            <button class="btn btn-outline-secondary rounded-pill px-4 btn-show-more-search" onclick="showMoreSearchResults(this)" style="border-color: rgba(255,255,255,0.15) !important; color: var(--text-gray); font-weight: 600; font-size: 0.75rem; background-color: rgba(255,255,255,0.03);">Ver mais resultados</button>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+
+        <?php else: ?>
+            <!-- Popular and Upcoming Shows -->
+            <div class="mb-5 mt-2">
+                <h5 class="refract-section-title d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-fire text-danger animate-pulse"></i> Mais Populares
+                </h5>
+                <div class="row row-cols-3 row-cols-md-4 row-cols-lg-6 g-3">
+                    <?php foreach ($this->popularItems as $item): ?>
+                        <?php
+                            $detailLink = '#';
+                            if (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
+                            elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'];
+                            elseif (!empty($item['mal_id'])) $detailLink = '/detail?mal_id=' . $item['mal_id'];
+                        ?>
+                        <div class="col mb-3">
+                            <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
+                                <a href="<?= $detailLink ?>">
+                                    <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
+                                </a>
+                                <div class="position-absolute top-0 start-0 w-100 d-flex justify-content-between p-2" style="background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);">
+                                    <span class="badge bg-black bg-opacity-70 p-1 d-flex align-items-center justify-content-center" style="width: 18px; height: 18px; border-radius: 4px;">
+                                        <i class="bi <?= $item['type'] === 'movie' ? 'bi-film' : 'bi-tv' ?>" style="font-size: 0.6rem;"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="px-1 text-start mt-1">
+                                <a href="<?= $detailLink ?>" class="text-decoration-none">
+                                    <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
+                                </a>
+                                <div style="font-size: 0.62rem; margin-top: 1px; color: #a5a5c0;"><?= $item['release_year'] ?></div>
                             </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
-            <?php endif; ?>
+            </div>
 
-        <?php else: ?>
-            <!-- Collection Mode -->
-            <?php if ($this->grouped): ?>
-                <!-- Grouped by status (A ver, Em dia, Visto) -->
-                <?php 
-                    $hasItems = !empty($this->items['watching']) || !empty($this->items['up_to_date']) || !empty($this->items['completed']);
-                ?>
-                
-                <?php if (!$hasItems): ?>
-                    <div class="text-center py-5">
-                        <div class="mb-3 text-muted" style="font-size: 3rem;">
-                            <i class="bi bi-folder-plus"></i>
-                        </div>
-                        <h6 class="text-white fw-bold">Sua coleção está vazia</h6>
-                        <p class="text-gray small px-4 mb-3">Pesquise suas séries e filmes preferidos acima para adicioná-los aqui.</p>
-                    </div>
-                <?php else: ?>
-                    <!-- 1. A ver (Watching) -->
-                    <?php if (!empty($this->items['watching'])): ?>
-                        <div class="d-flex justify-content-between align-items-center mb-3 mt-2 px-1">
-                            <h6 class="text-warning small fw-bold text-uppercase m-0 d-flex align-items-center gap-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                                <span class="refract-dot orange"></span> A ver
-                            </h6>
-                            <span class="text-muted small" style="font-size: 0.65rem;"><?= count($this->items['watching']) ?></span>
-                        </div>
-                        <div class="row row-cols-3 g-2 mb-4">
-                            <?php foreach ($this->items['watching'] as $item): ?>
-                                <div class="col mb-3">
-                                    <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
-                                        <a href="/detail?id=<?= $item['id_item'] ?>">
-                                            <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
-                                        </a>
-                                    </div>
-                                    <div class="px-1 text-start mt-1">
-                                        <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                            <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
-                                        </a>
-                                        <div class="text-muted" style="font-size: 0.62rem; margin-top: 1px;"><?= $item['release_year'] ?></div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <!-- 2. Em dia (Up to date) -->
-                    <?php if (!empty($this->items['up_to_date'])): ?>
-                        <div class="d-flex justify-content-between align-items-center mb-3 mt-2 px-1">
-                            <h6 class="text-success small fw-bold text-uppercase m-0 d-flex align-items-center gap-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                                <span class="refract-dot green"></span> Em dia
-                            </h6>
-                            <span class="text-muted small" style="font-size: 0.65rem;"><?= count($this->items['up_to_date']) ?></span>
-                        </div>
-                        <div class="row row-cols-3 g-2 mb-4">
-                            <?php foreach ($this->items['up_to_date'] as $item): ?>
-                                <div class="col mb-3">
-                                    <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
-                                        <a href="/detail?id=<?= $item['id_item'] ?>">
-                                            <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
-                                        </a>
-                                    </div>
-                                    <div class="px-1 text-start mt-1">
-                                        <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                            <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
-                                        </a>
-                                        <div class="text-muted" style="font-size: 0.62rem; margin-top: 1px;"><?= $item['release_year'] ?></div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <!-- 3. Visto (Completed) -->
-                    <?php if (!empty($this->items['completed'])): ?>
-                        <div class="d-flex justify-content-between align-items-center mb-3 mt-2 px-1">
-                            <h6 class="text-accent small fw-bold text-uppercase mb-3 mt-2 d-flex align-items-center gap-2" style="color: #a88beb !important; font-size: 0.7rem; letter-spacing: 0.5px;">
-                                <span class="refract-dot purple"></span> Visto
-                            </h6>
-                            <span class="text-muted small" style="font-size: 0.65rem;"><?= count($this->items['completed']) ?></span>
-                        </div>
-                        <div class="row row-cols-3 g-2 mb-4">
-                            <?php foreach ($this->items['completed'] as $item): ?>
-                                <div class="col mb-3">
-                                    <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
-                                        <a href="/detail?id=<?= $item['id_item'] ?>">
-                                            <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
-                                        </a>
-                                    </div>
-                                    <div class="px-1 text-start mt-1">
-                                        <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                            <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
-                                        </a>
-                                        <div class="text-muted" style="font-size: 0.62rem; margin-top: 1px;"><?= $item['release_year'] ?></div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                <?php endif; ?>
-            <?php else: ?>
-                <!-- Flat view -->
-                <?php if (empty($this->items)): ?>
-                    <div class="text-center py-5">
-                        <div class="mb-3 text-muted" style="font-size: 3rem;">
-                            <i class="bi bi-folder-plus"></i>
-                        </div>
-                        <h6 class="text-white fw-bold">Sua coleção está vazia</h6>
-                        <p class="text-gray small px-4 mb-3">Pesquise suas séries e filmes preferidos acima para adicioná-los aqui.</p>
-                    </div>
-                <?php else: ?>
-                    <div class="row row-cols-3 g-2">
-                        <?php foreach ($this->items as $item): ?>
-                            <div class="col mb-3">
-                                <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
-                                    <a href="/detail?id=<?= $item['id_item'] ?>">
-                                        <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
-                                    </a>
-                                </div>
-                                <div class="px-1 text-start mt-1">
-                                    <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                        <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
-                                    </a>
-                                    <div class="text-muted" style="font-size: 0.62rem; margin-top: 1px;"><?= $item['release_year'] ?></div>
+            <div class="mb-5">
+                <h5 class="refract-section-title d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-calendar-event text-info"></i> Em Breve
+                </h5>
+                <div class="row row-cols-3 row-cols-md-4 row-cols-lg-6 g-3">
+                    <?php foreach ($this->upcomingItems as $item): ?>
+                        <?php
+                            $detailLink = '#';
+                            if (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
+                            elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'];
+                            elseif (!empty($item['mal_id'])) $detailLink = '/detail?mal_id=' . $item['mal_id'];
+                        ?>
+                        <div class="col mb-3">
+                            <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
+                                <a href="<?= $detailLink ?>">
+                                    <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
+                                </a>
+                                <div class="position-absolute top-0 start-0 w-100 d-flex justify-content-between p-2" style="background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);">
+                                    <span class="badge bg-black bg-opacity-70 p-1 d-flex align-items-center justify-content-center" style="width: 18px; height: 18px; border-radius: 4px;">
+                                        <i class="bi <?= $item['type'] === 'movie' ? 'bi-film' : 'bi-tv' ?>" style="font-size: 0.6rem;"></i>
+                                    </span>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            <?php endif; ?>
+                            <div class="px-1 text-start mt-1">
+                                <a href="<?= $detailLink ?>" class="text-decoration-none">
+                                    <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
+                                </a>
+                                <div style="font-size: 0.62rem; margin-top: 1px; color: #a5a5c0;">
+                                    <?php if (!empty($item['release_date'])): ?>
+                                        Estreia: <?= date('d/m/Y', strtotime($item['release_date'])) ?>
+                                    <?php else: ?>
+                                        <?= $item['release_year'] ?>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         <?php endif; ?>
         </div> <!-- end of resultsGrid -->
     </div>
@@ -376,4 +331,3 @@ if ($this->search) {
     </div>
 </div>
 
-<script src="/js/app/catalog/catalog.js"></script>

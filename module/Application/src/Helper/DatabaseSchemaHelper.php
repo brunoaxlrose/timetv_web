@@ -36,6 +36,7 @@ class DatabaseSchemaHelper {
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS mal_id INT UNIQUE NULL;",
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS total_episodes INT DEFAULT 0;",
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS runtime_minutes INT DEFAULT 45;",
+            "ALTER TABLE item ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Running';",
 
             // 3. Episodio
             "CREATE TABLE IF NOT EXISTS episodio (
@@ -81,7 +82,25 @@ class DatabaseSchemaHelper {
                 ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );",
             "ALTER TABLE feedback ADD COLUMN IF NOT EXISTS screenshot TEXT NULL;",
-            "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;"
+            "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+            "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS rewatch_count INT DEFAULT 0;",
+            "ALTER TABLE usuario_item DROP CONSTRAINT IF EXISTS usuario_item_status_check;",
+            "ALTER TABLE usuario_item ADD CONSTRAINT usuario_item_status_check CHECK (status IN ('watching', 'completed', 'dropped', 'plan_to_watch', 'rewatching'));",
+            "ALTER TABLE item ADD COLUMN IF NOT EXISTS release_date DATE;",
+            "ALTER TABLE episodio ADD COLUMN IF NOT EXISTS image_url TEXT;",
+            "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS avatar_url TEXT;",
+
+            // 7. Notificacao
+            "CREATE TABLE IF NOT EXISTS notificacao (
+                id_notificacao SERIAL PRIMARY KEY,
+                id_usuario INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+                tipo VARCHAR(30) NOT NULL DEFAULT 'info',
+                id_item INT NULL REFERENCES item(id_item) ON DELETE CASCADE,
+                titulo VARCHAR(255) NOT NULL,
+                mensagem TEXT NOT NULL,
+                lida BOOLEAN NOT NULL DEFAULT FALSE,
+                ts_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );"
         ];
 
         foreach ($queries as $sql) {

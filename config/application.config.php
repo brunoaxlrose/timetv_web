@@ -2,6 +2,8 @@
 
 return [
     'modules' => [
+        'Laminas\InputFilter',
+        'Laminas\Filter',
         'Laminas\Router',
         'Laminas\Session',
         'Laminas\Db',

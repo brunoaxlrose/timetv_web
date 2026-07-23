@@ -1,0 +1,112 @@
+/* Stats/Profile Page specific styles */
+
+.refract-profile-avatar-wrapper {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #1b1b26;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid rgba(255,255,255,0.1);
+}
+.refract-profile-icons i {
+    color: var(--text-gray);
+    font-size: 1.25rem;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: color 0.2s;
+}
+.refract-profile-icons i:hover {
+    color: white;
+}
+.refract-profile-tabs {
+    border-bottom: 1px solid #161622;
+}
+.refract-profile-tab {
+    padding: 8px 16px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.refract-profile-tab.active {
+    color: #7c4dff;
+    border-bottom: 2px solid #7c4dff;
+}
+.refract-time-panel {
+    background: linear-gradient(135deg, rgba(124, 77, 255, 0.15) 0%, rgba(56, 239, 125, 0.03) 100%);
+    border: 1px solid rgba(124, 77, 255, 0.2);
+    border-radius: 16px;
+}
+.refract-stat-box {
+    background-color: #151522;
+    border: 1px solid #232336;
+    border-radius: 14px;
+    height: 100%;
+}
+.refract-stat-box.disabled {
+    opacity: 0.4;
+}
+.refract-upcoming-badge {
+    font-size: 0.5rem;
+    font-weight: 900;
+    color: var(--text-muted);
+    background-color: #232336;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+.refract-pink-text {
+    color: #ff758f;
+}
+.refract-status-grid {
+    background-color: #12121c;
+    border: 1px solid #1f1f2e;
+}
+.refract-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.refract-dot.orange { background-color: #f0932b; }
+.refract-dot.purple { background-color: #a55eea; }
+.refract-dot.green { background-color: #2ed573; }
+.refract-dot.red { background-color: #ff4757; }
+.refract-dot.blue { background-color: #1e90ff; }
+.refract-dot.dark-red { background-color: #b33939; }
+.refract-dot.cyan { background-color: #1dd1a1; }
+
+.refract-year-badge {
+    background-color: rgba(124,77,255,0.15) !important;
+    color: #a88beb !important;
+    border: 1px solid rgba(124,77,255,0.3);
+}
+.refract-activity-block {
+    flex: 1;
+    height: 16px;
+    background-color: #171724;
+    border-radius: 3px;
+}
+.refract-activity-block.active {
+    background-color: #7c4dff;
+    box-shadow: 0 0 8px rgba(124,77,255,0.6);
+}
+
+.refract-card-dark {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-dark);
+}
+
+@media (min-width: 992px) {
+    #profileTabOverview {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 25px;
+        align-items: start;
+    }
+    .refract-time-panel {
+        grid-column: 1 / -1;
+    }
+}

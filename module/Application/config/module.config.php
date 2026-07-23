@@ -5,6 +5,8 @@ namespace Application;
 use Application\Controller\AuthController;
 use Application\Controller\CatalogController;
 use Application\Controller\TrackingController;
+use Application\Controller\NotificationController;
+use Application\Controller\ImportExportController;
 use Laminas\Router\Http\Literal;
 
 return [
@@ -170,13 +172,60 @@ return [
                     ],
                 ],
             ],
+            'api-notifications' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/notifications',
+                    'defaults' => [
+                        'controller' => NotificationController::class,
+                        'action'     => 'list',
+                    ],
+                ],
+            ],
+            'api-notifications-read' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/notifications/read',
+                    'defaults' => [
+                        'controller' => NotificationController::class,
+                        'action'     => 'markRead',
+                    ],
+                ],
+            ],
+            'api-import' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/import',
+                    'defaults' => [
+                        'controller' => ImportExportController::class,
+                        'action'     => 'import',
+                    ],
+                ],
+            ],
+            'api-export' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/export',
+                    'defaults' => [
+                        'controller' => ImportExportController::class,
+                        'action'     => 'export',
+                    ],
+                ],
+            ],
         ],
     ],
     'controllers' => [
         'factories' => [
-            AuthController::class => \Application\Controller\Factory\ControllerFactory::class,
-            CatalogController::class => \Application\Controller\Factory\ControllerFactory::class,
-            TrackingController::class => \Application\Controller\Factory\ControllerFactory::class,
+            AuthController::class => \Application\Controller\Factory\AuthControllerFactory::class,
+            CatalogController::class => \Application\Controller\Factory\CatalogControllerFactory::class,
+            TrackingController::class => \Application\Controller\Factory\TrackingControllerFactory::class,
+            NotificationController::class => \Application\Controller\Factory\NotificationControllerFactory::class,
+            ImportExportController::class => \Application\Controller\Factory\ImportExportControllerFactory::class,
+        ],
+    ],
+    'service_manager' => [
+        'factories' => [
+            \PDO::class => \Application\Factory\PdoFactory::class,
         ],
     ],
     'view_manager' => [
@@ -189,6 +238,14 @@ return [
             'layout/layout'           => __DIR__ . '/../view/layout/layout.phtml',
             'error/404'               => __DIR__ . '/../view/error/404.phtml',
             'error/index'             => __DIR__ . '/../view/error/index.phtml',
+            
+            'application/auth/login'          => __DIR__ . '/../view/auth/login.phtml',
+            'application/auth/register'       => __DIR__ . '/../view/auth/register.phtml',
+            'application/catalog/index'       => __DIR__ . '/../view/catalog/index.phtml',
+            'application/catalog/detail'      => __DIR__ . '/../view/catalog/detail.phtml',
+            'application/tracking/dashboard'  => __DIR__ . '/../view/tracking/dashboard.phtml',
+            'application/tracking/stats'      => __DIR__ . '/../view/tracking/stats.phtml',
+            'application/tracking/diary'      => __DIR__ . '/../view/tracking/diary.phtml',
         ],
         'template_path_stack' => [
             __DIR__ . '/../view',

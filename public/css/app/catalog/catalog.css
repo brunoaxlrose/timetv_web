@@ -1,0 +1,55 @@
+/* Catalog / Search Page specific styles */
+
+.discover-search-wrap {
+    padding: 12px 16px;
+    background-color: var(--bg-black);
+    border-bottom: 1px solid var(--border-dark);
+}
+.discover-search-input {
+    background-color: #1c1c1e !important;
+    border: none !important;
+    color: var(--text-white) !important;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+}
+.discover-search-input::placeholder {
+    color: #8f90a6 !important;
+    opacity: 1 !important;
+}
+.pill-btn {
+    background-color: #161622;
+    color: #a5a5c0;
+    border: 1px solid #242436;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.pill-btn.active, .pill-btn:hover {
+    background-color: #7c4dff;
+    color: #ffffff;
+    border-color: #7c4dff;
+    box-shadow: 0 4px 12px rgba(124, 77, 255, 0.3);
+}
+
+.refract-section-title {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: var(--text-white);
+    letter-spacing: -0.3px;
+}
+
+@media (min-width: 992px) {
+    .row-cols-3 > * {
+        flex: 0 0 auto;
+        width: 16.66666667% !important;
+    }
+}
+
+@media (min-width: 1200px) {
+    .row-cols-3 > * {
+        width: 12.5% !important;
+    }
+}

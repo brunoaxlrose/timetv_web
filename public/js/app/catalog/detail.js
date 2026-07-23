@@ -15,7 +15,7 @@ function switchDetailTab(tab) {
         $('#tabEpisodiosContent').removeClass('d-none');
     }
     
-    localStorage.setItem('activeTab_' + window.location.pathname, tab);
+    localStorage.setItem('activeTab_' + window.location.search, tab);
 }
 
 function switchSeasonView(seasonNum) {
@@ -45,8 +45,18 @@ function toggleSeasonAccordion(season, event) {
 }
 
 $(document).ready(function() {
-    const savedTab = localStorage.getItem('activeTab_' + window.location.pathname);
-    if (savedTab) {
+    const savedTab = localStorage.getItem('activeTab_' + window.location.search);
+    if (savedTab === 'episodios' && !$('#tabEpisodiosBtn').length) {
+        switchDetailTab('sobre');
+    } else if (savedTab) {
         switchDetailTab(savedTab);
     }
 });
+
+window.showMoreEpisodes = function(seasonNum, button) {
+    const $container = $('#seasonContent' + seasonNum);
+    $container.find('.refract-episode-row.d-none').slice(0, 10).removeClass('d-none');
+    if ($container.find('.refract-episode-row.d-none').length === 0) {
+        $(button).closest('.btn-show-more-eps-container').remove();
+    }
+};

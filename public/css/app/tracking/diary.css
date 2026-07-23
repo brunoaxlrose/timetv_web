@@ -1,0 +1,12 @@
+/* Diary Page specific styles */
+
+.refract-card-dark {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-dark);
+}
+.refract-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}

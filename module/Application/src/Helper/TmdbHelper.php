@@ -22,14 +22,59 @@ class TmdbHelper {
         if (!$json) return [];
 
         $results = json_decode($json, true)['results'] ?? [];
-        $items   = [];
+        return self::formatTmdbResults($results, $limit);
+    }
 
+    public static function getPopular(int $limit = 12): array {
+        $url = self::BASE_URL . '/trending/all/week?api_key=' . self::API_KEY . '&language=pt-BR&page=1';
+        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $json = @file_get_contents($url, false, stream_context_create($opts));
+        if (!$json) return [];
+
+        $results = json_decode($json, true)['results'] ?? [];
+        return self::formatTmdbResults($results, $limit);
+    }
+
+    public static function getUpcoming(int $limit = 12): array {
+        // Adiciona region=BR para trazer datas de lançamento do Brasil
+        $url = self::BASE_URL . '/movie/upcoming?api_key=' . self::API_KEY . '&language=pt-BR&page=1&region=BR';
+        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $json = @file_get_contents($url, false, stream_context_create($opts));
+        if (!$json) return [];
+
+        $results = json_decode($json, true)['results'] ?? [];
+        
+        // Filtra para manter apenas filmes com data de lançamento futura (em relação a hoje)
+        $today = date('Y-m-d');
+        $upcomingResults = [];
+        foreach ($results as $r) {
+            $releaseDate = $r['release_date'] ?? '';
+            if ($releaseDate && $releaseDate > $today) {
+                $upcomingResults[] = $r;
+            }
+        }
+
+        // Se o filtro de data futura remover muitos filmes, podemos afrouxar ou usar os resultados originais
+        if (count($upcomingResults) < 4) {
+            $upcomingResults = $results; // Fallback se a API retornar poucos futuros reais no BR
+        }
+
+        return self::formatTmdbResults($upcomingResults, $limit);
+    }
+
+    private static function formatTmdbResults(array $results, int $limit): array {
+        $items   = [];
         foreach ($results as $r) {
             if (count($items) >= $limit) break;
             $mediaType = $r['media_type'] ?? '';
+            if (empty($mediaType)) {
+                $mediaType = isset($r['title']) ? 'movie' : 'tv';
+            }
             if ($mediaType === 'person') continue;
             $overview = trim($r['overview'] ?? '');
-            if (empty($overview)) continue;
+            if (empty($overview)) {
+                $overview = 'Nenhuma sinopse disponível.';
+            }
 
             $poster = $r['poster_path']
                 ? self::IMG . 'w500' . $r['poster_path']
@@ -61,6 +106,7 @@ class TmdbHelper {
                 'banner_url'   => $banner,
                 'description'  => $overview,
                 'release_year' => $releaseYear,
+                'release_date' => $releaseDate,
                 'track_status' => null,
                 'source'       => 'tmdb'
             ];
@@ -91,14 +137,28 @@ class TmdbHelper {
         $poster       = $movie['poster_path']   ? self::IMG . 'w500'    . $movie['poster_path']    : 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400';
         $banner       = $movie['backdrop_path'] ? self::IMG . 'original' . $movie['backdrop_path'] : 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200';
 
+        $status = 'Running';
+        if (!empty($movie['release_date']) && $movie['release_date'] > date('Y-m-d')) {
+            $status = 'Upcoming';
+        }
+
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO item (tmdb_id, title, type, poster_url, banner_url, description, release_year, total_episodes, runtime_minutes)
-                VALUES (:tmdb_id, :title, 'movie', :poster, :banner, :description, :year, 1, :runtime)
+                INSERT INTO item (tmdb_id, title, type, poster_url, banner_url, description, release_year, release_date, total_episodes, runtime_minutes, status)
+                VALUES (:tmdb_id, :title, 'movie', :poster, :banner, :description, :year, :release_date, 1, :runtime, :status)
                 RETURNING id_item
             ");
-            $stmt->execute([':tmdb_id' => $tmdbId, ':title' => $title, ':poster' => $poster,
-                ':banner' => $banner, ':description' => $description, ':year' => $releaseYear, ':runtime' => $runtime]);
+            $stmt->execute([
+                ':tmdb_id' => $tmdbId, 
+                ':title' => $title, 
+                ':poster' => $poster,
+                ':banner' => $banner, 
+                ':description' => $description, 
+                ':year' => $releaseYear, 
+                ':release_date' => $movie['release_date'] ?? null,
+                ':runtime' => $runtime,
+                ':status' => $status
+            ]);
             $row = $stmt->fetch();
             return $row ? (int)$row['id_item'] : false;
         } catch (\Exception $e) {

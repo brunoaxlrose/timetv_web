@@ -5,12 +5,15 @@ namespace Application\Controller;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use Laminas\View\Model\JsonModel;
+use Application\Model\AuthModel;
+use Application\InputFilter\LoginInputFilter;
+use Application\InputFilter\RegisterInputFilter;
 
 class AuthController extends AbstractActionController {
-    private $pdo;
+    private $authModel;
 
-    public function __construct($pdo) {
-        $this->pdo = $pdo;
+    public function __construct(AuthModel $authModel) {
+        $this->authModel = $authModel;
     }
 
     public function loginAction() {
@@ -20,18 +23,22 @@ class AuthController extends AbstractActionController {
         
         $request = $this->getRequest();
         if ($request->isPost()) {
-            $post = $request->getPost();
-            $email = trim($post->get('email', ''));
-            $password = $post->get('password', '');
+            $inputFilter = new LoginInputFilter();
+            $inputFilter->setData($request->getPost());
 
-            if (empty($email) || empty($password)) {
-                return new JsonModel(['success' => false, 'message' => 'Por favor, preencha todos os campos.']);
+            if (!$inputFilter->isValid()) {
+                $messages = $inputFilter->getMessages();
+                $firstMsg = reset($messages);
+                $errorMsg = reset($firstMsg);
+                return new JsonModel(['success' => false, 'message' => $errorMsg]);
             }
 
+            $data = $inputFilter->getValues();
+            $email = $data['email'];
+            $password = $data['password'];
+
             try {
-                $stmt = $this->pdo->prepare("SELECT * FROM usuario WHERE email = :email AND ts_cancelamento IS NULL LIMIT 1");
-                $stmt->execute([':email' => $email]);
-                $user = $stmt->fetch();
+                $user = $this->authModel->getUserByEmail($email);
 
                 if ($user && password_verify($password, $user['password_hash'])) {
                     $_SESSION['user_id'] = $user['id_usuario'];
@@ -59,47 +66,30 @@ class AuthController extends AbstractActionController {
 
         $request = $this->getRequest();
         if ($request->isPost()) {
-            $post = $request->getPost();
-            $username = trim($post->get('username', ''));
-            $email = trim($post->get('email', ''));
-            $password = $post->get('password', '');
+            $inputFilter = new RegisterInputFilter();
+            $inputFilter->setData($request->getPost());
 
-            if (empty($username) || empty($email) || empty($password)) {
-                return new JsonModel(['success' => false, 'message' => 'Por favor, preencha todos os campos.']);
+            if (!$inputFilter->isValid()) {
+                $messages = $inputFilter->getMessages();
+                $firstMsg = reset($messages);
+                $errorMsg = reset($firstMsg);
+                return new JsonModel(['success' => false, 'message' => $errorMsg]);
             }
 
-            if (strlen($username) < 3) {
-                return new JsonModel(['success' => false, 'message' => 'O nome de usuário deve ter pelo menos 3 caracteres.']);
-            }
-
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                return new JsonModel(['success' => false, 'message' => 'Formato de e-mail inválido.']);
-            }
-
-            if ($email === 'brunoaxlrose8@gmail.com' || $email === 'alcantarablao019@gmail.com') {
-                return new JsonModel(['success' => false, 'message' => 'Este e-mail está associado a uma conta do Google. Por favor, entre usando o Google.']);
-            }
-
-            if (strlen($password) < 6) {
-                return new JsonModel(['success' => false, 'message' => 'A senha deve ter pelo menos 6 caracteres.']);
-            }
+            $data = $inputFilter->getValues();
+            $username = $data['username'];
+            $email = $data['email'];
+            $password = $data['password'];
 
             try {
-                $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE email = :email OR username = :username LIMIT 1");
-                $stmt->execute([':email' => $email, ':username' => $username]);
-                if ($stmt->fetch()) {
+                if ($this->authModel->isUsernameOrEmailTaken($username, $email)) {
                     return new JsonModel(['success' => false, 'message' => 'E-mail ou nome de usuário já cadastrado.']);
                 }
 
                 $hash = password_hash($password, PASSWORD_BCRYPT);
-                $stmt = $this->pdo->prepare("INSERT INTO usuario (username, email, password_hash) VALUES (:username, :email, :hash) RETURNING id_usuario");
-                $stmt->execute([
-                    ':username' => $username,
-                    ':email' => $email,
-                    ':hash' => $hash
-                ]);
+                $userId = $this->authModel->createUser($username, $email, $hash);
 
-                $_SESSION['user_id'] = $stmt->fetchColumn();
+                $_SESSION['user_id'] = $userId;
                 $_SESSION['username'] = $username;
                 $_SESSION['email'] = $email;
                 session_write_close();
@@ -116,59 +106,18 @@ class AuthController extends AbstractActionController {
     }
 
     public function logoutAction() {
-        session_destroy();
-        return $this->redirect()->toRoute('login');
-    }
-
-    public function googleLoginAction() {
-        $request = $this->getRequest();
-        if (!$request->isPost()) {
-            return $this->redirect()->toRoute('login');
-        }
-
-        $post = $request->getPost();
-        $accountType = $post->get('account', 'oliveira');
-        if ($accountType === 'alcantara') {
-            $email = "alcantarablao019@gmail.com";
-            $username = "Bruno Alcantara";
-        } else {
-            $email = "brunoaxlrose8@gmail.com";
-            $username = "Bruno Oliveira";
-        }
-        
-        $hash = password_hash(uniqid(), PASSWORD_BCRYPT);
-        
-        try {
-            $stmt = $this->pdo->prepare("SELECT * FROM usuario WHERE email = :email AND ts_cancelamento IS NULL LIMIT 1");
-            $stmt->execute([':email' => $email]);
-            $user = $stmt->fetch();
-            
-            if ($user) {
-                $_SESSION['user_id'] = $user['id_usuario'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['email'] = $user['email'];
-                $_SESSION['login_type'] = 'google';
-                session_write_close();
-                return new JsonModel(['success' => true, 'redirect' => '/dashboard']);
+        if (session_status() === PHP_SESSION_ACTIVE || isset($_SESSION)) {
+            $_SESSION = [];
+            if (ini_get("session.use_cookies")) {
+                $params = session_get_cookie_params();
+                setcookie(session_name(), '', time() - 42000,
+                    $params["path"], $params["domain"],
+                    $params["secure"], $params["httponly"]
+                );
             }
-            
-            $stmt = $this->pdo->prepare("INSERT INTO usuario (username, email, password_hash) VALUES (:username, :email, :hash) RETURNING id_usuario");
-            $stmt->execute([
-                ':username' => $username,
-                ':email' => $email,
-                ':hash' => $hash
-            ]);
-            
-            $_SESSION['user_id'] = $stmt->fetchColumn();
-            $_SESSION['username'] = $username;
-            $_SESSION['email'] = $email;
-            $_SESSION['login_type'] = 'google';
-            session_write_close();
-            
-            return new JsonModel(['success' => true, 'redirect' => '/dashboard']);
-        } catch (\PDOException $e) {
-            return new JsonModel(['success' => false, 'message' => 'Erro ao logar com o Google: ' . $e->getMessage()]);
+            session_destroy();
         }
+        return $this->redirect()->toUrl('/login');
     }
 
     public function updateProfileAction() {
@@ -190,20 +139,43 @@ class AuthController extends AbstractActionController {
         }
         
         try {
-            $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE username = :username AND id_usuario != :id LIMIT 1");
-            $stmt->execute([':username' => $newUsername, ':id' => $userId]);
-            if ($stmt->fetch()) {
+            if ($this->authModel->isUsernameTaken($newUsername, $userId)) {
                 return new JsonModel(['success' => false, 'message' => 'Nome de usuário já está em uso.']);
             }
+
+            // Check if password change is requested
+            $currentPassword = $post->get('current_password', '');
+            $newPassword = $post->get('new_password', '');
+            $confirmNewPassword = $post->get('confirm_new_password', '');
+
+            if (!empty($currentPassword) || !empty($newPassword) || !empty($confirmNewPassword)) {
+                if (empty($currentPassword) || empty($newPassword) || empty($confirmNewPassword)) {
+                    return new JsonModel(['success' => false, 'message' => 'Preencha todos os campos de senha para alterá-la.']);
+                }
+
+                if (strlen($newPassword) < 6) {
+                    return new JsonModel(['success' => false, 'message' => 'A nova senha deve ter no mínimo 6 caracteres.']);
+                }
+
+                if ($newPassword !== $confirmNewPassword) {
+                    return new JsonModel(['success' => false, 'message' => 'As novas senhas não coincidem.']);
+                }
+
+                $user = $this->authModel->getUserById($userId);
+                if (!$user || !password_verify($currentPassword, $user['password_hash'])) {
+                    return new JsonModel(['success' => false, 'message' => 'Senha atual incorreta.']);
+                }
+
+                $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+                $this->authModel->updatePassword($userId, $newHash);
+            }
             
-            $stmt = $this->pdo->prepare("UPDATE usuario SET username = :username WHERE id_usuario = :id");
-            $stmt->execute([':username' => $newUsername, ':id' => $userId]);
-            
+            $this->authModel->updateUsername($userId, $newUsername);
             $_SESSION['username'] = $newUsername;
             
-            return new JsonModel(['success' => true, 'message' => 'Nome de usuário atualizado!']);
+            return new JsonModel(['success' => true, 'message' => 'Perfil atualizado com sucesso!']);
         } catch (\PDOException $e) {
-            return new JsonModel(['success' => false, 'message' => 'Erro no banco de dados ao atualizar.']);
+            return new JsonModel(['success' => false, 'message' => 'Erro ao atualizar perfil no banco de dados.']);
         }
     }
 
@@ -213,23 +185,11 @@ class AuthController extends AbstractActionController {
         }
 
         $userId = $_SESSION['user_id'];
-        
         try {
-            $this->pdo->beginTransaction();
-            
-            $stmt = $this->pdo->prepare("DELETE FROM usuario_item WHERE id_usuario = :id");
-            $stmt->execute([':id' => $userId]);
-            
-            $stmt = $this->pdo->prepare("DELETE FROM usuario_episodio WHERE id_usuario = :id");
-            $stmt->execute([':id' => $userId]);
-            
-            $this->pdo->commit();
-            return new JsonModel(['success' => true, 'message' => 'Biblioteca limpa com sucesso!']);
+            $this->authModel->clearLibrary($userId);
+            return new JsonModel(['success' => true, 'message' => 'Toda a sua coleção foi limpa com sucesso.']);
         } catch (\PDOException $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            return new JsonModel(['success' => false, 'message' => 'Erro ao limpar a biblioteca: ' . $e->getMessage()]);
+            return new JsonModel(['success' => false, 'message' => 'Erro ao limpar coleção.']);
         }
     }
 
@@ -239,13 +199,13 @@ class AuthController extends AbstractActionController {
         }
 
         $userId = $_SESSION['user_id'];
-        
         try {
-            $stmt = $this->pdo->prepare("UPDATE usuario SET ts_cancelamento = CURRENT_TIMESTAMP WHERE id_usuario = :id");
-            $stmt->execute([':id' => $userId]);
+            $this->authModel->deleteAccount($userId);
             
+            $_SESSION = [];
             session_destroy();
-            return new JsonModel(['success' => true, 'message' => 'Sua conta foi eliminada.']);
+            
+            return new JsonModel(['success' => true, 'redirect' => '/login']);
         } catch (\PDOException $e) {
             return new JsonModel(['success' => false, 'message' => 'Erro ao deletar conta.']);
         }
@@ -271,16 +231,12 @@ class AuthController extends AbstractActionController {
         }
 
         try {
-            $stmt = $this->pdo->prepare("
-                INSERT INTO feedback (id_usuario, feedback_type, content, screenshot)
-                VALUES (:user_id, :type, :content, :screenshot)
-            ");
-            $stmt->execute([
-                ':user_id' => $_SESSION['user_id'],
-                ':type' => $type,
-                ':content' => $content,
-                ':screenshot' => !empty($screenshot) ? $screenshot : null
-            ]);
+            $this->authModel->saveFeedback(
+                $_SESSION['user_id'], 
+                $type, 
+                $content, 
+                !empty($screenshot) ? $screenshot : null
+            );
 
             return new JsonModel(['success' => true, 'message' => 'Feedback registrado com sucesso! Obrigado pela colaboração.']);
         } catch (\PDOException $e) {

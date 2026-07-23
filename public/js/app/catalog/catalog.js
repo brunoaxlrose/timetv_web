@@ -18,6 +18,14 @@ document.addEventListener("DOMContentLoaded", function() {
         $('#mediaTypeModal').removeClass('active');
     };
 
+    window.showMoreSearchResults = function(button) {
+        const $grid = $('#searchResultGrid');
+        $grid.find('.refract-search-row.d-none').slice(0, 20).removeClass('d-none');
+        if ($grid.find('.refract-search-row.d-none').length === 0) {
+            $(button).closest('.btn-show-more-search-container').remove();
+        }
+    };
+
     window.toggleGroupedLayout = function() {
         const url = new URL(window.location.href);
         const currentlyGrouped = url.searchParams.get('grouped') !== '0';
@@ -140,7 +148,7 @@ document.addEventListener("DOMContentLoaded", function() {
     $('#filterForm, #mediaTypeForm').on('submit', function(e) {
         e.preventDefault();
         const form = $(this);
-        const action = form.attr('action') || '/catalog';
+        const action = window.location.pathname;
         const params = form.serialize();
         const fullUrl = action + '?' + params;
         applyFiltersAjax(fullUrl, null, true);

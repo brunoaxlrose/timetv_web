@@ -99,9 +99,7 @@ class TvmazeHelper {
             foreach ($filteredEpisodes as $ep) {
                 $epImage = $ep['image']['medium'] ?? $ep['image']['original'] ?? '';
                 $epDesc = strip_tags($ep['summary'] ?? '');
-                if (!empty($epDesc)) {
-                    $epDesc = self::translateToPortuguese($epDesc);
-                } else {
+                if (empty($epDesc)) {
                     $epDesc = 'Nenhuma sinopse disponível.';
                 }
                 $epRuntime = $ep['runtime'] ?? 45;
