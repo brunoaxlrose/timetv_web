@@ -441,7 +441,7 @@ class ImportExportController extends AbstractActionController {
                     return (int)$row['id_item'];
                 }
                 // Import via TmdbHelper
-                $itemId = \Application\Helper\TmdbHelper::importMovie($this->pdo, $r['tmdb_id']);
+                $itemId = \Application\Helper\TmdbHelper::importMovieFromTmdb($this->pdo, $r['tmdb_id']);
                 if ($itemId) {
                     return (int)$itemId;
                 }
@@ -460,7 +460,8 @@ class ImportExportController extends AbstractActionController {
             $stmt = $this->pdo->prepare("
                 INSERT INTO usuario_item (id_usuario, id_item, status, ts_atualizacao)
                 VALUES (:uid, :iid, :status, CURRENT_TIMESTAMP)
-                ON CONFLICT (id_usuario, id_item) DO NOTHING
+                ON CONFLICT (id_usuario, id_item) 
+                DO UPDATE SET status = EXCLUDED.status, ts_atualizacao = CURRENT_TIMESTAMP
             ");
             $stmt->execute([':uid' => $userId, ':iid' => $itemId, ':status' => $status]);
         } catch (\PDOException $e) {
@@ -489,5 +490,473 @@ class ImportExportController extends AbstractActionController {
         } catch (\PDOException $e) {
             // ignore
         }
+    }
+
+    // =========================================================
+    // PAGE ACTIONS
+    // =========================================================
+
+    public function tvtimeAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return $this->redirect()->toRoute('login');
+        }
+        return new \Laminas\View\Model\ViewModel();
+    }
+
+    public function imdbAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return $this->redirect()->toRoute('login');
+        }
+        return new \Laminas\View\Model\ViewModel();
+    }
+
+    public function traktAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return $this->redirect()->toRoute('login');
+        }
+        return new \Laminas\View\Model\ViewModel();
+    }
+
+    // =========================================================
+    // API ACTIONS
+    // =========================================================
+
+    public function apiImportTvtimeAction(): JsonModel {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autenticado']);
+        }
+        $userId = (int)$_SESSION['user_id'];
+        $ctx = stream_context_create(['http' => ['header' => "User-Agent: TVTimeClone/1.0\r\n", 'timeout' => 8]]);
+        set_time_limit(600);
+
+        $importedMovies = 0;
+        $importedShows = 0;
+
+        // 1. Movies File
+        if (!empty($_FILES['movies_file']['tmp_name'])) {
+            $content = file_get_contents($_FILES['movies_file']['tmp_name']);
+            $movies = json_decode($content, true);
+            if (isset($movies['objects'])) {
+                $movies = $movies['objects'];
+            }
+            if (is_array($movies)) {
+                foreach ($movies as $movie) {
+                    $title = $movie['name'] ?? $movie['title'] ?? ($movie['meta']['name'] ?? ($movie['meta']['title'] ?? ''));
+                    if (empty($title)) continue;
+
+                    $tmdbId = $movie['tmdb_id'] ?? ($movie['meta']['tmdb_id'] ?? null);
+                    $imdbId = $movie['imdb_id'] ?? ($movie['meta']['imdb_id'] ?? null);
+
+                    $status = 'completed';
+                    if (isset($movie['status']) && ($movie['status'] === 'watchlist' || $movie['status'] === 'plan_to_watch')) {
+                        $status = 'plan_to_watch';
+                    }
+
+                    $itemId = $this->importMovieByTmdbOrName($title, $tmdbId, $imdbId, $ctx);
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, $status);
+                        $importedMovies++;
+                    }
+                }
+            }
+        }
+
+        // 2. Series File
+        if (!empty($_FILES['series_file']['tmp_name'])) {
+            $content = file_get_contents($_FILES['series_file']['tmp_name']);
+            $shows = json_decode($content, true);
+            if (isset($shows['objects'])) {
+                $shows = $shows['objects'];
+            }
+            if (is_array($shows)) {
+                foreach ($shows as $show) {
+                    $showName = $show['name'] ?? $show['title'] ?? ($show['meta']['name'] ?? ($show['meta']['title'] ?? ''));
+                    if (empty($showName)) continue;
+
+                    $tvdbId = $show['tvdb_id'] ?? $show['id'] ?? ($show['meta']['tvdb_id'] ?? null);
+                    $itemId = null;
+                    if ($tvdbId) {
+                        $itemId = $this->findOrImportByTvdb((int)$tvdbId, $showName, $ctx);
+                    } else {
+                        $itemId = $this->findOrImportByName($showName, 'series', $ctx);
+                    }
+
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'watching');
+                        $importedShows++;
+
+                        if (isset($show['seasons']) && is_array($show['seasons'])) {
+                            foreach ($show['seasons'] as $season) {
+                                $seasonNum = $season['season'] ?? $season['number'] ?? null;
+                                if ($seasonNum === null) continue;
+
+                                if (isset($season['episodes']) && is_array($season['episodes'])) {
+                                    foreach ($season['episodes'] as $episode) {
+                                        $epNum = $episode['episode'] ?? $episode['number'] ?? null;
+                                        $watched = $episode['watched'] ?? false;
+                                        if ($epNum === null || !$watched) continue;
+
+                                        // Mark episode as watched
+                                        $stmtEp = $this->pdo->prepare("
+                                            SELECT id_episodio FROM episodio 
+                                            WHERE id_item = :id_item AND season_number = :s AND episode_number = :e
+                                            LIMIT 1
+                                        ");
+                                        $stmtEp->execute([':id_item' => $itemId, ':s' => $seasonNum, ':e' => $epNum]);
+                                        $ep = $stmtEp->fetch();
+                                        if ($ep) {
+                                            try {
+                                                $stmtInsert = $this->pdo->prepare("
+                                                    INSERT INTO usuario_episodio (id_usuario, id_episodio)
+                                                    VALUES (:uid, :eid)
+                                                    ON CONFLICT (id_usuario, id_episodio) DO NOTHING
+                                                ");
+                                                $stmtInsert->execute([':uid' => $userId, ':eid' => $ep['id_episodio']]);
+                                            } catch (\PDOException $e) {
+                                                // ignore
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $this->updateShowStatuses($userId);
+
+        $msg = "Importação do TV Time concluída: $importedMovies filmes e $importedShows séries processados.";
+        $this->notificationModel->createNotification($userId, 'info', null, 'Importação do TV Time Finalizada', $msg);
+
+        return new JsonModel(['success' => true, 'message' => $msg]);
+    }
+
+    public function apiImportImdbAction(): JsonModel {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autenticado']);
+        }
+        $userId = (int)$_SESSION['user_id'];
+        if (empty($_FILES['zip_file']['tmp_name'])) {
+            return new JsonModel(['success' => false, 'message' => 'Nenhum arquivo ZIP enviado.']);
+        }
+
+        $ctx = stream_context_create(['http' => ['header' => "User-Agent: TVTimeClone/1.0\r\n", 'timeout' => 8]]);
+        set_time_limit(600);
+
+        $zipPath = $_FILES['zip_file']['tmp_name'];
+        $zip = new \ZipArchive();
+        
+        $ratingsCsv = '';
+        $watchlistCsv = '';
+
+        if ($zip->open($zipPath) === true) {
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $filename = $zip->getNameIndex($i);
+                if (strpos(strtolower($filename), 'ratings.csv') !== false) {
+                    $ratingsCsv = $zip->getFromIndex($i);
+                }
+                if (strpos(strtolower($filename), 'watchlist.csv') !== false) {
+                    $watchlistCsv = $zip->getFromIndex($i);
+                }
+            }
+            $zip->close();
+        } else {
+            return new JsonModel(['success' => false, 'message' => 'Não foi possível abrir o arquivo ZIP.']);
+        }
+
+        $imported = 0;
+
+        // Process Ratings (Watched)
+        if (!empty($ratingsCsv)) {
+            $rows = $this->parseCsvString($ratingsCsv);
+            foreach ($rows as $row) {
+                $imdbId = $row['Const'] ?? null;
+                $title = $row['Title'] ?? null;
+                $type = $row['Title Type'] ?? 'movie';
+                $rating = isset($row['Your Rating']) ? (float)$row['Your Rating'] : null;
+
+                if (empty($title)) continue;
+
+                if ($type === 'movie') {
+                    $itemId = $this->importMovieByTmdbOrName($title, null, $imdbId, $ctx);
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'completed');
+                        if ($rating !== null) {
+                            $stmtUpdate = $this->pdo->prepare("UPDATE usuario_item SET rating = :r WHERE id_usuario = :uid AND id_item = :iid");
+                            $stmtUpdate->execute([':r' => $rating, ':uid' => $userId, ':iid' => $itemId]);
+                        }
+                        $imported++;
+                    }
+                } else {
+                    // TV Series
+                    $itemId = $this->findOrImportByName($title, 'series', $ctx);
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'completed');
+                        $imported++;
+                    }
+                }
+            }
+        }
+
+        // Process Watchlist
+        if (!empty($watchlistCsv)) {
+            $rows = $this->parseCsvString($watchlistCsv);
+            foreach ($rows as $row) {
+                $imdbId = $row['Const'] ?? null;
+                $title = $row['Title'] ?? null;
+                $type = $row['Title Type'] ?? 'movie';
+
+                if (empty($title)) continue;
+
+                if ($type === 'movie') {
+                    $itemId = $this->importMovieByTmdbOrName($title, null, $imdbId, $ctx);
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'plan_to_watch');
+                        $imported++;
+                    }
+                } else {
+                    $itemId = $this->findOrImportByName($title, 'series', $ctx);
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'plan_to_watch');
+                        $imported++;
+                    }
+                }
+            }
+        }
+
+        $msg = "Importação do IMDb concluída: $imported itens processados com sucesso.";
+        $this->notificationModel->createNotification($userId, 'info', null, 'Importação do IMDb Finalizada', $msg);
+
+        return new JsonModel(['success' => true, 'message' => $msg]);
+    }
+
+    public function apiImportTraktAction(): JsonModel {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autenticado']);
+        }
+        $userId = (int)$_SESSION['user_id'];
+        if (empty($_FILES['zip_file']['tmp_name'])) {
+            return new JsonModel(['success' => false, 'message' => 'Nenhum arquivo ZIP enviado.']);
+        }
+
+        $ctx = stream_context_create(['http' => ['header' => "User-Agent: TVTimeClone/1.0\r\n", 'timeout' => 8]]);
+        set_time_limit(600);
+
+        $zipPath = $_FILES['zip_file']['tmp_name'];
+        $zip = new \ZipArchive();
+        
+        $watchedMoviesJson = '';
+        $watchedShowsJson = '';
+        $watchlistMoviesJson = '';
+        $watchlistShowsJson = '';
+
+        if ($zip->open($zipPath) === true) {
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $filename = $zip->getNameIndex($i);
+                if (strpos(strtolower($filename), 'watched_movies.json') !== false || strpos(strtolower($filename), 'movies_watched.json') !== false) {
+                    $watchedMoviesJson = $zip->getFromIndex($i);
+                }
+                if (strpos(strtolower($filename), 'watched_shows.json') !== false || strpos(strtolower($filename), 'shows_watched.json') !== false) {
+                    $watchedShowsJson = $zip->getFromIndex($i);
+                }
+                if (strpos(strtolower($filename), 'watchlist_movies.json') !== false || strpos(strtolower($filename), 'movies_watchlist.json') !== false) {
+                    $watchlistMoviesJson = $zip->getFromIndex($i);
+                }
+                if (strpos(strtolower($filename), 'watchlist_shows.json') !== false || strpos(strtolower($filename), 'shows_watchlist.json') !== false) {
+                    $watchlistShowsJson = $zip->getFromIndex($i);
+                }
+            }
+            $zip->close();
+        } else {
+            return new JsonModel(['success' => false, 'message' => 'Não foi possível abrir o arquivo ZIP.']);
+        }
+
+        $moviesCount = 0;
+        $showsCount = 0;
+
+        // Process Watched Movies
+        if (!empty($watchedMoviesJson)) {
+            $movies = json_decode($watchedMoviesJson, true);
+            if (is_array($movies)) {
+                foreach ($movies as $movie) {
+                    $movieData = $movie['movie'] ?? $movie;
+                    $title = $movieData['title'] ?? null;
+                    if (empty($title)) continue;
+
+                    $tmdbId = $movieData['ids']['tmdb'] ?? null;
+                    $imdbId = $movieData['ids']['imdb'] ?? null;
+
+                    $itemId = $this->importMovieByTmdbOrName($title, $tmdbId, $imdbId, $ctx);
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'completed');
+                        $moviesCount++;
+                    }
+                }
+            }
+        }
+
+        // Process Watchlist Movies
+        if (!empty($watchlistMoviesJson)) {
+            $movies = json_decode($watchlistMoviesJson, true);
+            if (is_array($movies)) {
+                foreach ($movies as $movie) {
+                    $movieData = $movie['movie'] ?? $movie;
+                    $title = $movieData['title'] ?? null;
+                    if (empty($title)) continue;
+
+                    $tmdbId = $movieData['ids']['tmdb'] ?? null;
+                    $imdbId = $movieData['ids']['imdb'] ?? null;
+
+                    $itemId = $this->importMovieByTmdbOrName($title, $tmdbId, $imdbId, $ctx);
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'plan_to_watch');
+                        $moviesCount++;
+                    }
+                }
+            }
+        }
+
+        // Process Watched Shows
+        if (!empty($watchedShowsJson)) {
+            $shows = json_decode($watchedShowsJson, true);
+            if (is_array($shows)) {
+                foreach ($shows as $show) {
+                    $showData = $show['show'] ?? $show;
+                    $title = $showData['title'] ?? null;
+                    if (empty($title)) continue;
+
+                    $tvdbId = $showData['ids']['tvdb'] ?? null;
+                    $itemId = null;
+                    if ($tvdbId) {
+                        $itemId = $this->findOrImportByTvdb((int)$tvdbId, $title, $ctx);
+                    } else {
+                        $itemId = $this->findOrImportByName($title, 'series', $ctx);
+                    }
+
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'watching');
+                        $showsCount++;
+
+                        if (isset($show['seasons']) && is_array($show['seasons'])) {
+                            foreach ($show['seasons'] as $season) {
+                                $seasonNum = $season['number'] ?? null;
+                                if ($seasonNum === null) continue;
+
+                                if (isset($season['episodes']) && is_array($season['episodes'])) {
+                                    foreach ($season['episodes'] as $episode) {
+                                        $epNum = $episode['number'] ?? null;
+                                        if ($epNum === null) continue;
+
+                                        $stmtEp = $this->pdo->prepare("
+                                            SELECT id_episodio FROM episodio 
+                                            WHERE id_item = :id_item AND season_number = :s AND episode_number = :e
+                                            LIMIT 1
+                                        ");
+                                        $stmtEp->execute([':id_item' => $itemId, ':s' => $seasonNum, ':e' => $epNum]);
+                                        $ep = $stmtEp->fetch();
+                                        if ($ep) {
+                                            try {
+                                                $stmtInsert = $this->pdo->prepare("
+                                                    INSERT INTO usuario_episodio (id_usuario, id_episodio)
+                                                    VALUES (:uid, :eid)
+                                                    ON CONFLICT (id_usuario, id_episodio) DO NOTHING
+                                                ");
+                                                $stmtInsert->execute([':uid' => $userId, ':eid' => $ep['id_episodio']]);
+                                            } catch (\PDOException $e) {
+                                                // ignore
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Process Watchlist Shows
+        if (!empty($watchlistShowsJson)) {
+            $shows = json_decode($watchlistShowsJson, true);
+            if (is_array($shows)) {
+                foreach ($shows as $show) {
+                    $showData = $show['show'] ?? $show;
+                    $title = $showData['title'] ?? null;
+                    if (empty($title)) continue;
+
+                    $tvdbId = $showData['ids']['tvdb'] ?? null;
+                    $itemId = null;
+                    if ($tvdbId) {
+                        $itemId = $this->findOrImportByTvdb((int)$tvdbId, $title, $ctx);
+                    } else {
+                        $itemId = $this->findOrImportByName($title, 'series', $ctx);
+                    }
+
+                    if ($itemId) {
+                        $this->upsertUserItem($userId, $itemId, 'plan_to_watch');
+                        $showsCount++;
+                    }
+                }
+            }
+        }
+
+        $this->updateShowStatuses($userId);
+
+        $msg = "Importação do Trakt concluída: $moviesCount filmes e $showsCount séries processados.";
+        $this->notificationModel->createNotification($userId, 'info', null, 'Importação do Trakt Finalizada', $msg);
+
+        return new JsonModel(['success' => true, 'message' => $msg]);
+    }
+
+    // =========================================================
+    // PARSER HELPERS
+    // =========================================================
+
+    private function importMovieByTmdbOrName(string $title, ?int $tmdbId, ?string $imdbId, $ctx): ?int {
+        if (empty($tmdbId) && !empty($imdbId)) {
+            $url = "https://api.themoviedb.org/3/find/" . urlencode($imdbId) . "?api_key=1f54bd990f1cdfb230adb312546d765d&external_source=imdb_id&language=pt-BR";
+            $json = @file_get_contents($url, false, $ctx);
+            if ($json) {
+                $data = json_decode($json, true);
+                if (!empty($data['movie_results'][0]['id'])) {
+                    $tmdbId = (int)$data['movie_results'][0]['id'];
+                }
+            }
+        }
+
+        if ($tmdbId) {
+            $itemId = \Application\Helper\TmdbHelper::importMovieFromTmdb($this->pdo, $tmdbId);
+            if ($itemId) {
+                return $itemId;
+            }
+        }
+
+        return $this->importTmdbMovie($title, $ctx);
+    }
+
+    private function parseCsvString(string $content): array {
+        $lines = preg_split('/\r\n|\r|\n/', $content);
+        $header = null;
+        $rows = [];
+        foreach ($lines as $line) {
+            $row = str_getcsv($line);
+            if (empty($row) || count($row) < 2) continue;
+            if (!$header) {
+                $header = $row;
+                foreach ($header as &$h) {
+                    $h = trim(preg_replace('/[\x00-\x1F\x80-\xFF]/', '', $h));
+                }
+                continue;
+            }
+            if (count($row) < count($header)) {
+                $row = array_pad($row, count($header), '');
+            } elseif (count($row) > count($header)) {
+                $row = array_slice($row, 0, count($header));
+            }
+            $rows[] = array_combine($header, $row);
+        }
+        return $rows;
     }
 }

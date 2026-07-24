@@ -96,26 +96,110 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                         <div class="refract-cast-card text-center">
                             <img src="<?= htmlspecialchars($actorPhoto) ?>" class="refract-cast-img shadow" alt="<?= htmlspecialchars($actorName) ?>">
                             <div class="text-white text-truncate mt-1 px-1" style="font-size: 0.7rem; font-weight: 600;"><?= htmlspecialchars($actorName) ?></div>
-                            <div class="text-muted text-truncate" style="font-size: 0.6rem;"><?= htmlspecialchars($charName) ?></div>
+                            <div class="text-muted text-truncate" style="font-size: 0.6rem; color: #a5a5c0 !important;"><?= htmlspecialchars($charName) ?></div>
                         </div>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
 
-            <!-- Rating Pills -->
-            <div class="d-flex justify-content-center gap-2 mb-4">
-                <span class="refract-rating-pill imdb"><span class="badge text-bg-warning me-1 fw-bold">IMDb</span> 8.5</span>
-                <span class="refract-rating-pill tmdb"><span class="badge text-bg-info me-1 text-white fw-bold">TMDB</span> 8.4</span>
-                <span class="refract-rating-pill community"><i class="bi bi-chevron-up text-accent me-1"></i> 8.1 (836)</span>
-            </div>
-
-            <!-- Awards / Achievements -->
-            <div class="refract-awards-card p-3 mb-4 d-flex align-items-center gap-3">
-                <i class="bi bi-trophy-fill text-warning fs-4"></i>
-                <div class="text-white small" style="font-weight: 500; font-size: 0.78rem;">
-                    Venceu 4 Primetime Emmys. 26 vitórias & 97 indicações no total.
+            <!-- Watch Providers -->
+            <?php 
+                $providersList = [];
+                if (!empty($item['watch_providers'])) {
+                    $decoded = json_decode($item['watch_providers'], true);
+                    if (is_array($decoded)) {
+                        $providersList = $decoded;
+                    } else {
+                        foreach (explode(', ', $item['watch_providers']) as $p) {
+                            $providersList[] = ['name' => $p, 'logo' => ''];
+                        }
+                    }
+                }
+                if (!empty($providersList)): 
+            ?>
+            <div class="mb-4 text-center">
+                <div class="small text-muted mb-2 fw-bold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px; color: #a5a5c0 !important;">Onde Assistir</div>
+                <div class="d-flex flex-wrap gap-2 justify-content-center">
+                    <?php foreach ($providersList as $prov): ?>
+                        <span class="d-flex align-items-center gap-2 px-2.5 py-1.5 rounded-3" style="font-size: 0.72rem; background-color: #121218; border: 1px solid rgba(255,255,255,0.06); color: #e5e5e7; font-weight: 500;">
+                            <?php if (!empty($prov['logo'])): ?>
+                                <img src="<?= htmlspecialchars($prov['logo']) ?>" style="width: 18px; height: 18px; border-radius: 4px; object-fit: cover;" alt="logo">
+                            <?php else: ?>
+                                <i class="bi bi-play-fill text-accent"></i>
+                            <?php endif; ?>
+                            <?= htmlspecialchars($prov['name']) ?>
+                        </span>
+                    <?php endforeach; ?>
                 </div>
             </div>
+            <?php endif; ?>
+
+            <!-- Personal Review and Star Rating -->
+            <div class="p-3 rounded-4 mb-4 text-start" style="background-color: #121218; border: 1px solid rgba(255,255,255,0.04);">
+                <div class="d-flex justify-content-between align-items-center mb-2.5">
+                    <span class="text-white fw-bold small text-uppercase" style="letter-spacing: 0.5px; font-size: 0.7rem; color: #a5a5c0 !important;">A Minha Avaliação</span>
+                    <span id="saveStatus" class="small text-muted" style="font-size: 0.65rem;"></span>
+                </div>
+                
+                <!-- Interactive Stars -->
+                <div class="d-flex justify-content-center gap-3 mb-3" id="ratingStarsContainer" style="cursor: pointer; <?= !empty($item['comment']) ? 'pointer-events: none; opacity: 0.6;' : '' ?>">
+                    <?php 
+                        $userRating = isset($item['rating']) ? (int)$item['rating'] : 0; 
+                        for ($i = 1; $i <= 5; $i++): 
+                            $isFilled = $i <= $userRating;
+                    ?>
+                        <i class="bi <?= $isFilled ? 'bi-star-fill text-warning' : 'bi-star text-muted' ?> fs-3 star-btn" data-value="<?= $i ?>" onclick="setStarRating(<?= $i ?>)"></i>
+                    <?php endfor; ?>
+                </div>
+                
+                <!-- Comment Textarea -->
+                <div class="mb-2">
+                    <textarea id="userComment" class="form-control border-0 text-white rounded-3 small p-2" rows="2" placeholder="Deixe um comentário sobre este título..." <?= !empty($item['comment']) ? 'disabled' : '' ?> style="font-size: 0.78rem; resize: none; background-color: #1c1c24 !important; color: #e5e5e7 !important; border: 1px solid rgba(255,255,255,0.03) !important;"><?= htmlspecialchars($item['comment'] ?? '') ?></textarea>
+                </div>
+                
+                <div class="d-flex justify-content-end">
+                    <button type="button" id="btnSaveReview" class="btn btn-sm rounded-pill px-3 py-1 fw-bold text-white" onclick="savePersonalReview(<?= $item['id_item'] ?>)" <?= !empty($item['comment']) ? 'disabled' : '' ?> style="font-size: 0.7rem; background: linear-gradient(135deg, #a88beb 0%, #8a63e5 100%); border: none;">Salvar Avaliação</button>
+                </div>
+            </div>
+
+            <!-- Community Comments Section -->
+            <?php if (!empty($this->comments)): ?>
+            <div class="p-3 rounded-4 mb-4 text-start" style="background-color: #121218; border: 1px solid rgba(255,255,255,0.04);">
+                <div class="small text-muted mb-3 fw-bold text-uppercase" style="font-size: 0.7rem; color: #a5a5c0 !important; letter-spacing: 0.5px;">Comentários da Comunidade</div>
+                <div class="d-flex flex-column gap-3" id="communityCommentsContainer">
+                    <?php 
+                        $commentIndex = 0;
+                        foreach ($this->comments as $c): 
+                            $commentIndex++;
+                            $isHidden = $commentIndex > 3;
+                            $defaultAvatar = 'https://ui-avatars.com/api/?name=' . urlencode($c['username']) . '&background=a88beb&color=fff';
+                    ?>
+                        <div class="d-flex gap-2.5 pb-2.5 <?= $isHidden ? 'd-none extra-comment' : '' ?>" style="border-bottom: 1px solid rgba(255,255,255,0.03); opacity: 0.95;">
+                            <img src="<?= htmlspecialchars($c['avatar_url'] ?: $defaultAvatar) ?>" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,255,255,0.08);" alt="avatar" onerror="this.src='<?= $defaultAvatar ?>';">
+                            <div class="flex-grow-1 min-width-0">
+                                <div class="d-flex justify-content-between align-items-baseline">
+                                    <span class="text-white fw-bold" style="font-size: 0.75rem;"><?= htmlspecialchars($c['username']) ?></span>
+                                    <span class="text-muted" style="font-size: 0.6rem;"><?= date('d/m/Y H:i', strtotime($c['ts_atualizacao'])) ?></span>
+                                </div>
+                                <?php if (!empty($c['rating'])): ?>
+                                    <div class="text-warning mb-1" style="font-size: 0.6rem;">
+                                        <?php for ($star = 1; $star <= 5; $star++): ?>
+                                            <i class="bi <?= $star <= (int)$c['rating'] ? 'bi-star-fill' : 'bi-star' ?>"></i>
+                                        <?php endfor; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <p class="text-gray mb-0" style="font-size: 0.74rem; line-height: 1.35; color: #d0d0d5 !important;"><?= htmlspecialchars($c['comment']) ?></p>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if (count($this->comments) > 3): ?>
+                    <div class="text-center mt-2.5">
+                        <button type="button" class="btn btn-sm btn-link text-accent text-decoration-none p-0 fw-bold" onclick="showMoreComments(this)" style="font-size: 0.72rem; color: #a88beb; background: transparent; border: none;">Ver mais comentários</button>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- TAB 2: EPISÓDIOS (only for non-movies) -->
@@ -236,12 +320,27 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                                 <?php if ($isUpcoming): ?>
                                     <span class="upcoming-countdown" style="font-size: 0.6rem; color: #aaa;">Falta <?= $daysLeft ?> dias</span>
                                 <?php else: ?>
-                                    <button class="tvtime-circle-check btn-check-episode <?= $ep['watched'] ? 'checked' : '' ?>" 
-                                            data-episode-id="<?= $ep['id_episodio'] ?>" 
-                                            data-item-id="<?= $item['id_item'] ?>"
-                                            style="width: 30px; height: 30px; font-size: 0.95rem;">
-                                        <i class="bi bi-check-lg"></i>
-                                    </button>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <?php if ($ep['watched']): ?>
+                                            <?php $rewCount = (int)($ep['rewatch_count'] ?? 0); ?>
+                                            <button type="button" class="btn btn-rewatch-ep text-muted p-0 d-flex align-items-center justify-content-center"
+                                                    data-episode-id="<?= $ep['id_episodio'] ?>"
+                                                    title="Reassistir este episódio"
+                                                    onclick="event.stopPropagation(); rewatchEpisode(<?= $ep['id_episodio'] ?>, this)"
+                                                    style="width: 30px; height: 30px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255,255,255,0.15); transition: all 0.2s;">
+                                                <i class="bi bi-arrow-counterclockwise fs-6"></i>
+                                                <?php if ($rewCount > 0): ?>
+                                                    <span class="badge bg-warning text-black ms-0.5 px-1 py-0.5" style="font-size: 0.52rem; font-weight: 800; border-radius: 4px;"><?= $rewCount ?>x</span>
+                                                <?php endif; ?>
+                                            </button>
+                                        <?php endif; ?>
+                                        <button class="tvtime-circle-check btn-check-episode <?= $ep['watched'] ? 'checked' : '' ?>" 
+                                                data-episode-id="<?= $ep['id_episodio'] ?>" 
+                                                data-item-id="<?= $item['id_item'] ?>"
+                                                style="width: 30px; height: 30px; font-size: 0.95rem;">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
+                                    </div>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
@@ -299,6 +398,9 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                         data-action="rewatch"
                         style="background-color: #2ed573 !important;">
                     <i class="bi bi-arrow-repeat me-1"></i> REASSISTIR <?= $item['type'] === 'movie' ? 'FILME' : 'SÉRIE' ?>
+                    <?php if ($item['type'] === 'movie' && isset($item['rewatch_count']) && $item['rewatch_count'] > 0): ?>
+                        <span class="badge bg-dark ms-2" id="movie-rewatch-badge" style="background-color: rgba(0,0,0,0.5) !important; color: #ffffff !important; font-weight: 700;"><?= $item['rewatch_count'] ?>x</span>
+                    <?php endif; ?>
                 </button>
                 <button class="btn-floating-action remove btn-track-toggle px-3" 
                         data-item-id="<?= $item['id_item'] ?>" 

@@ -1,0 +1,104 @@
+<div class="d-flex align-items-center gap-3 px-3 py-3 border-bottom border-dark" style="background-color: var(--bg-black);">
+    <a href="javascript:history.back()" class="text-white fs-4" style="text-decoration:none;"><i class="bi bi-arrow-left"></i></a>
+    <h5 class="text-white mb-0 fw-extrabold" style="font-weight: 800; font-size: 1.25rem;">Import do IMDb</h5>
+</div>
+
+<div class="p-3">
+    <!-- Passo 1 -->
+    <div class="p-4 rounded-4 mb-4" style="background-color: #1a1a24; border: 1px solid #2a2a3a;">
+        <h6 class="text-white fw-bold mb-3">Passo 1 — Pede os teus dados</h6>
+        <p class="small text-gray mb-3" style="font-size: 0.82rem; line-height: 1.6;">
+            Num browser, vai a:
+        </p>
+        <a href="https://www.imdb.com/registration/data-requests" target="_blank" class="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none fw-bold" style="color: #a88beb; font-size: 0.82rem;">
+            <i class="bi bi-globe"></i> imdb.com/registration/data-requests
+        </a>
+        <ol class="small text-gray ps-3 mb-0" style="font-size: 0.82rem; line-height: 1.8;">
+            <li>Inicia sessão se necessário (Nome de perfil -> Definições da conta -> Pedir os meus dados)</li>
+            <li>Clica em &laquo;Submit Request&raquo; no popup</li>
+            <li>Confirma o pedido pelo email que o IMDb te envia</li>
+            <li>Espera ~30 minutos até o IMDb te enviar os dados</li>
+            <li>Faz download do ZIP a partir do link no email</li>
+            <li>Volta aqui e faz upload abaixo</li>
+        </ol>
+        <p class="small text-muted mt-3 mb-0" style="font-size: 0.75rem; line-height: 1.5; color: #6e6e82 !important;">
+            O ZIP chama-se &laquo;All Data Categories&raquo; e contém os teus ratings, watchlist e listas.
+        </p>
+    </div>
+
+    <!-- Passo 2 -->
+    <div class="p-4 rounded-4 mb-4" style="background-color: #1a1a24; border: 1px solid #2a2a3a;">
+        <h6 class="text-white fw-bold mb-3">Passo 2 — Faz upload do teu ZIP</h6>
+        
+        <div class="position-relative p-4 rounded-3 text-center cursor-pointer" onclick="$('#zip_file').click()" style="background-color: #12121a; border: 1.5px dashed #2b2b3a; border-radius: 12px;">
+            <i class="bi bi-cloud-arrow-up fs-3 mb-2" style="color: #a88beb;"></i>
+            <div class="fw-bold text-white small" id="zip_label" style="font-size: 0.82rem;">Seleciona o teu ZIP do IMDb</div>
+            <div class="small" style="font-size: 0.72rem; color: #6e6e82; margin-top: 2px;">All Data Categories.zip</div>
+            <input type="file" id="zip_file" accept=".zip" class="d-none" onclick="event.stopPropagation()">
+        </div>
+    </div>
+
+    <!-- Import button -->
+    <div class="mb-5 pb-5">
+        <button type="button" id="btnSubmitImdb" class="btn w-100 py-3 rounded-pill fw-bold text-white" style="background-color: #3b3b4f; color: #8a8a9a !important; border: none; font-size: 0.9rem;" disabled>
+            Importar
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const zipInput = document.getElementById('zip_file');
+    const importBtn = document.getElementById('btnSubmitImdb');
+
+    zipInput.addEventListener('change', function() {
+        if (this.files[0]) {
+            document.getElementById('zip_label').textContent = this.files[0].name;
+            document.getElementById('zip_label').style.color = '#38ef7d';
+            importBtn.disabled = false;
+            importBtn.style.backgroundColor = '#7c4dff';
+            importBtn.style.color = '#ffffff';
+        } else {
+            document.getElementById('zip_label').textContent = 'Seleciona o teu ZIP do IMDb';
+            document.getElementById('zip_label').style.color = '#ffffff';
+            importBtn.disabled = true;
+            importBtn.style.backgroundColor = '#3b3b4f';
+            importBtn.style.color = '#8a8a9a';
+        }
+    });
+
+    importBtn.addEventListener('click', function() {
+        if (this.disabled) return;
+        
+        const formData = new FormData();
+        formData.append('zip_file', zipInput.files[0]);
+
+        // Show global loader
+        const loader = document.getElementById('globalLoader');
+        if (loader) loader.classList.remove('d-none');
+
+        $.ajax({
+            url: '/api/import/imdb',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    showToast(response.message || 'Importação finalizada com sucesso!', true);
+                    setTimeout(() => window.location.href = '/dashboard', 2000);
+                } else {
+                    showToast(response.message || 'Erro na importação.', false);
+                }
+            },
+            error: function() {
+                showToast('Erro de rede ou servidor ao importar.', false);
+            },
+            complete: function() {
+                if (loader) loader.classList.add('d-none');
+            }
+        });
+    });
+});
+</script>

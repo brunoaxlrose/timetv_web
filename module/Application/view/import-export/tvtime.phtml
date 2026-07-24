@@ -1,0 +1,148 @@
+<div class="d-flex align-items-center gap-3 px-3 py-3 border-bottom border-dark" style="background-color: var(--bg-black);">
+    <a href="javascript:history.back()" class="text-white fs-4" style="text-decoration:none;"><i class="bi bi-arrow-left"></i></a>
+    <h5 class="text-white mb-0 fw-extrabold" style="font-weight: 800; font-size: 1.25rem;">Import do TV Time</h5>
+</div>
+
+<div class="p-3">
+    <!-- Passo 1 -->
+    <div class="p-4 rounded-4 mb-4" style="background-color: #1a1a24; border: 1px solid #2a2a3a;">
+        <h6 class="text-white fw-bold mb-3">Passo 1 — Exporta os teus dados</h6>
+        <p class="small text-gray mb-3" style="font-size: 0.82rem; line-height: 1.6;">
+            Instala a extensão <strong>Refract's TV Time Out</strong> no Chrome:
+        </p>
+        <a href="https://chromewebstore.google.com" target="_blank" class="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none fw-bold" style="color: #a88beb; font-size: 0.82rem;">
+            <i class="bi bi-globe"></i> Refract's TV Time Out na Chrome Web Store
+        </a>
+        <ol class="small text-gray ps-3 mb-0" style="font-size: 0.82rem; line-height: 1.8;">
+            <li>Instala a extensão Refract's TV Time Out no Chrome (desktop)</li>
+            <li>Vai a tvtime.com e inicia sessão</li>
+            <li>Clica no ícone da extensão na barra do browser</li>
+            <li>Clica em &laquo;Export my data&raquo; — faz download de uma pasta com vários ficheiros</li>
+            <li>Encontra os ficheiros descarregados (com nomes como &laquo;tvtime-movies-YYYY-MM-DD.json&raquo; e &laquo;tvtime-series-YYYY-MM-DD.json&raquo;)</li>
+            <li>Transfere esses ficheiros para o teu telefone</li>
+            <li>Faz upload deles abaixo</li>
+        </ol>
+        <p class="small text-muted mt-3 mb-0" style="font-size: 0.75rem; line-height: 1.5; color: #6e6e82 !important;">
+            O export inclui os teus filmes e séries vistos com o progresso de episódios.
+        </p>
+    </div>
+
+    <!-- Passo 2 -->
+    <div class="p-4 rounded-4 mb-4" style="background-color: #1a1a24; border: 1px solid #2a2a3a;">
+        <h6 class="text-white fw-bold mb-3">Passo 2 — Faz upload dos teus ficheiros</h6>
+        
+        <div class="d-flex flex-column gap-3">
+            <!-- Movies -->
+            <div class="position-relative p-4 rounded-3 text-center cursor-pointer" onclick="$('#movies_file').click()" style="background-color: #12121a; border: 1.5px dashed #2b2b3a; border-radius: 12px;">
+                <i class="bi bi-film fs-3 mb-2" style="color: #a88beb;"></i>
+                <div class="fw-bold text-white small" id="movies_label" style="font-size: 0.82rem;">tvtime-movies-YYYY-MM-DD.json</div>
+                <div class="small" style="font-size: 0.72rem; color: #6e6e82; margin-top: 2px;">Opcional — os teus filmes vistos e watchlist</div>
+                <input type="file" id="movies_file" accept=".json" class="d-none" onclick="event.stopPropagation()">
+            </div>
+
+            <!-- Series -->
+            <div class="position-relative p-4 rounded-3 text-center cursor-pointer" onclick="$('#series_file').click()" style="background-color: #12121a; border: 1.5px dashed #2b2b3a; border-radius: 12px;">
+                <i class="bi bi-tv fs-3 mb-2" style="color: #a88beb;"></i>
+                <div class="fw-bold text-white small" id="series_label" style="font-size: 0.82rem;">tvtime-series-YYYY-MM-DD.json</div>
+                <div class="small" style="font-size: 0.72rem; color: #6e6e82; margin-top: 2px;">Opcional — as tuas séries e progresso de episódios</div>
+                <input type="file" id="series_file" accept=".json" class="d-none" onclick="event.stopPropagation()">
+            </div>
+
+            <!-- Lists -->
+            <div class="position-relative p-4 rounded-3 text-center cursor-pointer" onclick="$('#lists_file').click()" style="background-color: #12121a; border: 1.5px dashed #2b2b3a; border-radius: 12px;">
+                <i class="bi bi-list-task fs-3 mb-2" style="color: #a88beb;"></i>
+                <div class="fw-bold text-white small" id="lists_label" style="font-size: 0.82rem;">tvtime-lists-YYYY-MM-DD.json</div>
+                <div class="small" style="font-size: 0.72rem; color: #6e6e82; margin-top: 2px;">Opcional — as tuas listas personalizadas TV Time</div>
+                <input type="file" id="lists_file" accept=".json" class="d-none" onclick="event.stopPropagation()">
+            </div>
+        </div>
+    </div>
+
+    <!-- Import button -->
+    <div class="mb-5 pb-5">
+        <button type="button" id="btnSubmitTvtime" class="btn w-100 py-3 rounded-pill fw-bold text-white" style="background-color: #3b3b4f; color: #8a8a9a !important; border: none; font-size: 0.9rem;" disabled>
+            Importar
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const moviesInput = document.getElementById('movies_file');
+    const seriesInput = document.getElementById('series_file');
+    const listsInput = document.getElementById('lists_file');
+    const importBtn = document.getElementById('btnSubmitTvtime');
+
+    function updateBtnState() {
+        if (moviesInput.files.length > 0 || seriesInput.files.length > 0 || listsInput.files.length > 0) {
+            importBtn.disabled = false;
+            importBtn.style.backgroundColor = '#7c4dff';
+            importBtn.style.color = '#ffffff';
+        } else {
+            importBtn.disabled = true;
+            importBtn.style.backgroundColor = '#3b3b4f';
+            importBtn.style.color = '#8a8a9a';
+        }
+    }
+
+    moviesInput.addEventListener('change', function() {
+        if (this.files[0]) {
+            document.getElementById('movies_label').textContent = this.files[0].name;
+            document.getElementById('movies_label').style.color = '#38ef7d';
+        }
+        updateBtnState();
+    });
+
+    seriesInput.addEventListener('change', function() {
+        if (this.files[0]) {
+            document.getElementById('series_label').textContent = this.files[0].name;
+            document.getElementById('series_label').style.color = '#38ef7d';
+        }
+        updateBtnState();
+    });
+
+    listsInput.addEventListener('change', function() {
+        if (this.files[0]) {
+            document.getElementById('lists_label').textContent = this.files[0].name;
+            document.getElementById('lists_label').style.color = '#38ef7d';
+        }
+        updateBtnState();
+    });
+
+    importBtn.addEventListener('click', function() {
+        if (this.disabled) return;
+        
+        const formData = new FormData();
+        if (moviesInput.files[0]) formData.append('movies_file', moviesInput.files[0]);
+        if (seriesInput.files[0]) formData.append('series_file', seriesInput.files[0]);
+        if (listsInput.files[0]) formData.append('lists_file', listsInput.files[0]);
+
+        // Show global loader
+        const loader = document.getElementById('globalLoader');
+        if (loader) loader.classList.remove('d-none');
+
+        $.ajax({
+            url: '/api/import/tvtime',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    showToast(response.message || 'Importação iniciada com sucesso!', true);
+                    setTimeout(() => window.location.href = '/dashboard', 2000);
+                } else {
+                    showToast(response.message || 'Erro na importação.', false);
+                }
+            },
+            error: function() {
+                showToast('Erro de rede ou servidor ao importar.', false);
+            },
+            complete: function() {
+                if (loader) loader.classList.add('d-none');
+            }
+        });
+    });
+});
+</script>

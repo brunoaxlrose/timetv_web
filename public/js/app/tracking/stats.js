@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", function() {
+$(function() {
     window.switchProfileTab = function(tabElement, tabName) {
         $('.refract-profile-tab').removeClass('active');
         $(tabElement).addClass('active');

@@ -249,56 +249,25 @@
 
                         <!-- Import Section -->
                         <div class="settings-data-section mb-4">
-                            <div class="d-flex align-items-center gap-2 mb-1">
+                            <div class="d-flex align-items-center gap-2 mb-3">
                                 <i class="bi bi-upload text-accent" style="color: #a88beb;"></i>
-                                <h6 class="text-white mb-0 fw-bold">Importar do TV Time</h6>
+                                <h6 class="text-white mb-0 fw-bold">Importação de Dados</h6>
                             </div>
-                            <p class="small mb-3" style="color: #a5a5c0; font-size: 0.78rem; line-height: 1.5;">
-                                Importe seus dados de acompanhamento do TV Time. Faça o download do seu arquivo GDPR em <strong>tvtime.com/settings</strong> e selecione um dos CSVs abaixo.
-                            </p>
-
-                            <!-- File type guide -->
-                            <div class="settings-import-guide mb-3">
-                                <div class="settings-import-guide-item">
-                                    <i class="bi bi-camera-video-fill" style="color: #a88beb;"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 0.8rem;">tracking-prod-records-v2.csv</div>
-                                        <div style="font-size: 0.72rem; color: #a5a5c0;">Episódios assistidos de séries</div>
-                                    </div>
-                                </div>
-                                <div class="settings-import-guide-item">
-                                    <i class="bi bi-film" style="color: #ffd200;"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 0.8rem;">tracking-prod-records.csv</div>
-                                        <div style="font-size: 0.72rem; color: #a5a5c0;">Filmes assistidos/salvos</div>
-                                    </div>
-                                </div>
-                                <div class="settings-import-guide-item">
-                                    <i class="bi bi-tv-fill" style="color: #38ef7d;"></i>
-                                    <div>
-                                        <div class="fw-bold" style="font-size: 0.8rem;">user_tv_show_data.csv</div>
-                                        <div style="font-size: 0.72rem; color: #a5a5c0;">Lista de séries seguidas</div>
-                                    </div>
-                                </div>
+                            
+                            <div class="d-flex flex-column gap-2">
+                                <a href="/import/tvtime" class="btn btn-outline-light btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between text-white" style="border: 1px solid #2d2d3e; background-color: #0c0c12; text-decoration: none;">
+                                    <span><i class="bi bi-tv-fill me-2" style="color: #a88beb;"></i> Importar do TV Time</span>
+                                    <i class="bi bi-chevron-right small text-muted"></i>
+                                </a>
+                                <a href="/import/imdb" class="btn btn-outline-light btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between text-white" style="border: 1px solid #2d2d3e; background-color: #0c0c12; text-decoration: none;">
+                                    <span><i class="bi bi-film me-2" style="color: #ffd200;"></i> Importar do IMDb</span>
+                                    <i class="bi bi-chevron-right small text-muted"></i>
+                                </a>
+                                <a href="/import/trakt" class="btn btn-outline-light btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between text-white" style="border: 1px solid #2d2d3e; background-color: #0c0c12; text-decoration: none;">
+                                    <span><i class="bi bi-cloud-arrow-down-fill me-2" style="color: #38ef7d;"></i> Importar do Trakt</span>
+                                    <i class="bi bi-chevron-right small text-muted"></i>
+                                </a>
                             </div>
-
-                            <!-- File upload -->
-                            <label for="importCsvFile" class="settings-upload-label w-100" id="importUploadLabel">
-                                <i class="bi bi-cloud-upload-fill fs-4 mb-1" style="color: #a88beb;"></i>
-                                <span id="importFileName">Clique para selecionar o CSV</span>
-                                <input type="file" id="importCsvFile" accept=".csv" class="d-none">
-                            </label>
-
-                            <!-- Progress / Result -->
-                            <div id="importProgress" class="d-none mt-3 p-3 rounded-3 text-center" style="background: rgba(168,139,235,0.07); border: 1px solid rgba(168,139,235,0.15);">
-                                <div id="importSpinner" class="spinner-border spinner-border-sm me-2" style="color: #a88beb;" role="status"></div>
-                                <span id="importStatusText" style="font-size: 0.82rem; color: #a5a5c0;">Importando dados, aguarde...</span>
-                            </div>
-                            <div id="importResult" class="d-none mt-3"></div>
-
-                            <button type="button" id="btnStartImport" class="btn w-100 mt-3 py-2 rounded-pill fw-bold text-white d-none" style="background: linear-gradient(135deg, #a88beb, #7c4dff); border: none; font-size: 0.85rem;">
-                                <i class="bi bi-cloud-upload me-1"></i> Importar Arquivo
-                            </button>
                         </div>
 
                         <div class="settings-data-divider"></div>

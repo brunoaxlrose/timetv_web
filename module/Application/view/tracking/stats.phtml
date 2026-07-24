@@ -58,53 +58,24 @@ $this->partial('tracking/js.phtml', ['page' => 'stats']);
             <div class="row g-3">
                 <div class="col-6 d-flex align-items-center gap-2">
                     <span class="refract-dot orange"></span>
-                    <span class="text-white small fw-bold"><?= $seriesCount + $animeCount ?></span>
+                    <span class="text-white small fw-bold"><?= $this->watchingCount ?></span>
                     <span class="text-muted small">A ver</span>
                 </div>
                 <div class="col-6 d-flex align-items-center gap-2">
                     <span class="refract-dot purple"></span>
-                    <span class="text-white small fw-bold"><?= $totalEpisodesWatched ?></span>
+                    <span class="text-white small fw-bold"><?= $this->completedCount ?></span>
                     <span class="text-muted small">Visto</span>
                 </div>
                 <div class="col-6 d-flex align-items-center gap-2">
                     <span class="refract-dot green"></span>
-                    <span class="text-white small fw-bold">1</span>
+                    <span class="text-white small fw-bold"><?= $this->upToDateCount ?></span>
                     <span class="text-muted small">Em dia</span>
-                </div>
-                <div class="col-6 d-flex align-items-center gap-2">
-                    <span class="refract-dot red"></span>
-                    <span class="text-white small fw-bold">0</span>
-                    <span class="text-muted small">Em pausa</span>
-                </div>
-                <div class="col-6 d-flex align-items-center gap-2">
-                    <span class="refract-dot cyan"></span>
-                    <span class="text-white small fw-bold">0</span>
-                    <span class="text-muted small">Revisto</span>
                 </div>
                 <div class="col-6 d-flex align-items-center gap-2">
                     <span class="refract-dot green" style="background-color: #2ed573 !important;"></span>
                     <span class="text-white small fw-bold"><?= $this->totalRewatched ?></span>
                     <span class="text-muted small">Reassistidos</span>
                 </div>
-            </div>
-        </div>
-
-        <!-- Activity Map Panel -->
-        <div class="refract-card-dark p-3 rounded-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="text-white fw-bold small text-uppercase" style="letter-spacing: 0.5px;">Atividade</span>
-                <span class="text-muted" style="font-size: 0.65rem;">1 dia ativo &bull; 🔥 1 dias</span>
-            </div>
-            <!-- Simple year selector as in Image 4 -->
-            <span class="badge refract-year-badge py-2 px-3 mb-3">2026</span>
-            <!-- Simulated activity blocks -->
-            <div class="d-flex gap-1 justify-content-between overflow-hidden py-1">
-                <?php for ($i=0; $i<24; $i++): ?>
-                    <span class="refract-activity-block <?= $i == 18 ? 'active' : '' ?>"></span>
-                <?php endfor; ?>
-            </div>
-            <div class="d-flex justify-content-between text-muted mt-2" style="font-size: 0.58rem;">
-                <span>jun.</span><span>jul.</span><span>ago.</span><span>set.</span>
             </div>
         </div>
     </div>

@@ -212,6 +212,86 @@ return [
                     ],
                 ],
             ],
+            'import-tvtime' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/import/tvtime',
+                    'defaults' => [
+                        'controller' => ImportExportController::class,
+                        'action'     => 'tvtime',
+                    ],
+                ],
+            ],
+            'import-imdb' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/import/imdb',
+                    'defaults' => [
+                        'controller' => ImportExportController::class,
+                        'action'     => 'imdb',
+                    ],
+                ],
+            ],
+            'import-trakt' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/import/trakt',
+                    'defaults' => [
+                        'controller' => ImportExportController::class,
+                        'action'     => 'trakt',
+                    ],
+                ],
+            ],
+            'api-import-tvtime' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/import/tvtime',
+                    'defaults' => [
+                        'controller' => ImportExportController::class,
+                        'action'     => 'apiImportTvtime',
+                    ],
+                ],
+            ],
+            'api-import-imdb' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/import/imdb',
+                    'defaults' => [
+                        'controller' => ImportExportController::class,
+                        'action'     => 'apiImportImdb',
+                    ],
+                ],
+            ],
+            'api-save-review' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/save-review',
+                    'defaults' => [
+                        'controller' => CatalogController::class,
+                        'action'     => 'apiSaveReview',
+                    ],
+                ],
+            ],
+            'api-rewatch-episode' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/rewatch-episode',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiRewatchEpisode',
+                    ],
+                ],
+            ],
+            'api-import-trakt' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/import/trakt',
+                    'defaults' => [
+                        'controller' => ImportExportController::class,
+                        'action'     => 'apiImportTrakt',
+                    ],
+                ],
+            ],
         ],
     ],
     'controllers' => [
@@ -246,6 +326,9 @@ return [
             'application/tracking/dashboard'  => __DIR__ . '/../view/tracking/dashboard.phtml',
             'application/tracking/stats'      => __DIR__ . '/../view/tracking/stats.phtml',
             'application/tracking/diary'      => __DIR__ . '/../view/tracking/diary.phtml',
+            'application/import-export/tvtime' => __DIR__ . '/../view/import-export/tvtime.phtml',
+            'application/import-export/imdb'   => __DIR__ . '/../view/import-export/imdb.phtml',
+            'application/import-export/trakt'  => __DIR__ . '/../view/import-export/trakt.phtml',
         ],
         'template_path_stack' => [
             __DIR__ . '/../view',

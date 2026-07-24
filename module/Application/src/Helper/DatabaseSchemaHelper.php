@@ -89,6 +89,10 @@ class DatabaseSchemaHelper {
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS release_date DATE;",
             "ALTER TABLE episodio ADD COLUMN IF NOT EXISTS image_url TEXT;",
             "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS avatar_url TEXT;",
+            "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS comment TEXT NULL;",
+            "ALTER TABLE item ADD COLUMN IF NOT EXISTS watch_providers TEXT NULL;",
+            "ALTER TABLE usuario_episodio ADD COLUMN IF NOT EXISTS rewatch_count INT DEFAULT 0;",
+            "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS rewatch_count INT DEFAULT 0;",
 
             // 7. Notificacao
             "CREATE TABLE IF NOT EXISTS notificacao (

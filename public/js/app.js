@@ -1,3 +1,5 @@
+$.ajaxSetup({ cache: false });
+
 // Helper function to show/hide global loading spinner overlay
 function showGlobalLoader(show) {
     const $loader = $('#globalLoader');
@@ -26,6 +28,133 @@ function showToast(message, isSuccess = true) {
     }
     toast.show();
 }
+
+function loadPageContent(url, push = true) {
+    showGlobalLoader(true);
+
+    // Programmatically close settings modal if open on navigation transition
+    const $settingsModal = $('#editProfileModal');
+    if ($settingsModal.length && $settingsModal.hasClass('show')) {
+        const modalInstance = bootstrap.Modal.getInstance($settingsModal[0]);
+        if (modalInstance) {
+            modalInstance.hide();
+        }
+    }
+
+    $.get(url, function(data) {
+        if (push) {
+            history.pushState({ url: url }, '', url);
+        }
+        const html = $.parseHTML(data, document, true);
+        
+        // Swap content using temporary container wrapper
+        const $temp = $('<div>').append(html);
+        const $newContent = $temp.find('.flex-grow-1');
+        if ($newContent.length) {
+            $('.flex-grow-1').html($newContent.html());
+        } else {
+            // Fallback: server returned view without layout (setTerminal(true))
+            $('.flex-grow-1').html(html);
+        }
+
+        // Swap floating bar if exists
+        const $newFloatingBar = $temp.find('.bottom-floating-bar');
+        if ($newFloatingBar.length) {
+            if ($('.bottom-floating-bar').length) {
+                $('.bottom-floating-bar').replaceWith($newFloatingBar);
+            } else {
+                $('.flex-grow-1').append($newFloatingBar);
+            }
+        } else {
+            $('.bottom-floating-bar').remove();
+        }
+
+        // Find and execute script tags (only if they are outside .flex-grow-1 to prevent duplicate runs)
+        const $allScripts = $temp.find('script');
+        const $insideScripts = $newContent.find('script');
+        const $outsideScripts = $allScripts.filter(function() {
+            const script = this;
+            let isInside = false;
+            $insideScripts.each(function() {
+                if (this === script) {
+                    isInside = true;
+                }
+            });
+            return !isInside;
+        });
+
+        $outsideScripts.each(function() {
+            const src = $(this).attr('src');
+            if (src) {
+                if (src.indexOf('app.js') === -1 && src.indexOf('bootstrap') === -1 && src.indexOf('jquery') === -1) {
+                    $.ajax({
+                        url: src,
+                        dataType: "script",
+                        cache: true,
+                        async: false
+                    });
+                }
+            } else {
+                const scriptText = this.text || this.textContent || this.innerHTML || '';
+                $.globalEval(scriptText);
+            }
+        });
+
+        // Update active class on bottom-navbar
+        $('.bottom-navbar .nav-item').removeClass('active');
+        $('.bottom-navbar .nav-item').each(function() {
+            const href = $(this).attr('href');
+            const cleanUrl = url.split('?')[0]; // ignore query parameters
+            if (cleanUrl === href || (href !== '/dashboard' && cleanUrl.startsWith(href))) {
+                $(this).addClass('active');
+            }
+        });
+
+        // Initialize dynamic tabs if we are on the detail page
+        if (url.indexOf('/detail') !== -1) {
+            const savedTab = localStorage.getItem('activeTab_' + window.location.search) || 'sobre';
+            if (typeof switchDetailTab === 'function') {
+                switchDetailTab(savedTab);
+            } else {
+                // Inline fallback if switchDetailTab is not globally declared yet
+                $('#tabSobreBtn, #tabEpisodiosBtn').removeClass('active');
+                $('#tabSobreContent, #tabEpisodiosContent').addClass('d-none');
+                if (savedTab === 'sobre') {
+                    $('#tabSobreBtn').addClass('active');
+                    $('#tabSobreContent').removeClass('d-none');
+                } else {
+                    $('#tabEpisodiosBtn').addClass('active');
+                    $('#tabEpisodiosContent').removeClass('d-none');
+                }
+            }
+        }
+
+        // Scroll to top
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    }).fail(function() {
+        window.location.href = url;
+    }).always(function() {
+        showGlobalLoader(false);
+    });
+}
+
+// Global Interceptor for SPA links
+$(document).on('click', 'a', function(e) {
+    const href = $(this).attr('href');
+    const target = $(this).attr('target');
+    
+    if (!href || href.startsWith('http') || href.startsWith('#') || href.startsWith('javascript') || target === '_blank' || href === '/logout') {
+        return;
+    }
+    
+    e.preventDefault();
+    loadPageContent(href, true);
+});
+
+// Browser navigation popstate listener
+window.addEventListener('popstate', function(e) {
+    loadPageContent(window.location.pathname + window.location.search, false);
+});
 
 $(document).ready(function() {
     // --- AUTHENTICATION HANDLERS VIA JQUERY $.ajax ---
@@ -93,7 +222,7 @@ $(document).ready(function() {
 
     // Helper: silently refresh the layout's content container via AJAX
     function reloadKeepEpisodesTab() {
-        const activeTab = localStorage.getItem('activeTab_' + window.location.pathname) || 'sobre';
+        const activeTab = localStorage.getItem('activeTab_' + window.location.search) || 'sobre';
         showGlobalLoader(true);
         
         $.get(window.location.href, function(data) {
@@ -113,7 +242,7 @@ $(document).ready(function() {
             
             // Restore active tab on detail page
             if (window.location.pathname.indexOf('/detail') !== -1) {
-                localStorage.setItem('activeTab_' + window.location.pathname, activeTab);
+                localStorage.setItem('activeTab_' + window.location.search, activeTab);
                 const tabBtnId = `#tab${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}Btn`;
                 $(tabBtnId).click();
             }

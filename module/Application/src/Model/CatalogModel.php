@@ -53,7 +53,7 @@ class CatalogModel {
 
     public function getLocalItemById(int $userId, string $itemId) {
         $stmt = $this->pdo->prepare("
-            SELECT i.*, ui.status as track_status, ui.rating
+            SELECT i.*, ui.status as track_status, ui.rating, ui.comment, COALESCE(ui.rewatch_count, 0) as rewatch_count
             FROM item i
             LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id
             WHERE i.id_item = :id
@@ -66,8 +66,10 @@ class CatalogModel {
     public function getEpisodesWithWatchedState(int $userId, string $itemId): array {
         $stmt = $this->pdo->prepare("
             SELECT e.*, 
-                   (SELECT 1 FROM usuario_episodio ue WHERE ue.id_episodio = e.id_episodio AND ue.id_usuario = :user_id) as watched
+                   (ue.id_usuario_episodio IS NOT NULL) as watched,
+                   COALESCE(ue.rewatch_count, 0) as rewatch_count
             FROM episodio e
+            LEFT JOIN usuario_episodio ue ON e.id_episodio = ue.id_episodio AND ue.id_usuario = :user_id
             WHERE e.id_item = :item_id
             ORDER BY e.season_number ASC, e.episode_number ASC
         ");
@@ -333,9 +335,20 @@ class CatalogModel {
             }
         }
 
-        // Cache the parsed results
         $this->cacheSearchResults($search, $merged);
 
         return $merged;
+    }
+
+    public function getItemComments(int $itemId): array {
+        $stmt = $this->pdo->prepare("
+            SELECT ui.comment, ui.rating, ui.ts_atualizacao, u.username, u.avatar_url, ui.id_usuario
+            FROM usuario_item ui
+            JOIN usuario u ON ui.id_usuario = u.id_usuario
+            WHERE ui.id_item = :item_id AND ui.comment IS NOT NULL AND ui.comment != ''
+            ORDER BY ui.ts_atualizacao DESC
+        ");
+        $stmt->execute([':item_id' => $itemId]);
+        return $stmt->fetchAll();
     }
 }

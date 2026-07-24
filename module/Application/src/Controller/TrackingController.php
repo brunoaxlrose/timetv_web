@@ -22,9 +22,10 @@ class TrackingController extends AbstractActionController {
 
         $userId = $_SESSION['user_id'];
 
-        $grouped      = $this->params()->fromQuery('grouped', '1') === '1';
-        $statusFilter = $this->params()->fromQuery('status_filter', '');
-        $sortBy       = $this->params()->fromQuery('sort_by', 'last_watched');
+        $grouped        = $this->params()->fromQuery('grouped', '1') === '1';
+        $statusFilter   = $this->params()->fromQuery('status_filter', '');
+        $sortBy         = $this->params()->fromQuery('sort_by', 'last_watched');
+        $providerFilter = $this->params()->fromQuery('provider', '');
         
         $mediaMovies = $this->params()->fromQuery('media_movies', '1') === '1';
         $mediaSeries = $this->params()->fromQuery('media_series', '1') === '1';
@@ -35,7 +36,15 @@ class TrackingController extends AbstractActionController {
         if ($mediaSeries) $types[] = 'series';
         if ($mediaAnime) $types[] = 'anime';
 
-        $userItems = $this->trackingModel->getUserCollection($userId, $types, $sortBy);
+        $userItems = $this->trackingModel->getUserCollection($userId, $types, $sortBy, $providerFilter);
+
+        // Precalculate progress percent for all series and animes
+        foreach ($userItems as &$item) {
+            if ($item['type'] !== 'movie') {
+                $prog = $this->trackingModel->getProgress($userId, $item['id_item']);
+                $item['progress_percent'] = $prog['total_count'] > 0 ? round(($prog['watched_count'] / $prog['total_count']) * 100) : 0;
+            }
+        }
 
         $items = [];
         if ($grouped) {
@@ -125,13 +134,14 @@ class TrackingController extends AbstractActionController {
         }
 
         $view = new ViewModel([
-            'items'        => $items,
-            'grouped'      => $grouped,
-            'statusFilter' => $statusFilter,
-            'sortBy'       => $sortBy,
-            'mediaMovies'  => $mediaMovies,
-            'mediaSeries'  => $mediaSeries,
-            'mediaAnime'   => $mediaAnime,
+            'items'          => $items,
+            'grouped'        => $grouped,
+            'statusFilter'   => $statusFilter,
+            'sortBy'         => $sortBy,
+            'mediaMovies'    => $mediaMovies,
+            'mediaSeries'    => $mediaSeries,
+            'mediaAnime'     => $mediaAnime,
+            'providerFilter' => $providerFilter,
         ]);
 
         if ($this->getRequest()->isXmlHttpRequest()) {
@@ -260,6 +270,28 @@ class TrackingController extends AbstractActionController {
         }
     }
 
+    public function apiRewatchEpisodeAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autenticado.']);
+        }
+        $userId = $_SESSION['user_id'];
+        $request = $this->getRequest();
+        if (!$request->isPost()) {
+            return new JsonModel(['success' => false, 'message' => 'Método inválido.']);
+        }
+        $episodeId = (int)$request->getPost()->get('episode_id');
+        if ($episodeId <= 0) {
+            return new JsonModel(['success' => false, 'message' => 'ID de episódio inválido.']);
+        }
+        
+        try {
+            $newCount = $this->trackingModel->rewatchEpisode($userId, $episodeId);
+            return new JsonModel(['success' => true, 'rewatch_count' => $newCount]);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     public function statsAction() {
         if (!isset($_SESSION['user_id'])) {
             return $this->redirect()->toRoute('login');
@@ -269,11 +301,8 @@ class TrackingController extends AbstractActionController {
         
         $stats = $this->trackingModel->getStatsSummary($userId);
         $timeline = $this->trackingModel->getStatsTimeline($userId);
-        $genres = $this->trackingModel->getStatsGenres($userId);
 
-        // Convert total episodes count to watch time estimates
-        $avgRuntime = 40;
-        $totalMinutes = $stats['totalEpisodes'] * $avgRuntime;
+        $totalMinutes = $stats['totalMinutes'];
         $days = floor($totalMinutes / 1440);
         $hours = floor(($totalMinutes % 1440) / 60);
         $minutes = $totalMinutes % 60;
@@ -284,11 +313,15 @@ class TrackingController extends AbstractActionController {
             'animeCount' => $stats['animeCount'],
             'moviesCount' => $stats['moviesCount'],
             'totalRewatched' => $stats['totalRewatched'],
+            'watchingCount' => $stats['watchingCount'],
+            'upToDateCount' => $stats['upToDateCount'],
+            'completedCount' => $stats['completedCount'],
+            'pausedCount' => $stats['pausedCount'],
+            'rewatchingCount' => $stats['rewatchingCount'],
             'days' => $days,
             'hours' => $hours,
             'minutes' => $minutes,
             'timeline' => $timeline,
-            'genres' => $genres,
         ]);
         
         $this->layout()->title = "Perfil - Time View";

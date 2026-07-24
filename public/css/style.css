@@ -10,7 +10,7 @@
     --accent-pink: #ff758f;
     --text-white: #ffffff;
     --text-gray: #a5a5b4;
-    --text-muted: #6e6e82;
+    --text-muted: #a5a5c0;
     --font-family: 'Outfit', sans-serif;
 }
 
@@ -1522,19 +1522,21 @@ textarea::-moz-placeholder,
     body {
         justify-content: center;
         background-color: #050508;
+        overflow-x: hidden;
     }
 
     .app-container {
         max-width: 100% !important;
-        width: 100% !important;
+        width: 100vw !important;
         margin: 0 !important;
-        padding: 0 40px !important;
+        padding: 0 20px !important;
         padding-bottom: 0 !important;
         border: none;
         box-shadow: none;
         background-color: transparent;
-        flex-direction: row-reverse;
+        flex-direction: row;
         /* Sidebar navigation on left, content on right */
+        overflow-x: hidden;
     }
 
     .flex-grow-1 {

@@ -11,7 +11,7 @@ class TrackingModel {
         $this->pdo = $pdo;
     }
 
-    public function getUserCollection(int $userId, array $types, string $sortBy): array {
+    public function getUserCollection(int $userId, array $types, string $sortBy, string $providerFilter = ''): array {
         $query = "
             SELECT ui.status as track_status, ui.ts_atualizacao, i.* 
             FROM usuario_item ui
@@ -28,6 +28,10 @@ class TrackingModel {
 
         $query .= " AND i.description IS NOT NULL AND i.description != 'Nenhuma sinopse disponível.' AND i.description != ''";
 
+        if (!empty($providerFilter)) {
+            $query .= " AND i.watch_providers LIKE :provider_pattern";
+        }
+
         if ($sortBy === 'last_added') {
             $query .= " ORDER BY ui.ts_inclusao DESC";
         } elseif ($sortBy === 'last_premiered') {
@@ -37,8 +41,37 @@ class TrackingModel {
         }
 
         $stmt = $this->pdo->prepare($query);
-        $stmt->execute([':user_id' => $userId]);
+        $params = [':user_id' => $userId];
+        if (!empty($providerFilter)) {
+            $params[':provider_pattern'] = '%"name":"' . $providerFilter . '"%';
+        }
+        $stmt->execute($params);
         return $stmt->fetchAll();
+    }
+
+    public function getProgress(int $userId, string $itemId): array {
+        $stmtTotal = $this->pdo->prepare("
+            SELECT COUNT(id_episodio) 
+            FROM episodio 
+            WHERE id_item = :item_id 
+              AND (air_date IS NULL OR air_date = '' OR CAST(air_date AS DATE) <= CURRENT_DATE)
+        ");
+        $stmtTotal->execute([':item_id' => $itemId]);
+        $total = (int)$stmtTotal->fetchColumn();
+
+        $stmtWatched = $this->pdo->prepare("
+            SELECT COUNT(ue.id_episodio) 
+            FROM usuario_episodio ue
+            JOIN episodio e ON ue.id_episodio = e.id_episodio
+            WHERE ue.id_usuario = :user_id AND e.id_item = :item_id
+        ");
+        $stmtWatched->execute([':user_id' => $userId, ':item_id' => $itemId]);
+        $watched = (int)$stmtWatched->fetchColumn();
+
+        return [
+            'total_count' => $total,
+            'watched_count' => $watched
+        ];
     }
 
     public function countReleasedUnwatchedEpisodes(int $userId, string $itemId): int {
@@ -81,16 +114,31 @@ class TrackingModel {
     }
 
     public function startRewatching(int $userId, string $itemId): void {
-        $stmt = $this->pdo->prepare("
-            UPDATE usuario_item 
-            SET status = 'watching', 
-                rewatch_count = COALESCE(rewatch_count, 0) + 1,
-                ts_atualizacao = CURRENT_TIMESTAMP
-            WHERE id_usuario = :user_id AND id_item = :item_id
-        ");
-        $stmt->execute([':user_id' => $userId, ':item_id' => $itemId]);
-        
-        $this->unwatchAllEpisodes($userId, $itemId);
+        $stmtType = $this->pdo->prepare("SELECT type FROM item WHERE id_item = :item_id");
+        $stmtType->execute([':item_id' => $itemId]);
+        $type = $stmtType->fetchColumn();
+
+        if ($type === 'movie') {
+            $stmt = $this->pdo->prepare("
+                UPDATE usuario_item 
+                SET status = 'completed', 
+                    rewatch_count = COALESCE(rewatch_count, 0) + 1,
+                    ts_atualizacao = CURRENT_TIMESTAMP
+                WHERE id_usuario = :user_id AND id_item = :item_id
+            ");
+            $stmt->execute([':user_id' => $userId, ':item_id' => $itemId]);
+        } else {
+            $stmt = $this->pdo->prepare("
+                UPDATE usuario_item 
+                SET status = 'watching', 
+                    rewatch_count = COALESCE(rewatch_count, 0) + 1,
+                    ts_atualizacao = CURRENT_TIMESTAMP
+                WHERE id_usuario = :user_id AND id_item = :item_id
+            ");
+            $stmt->execute([':user_id' => $userId, ':item_id' => $itemId]);
+            
+            $this->unwatchAllEpisodes($userId, $itemId);
+        }
     }
 
     public function removeTrack(int $userId, string $itemId): void {
@@ -188,12 +236,26 @@ class TrackingModel {
     }
 
     public function getStatsSummary(int $userId): array {
-        $stats = [];
-        
+        $stats = [
+            'totalEpisodes' => 0,
+            'seriesCount' => 0,
+            'animeCount' => 0,
+            'moviesCount' => 0,
+            'totalRewatched' => 0,
+            'watchingCount' => 0,
+            'upToDateCount' => 0,
+            'completedCount' => 0,
+            'pausedCount' => 0,
+            'rewatchingCount' => 0,
+            'totalMinutes' => 0
+        ];
+
+        // 1. Total episodes watched count
         $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM usuario_episodio WHERE id_usuario = :user_id");
         $stmt->execute([':user_id' => $userId]);
         $stats['totalEpisodes'] = intval($stmt->fetchColumn());
 
+        // 2. Counts by type
         $stmt = $this->pdo->prepare("
             SELECT i.type, COUNT(i.id_item) as count 
             FROM usuario_item ui
@@ -203,19 +265,84 @@ class TrackingModel {
         ");
         $stmt->execute([':user_id' => $userId]);
         $counts = $stmt->fetchAll();
-        
-        $stats['seriesCount'] = 0;
-        $stats['animeCount'] = 0;
-        $stats['moviesCount'] = 0;
         foreach ($counts as $c) {
             if ($c['type'] === 'series') $stats['seriesCount'] = intval($c['count']);
             elseif ($c['type'] === 'anime') $stats['animeCount'] = intval($c['count']);
             elseif ($c['type'] === 'movie') $stats['moviesCount'] = intval($c['count']);
         }
 
-        $stmt = $this->pdo->prepare("SELECT COALESCE(SUM(rewatch_count), 0) FROM usuario_item WHERE id_usuario = :user_id");
+        // 3. Total rewatched
+        $stmt = $this->pdo->prepare("SELECT COALESCE(SUM(rewatch_count), 0) FROM usuario_episodio WHERE id_usuario = :user_id");
         $stmt->execute([':user_id' => $userId]);
         $stats['totalRewatched'] = intval($stmt->fetchColumn());
+
+        // 4. Group status counts (watching, em dia, visto, etc.)
+        $stmtItems = $this->pdo->prepare("
+            SELECT ui.status as track_status, i.id_item, i.type, i.runtime_minutes 
+            FROM usuario_item ui
+            JOIN item i ON ui.id_item = i.id_item
+            WHERE ui.id_usuario = :user_id
+        ");
+        $stmtItems->execute([':user_id' => $userId]);
+        $userItems = $stmtItems->fetchAll();
+
+        foreach ($userItems as $item) {
+            if ($item['track_status'] === 'dropped') {
+                $stats['pausedCount']++;
+                continue;
+            }
+            if ($item['track_status'] === 'rewatching') {
+                $stats['rewatchingCount']++;
+            }
+
+            if ($item['type'] !== 'movie') {
+                // Count released unwatched episodes
+                $stmtRem = $this->pdo->prepare("
+                    SELECT COUNT(e.id_episodio) 
+                    FROM episodio e
+                    WHERE e.id_item = :item_id 
+                      AND (e.air_date IS NULL OR e.air_date = '' OR CAST(e.air_date AS DATE) <= CURRENT_DATE)
+                      AND e.id_episodio NOT IN (SELECT id_episodio FROM usuario_episodio WHERE id_usuario = :user_id)
+                ");
+                $stmtRem->execute([':item_id' => $item['id_item'], ':user_id' => $userId]);
+                $remaining = intval($stmtRem->fetchColumn());
+
+                if ($item['track_status'] === 'completed') {
+                    $stats['completedCount']++;
+                } elseif ($remaining === 0) {
+                    $stats['upToDateCount']++;
+                } else {
+                    $stats['watchingCount']++;
+                }
+            } else {
+                if ($item['track_status'] === 'completed') {
+                    $stats['completedCount']++;
+                } else {
+                    $stats['watchingCount']++;
+                }
+            }
+        }
+
+        // 5. Total watched time in minutes
+        $stmtEpTime = $this->pdo->prepare("
+            SELECT COALESCE(SUM(COALESCE(e.runtime_minutes, 45)), 0) 
+            FROM usuario_episodio ue 
+            JOIN episodio e ON ue.id_episodio = e.id_episodio 
+            WHERE ue.id_usuario = :user_id
+        ");
+        $stmtEpTime->execute([':user_id' => $userId]);
+        $epMinutes = intval($stmtEpTime->fetchColumn());
+
+        $stmtMovieTime = $this->pdo->prepare("
+            SELECT COALESCE(SUM(COALESCE(i.runtime_minutes, 120)), 0) 
+            FROM usuario_item ui 
+            JOIN item i ON ui.id_item = i.id_item 
+            WHERE ui.id_usuario = :user_id AND i.type = 'movie' AND ui.status = 'completed'
+        ");
+        $stmtMovieTime->execute([':user_id' => $userId]);
+        $movieMinutes = intval($stmtMovieTime->fetchColumn());
+
+        $stats['totalMinutes'] = $epMinutes + $movieMinutes;
 
         return $stats;
     }
@@ -267,5 +394,22 @@ class TrackingModel {
         ");
         $stmt->execute([':user_id' => $userId]);
         return $stmt->fetchAll();
+    }
+
+    public function rewatchEpisode(int $userId, int $episodeId): int {
+        $stmt = $this->pdo->prepare("SELECT id_usuario_episodio, rewatch_count FROM usuario_episodio WHERE id_usuario = :uid AND id_episodio = :eid LIMIT 1");
+        $stmt->execute([':uid' => $userId, ':eid' => $episodeId]);
+        $row = $stmt->fetch();
+        
+        if ($row) {
+            $newCount = (int)$row['rewatch_count'] + 1;
+            $stmtUpdate = $this->pdo->prepare("UPDATE usuario_episodio SET rewatch_count = :count WHERE id_usuario_episodio = :id");
+            $stmtUpdate->execute([':count' => $newCount, ':id' => $row['id_usuario_episodio']]);
+            return $newCount;
+        } else {
+            $stmtInsert = $this->pdo->prepare("INSERT INTO usuario_episodio (id_usuario, id_episodio, rewatch_count) VALUES (:uid, :eid, 1)");
+            $stmtInsert->execute([':uid' => $userId, ':eid' => $episodeId]);
+            return 1;
+        }
     }
 }

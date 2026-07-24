@@ -1,5 +1,5 @@
 // Executa somente apos todo o DOM e scripts (inclusive jQuery no rodape do layout) estarem carregados
-document.addEventListener("DOMContentLoaded", function() {
+$(function() {
     // Agora o jQuery ($) ja esta disponivel com total certeza
 
     window.openFilterModal = function() {
@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", function() {
     window.resetFilters = function() {
         $('#statusFilterNone').prop('checked', true);
         $('#sortLastWatched').prop('checked', true);
+        $('#providerNone').prop('checked', true);
         const $groupedSwitch = $('input[name="grouped"]');
         if ($groupedSwitch.length) $groupedSwitch.prop('checked', true);
     };
@@ -122,7 +123,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Live search: trigger 2000ms after last keystroke if query length >= 3
     let searchDebounce;
-    $('#searchInput').on('input', function() {
+    $(document).off('input', '#searchInput').on('input', '#searchInput', function() {
         clearTimeout(searchDebounce);
         const val = $(this).val().trim();
         
@@ -133,7 +134,7 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // Also trigger on Enter key immediately (ignoring the 2s debounce but requiring 3 chars)
-    $('#searchInput').on('keydown', function(e) {
+    $(document).off('keydown', '#searchInput').on('keydown', '#searchInput', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
             clearTimeout(searchDebounce);
