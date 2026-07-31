@@ -1,22 +1,22 @@
+window.openFilterModal = function() {
+    $('#filterModal').addClass('active');
+};
+
+window.closeFilterModal = function() {
+    $('#filterModal').removeClass('active');
+};
+
+window.openMediaTypeModal = function() {
+    $('#mediaTypeModal').addClass('active');
+};
+
+window.closeMediaTypeModal = function() {
+    $('#mediaTypeModal').removeClass('active');
+};
+
 // Executa somente apos todo o DOM e scripts (inclusive jQuery no rodape do layout) estarem carregados
 $(function() {
     // Agora o jQuery ($) ja esta disponivel com total certeza
-
-    window.openFilterModal = function() {
-        $('#filterModal').addClass('active');
-    };
-
-    window.closeFilterModal = function() {
-        $('#filterModal').removeClass('active');
-    };
-
-    window.openMediaTypeModal = function() {
-        $('#mediaTypeModal').addClass('active');
-    };
-
-    window.closeMediaTypeModal = function() {
-        $('#mediaTypeModal').removeClass('active');
-    };
 
     window.showMoreSearchResults = function(button) {
         const $grid = $('#searchResultGrid');

@@ -209,8 +209,8 @@ class CatalogController extends AbstractActionController {
         if (!empty($search)) {
             // Add to top of list, prevent duplicates
             $_SESSION['recent_searches'] = array_values(array_unique(array_merge([$search], $_SESSION['recent_searches'])));
-            // Keep last 5 searches
-            $_SESSION['recent_searches'] = array_slice($_SESSION['recent_searches'], 0, 5);
+            // Keep last 4 searches
+            $_SESSION['recent_searches'] = array_slice($_SESSION['recent_searches'], 0, 4);
         }
 
         $clearRecent = $this->params()->fromQuery('clear_recent', '0') === '1';

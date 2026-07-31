@@ -200,21 +200,8 @@ $upcomingItems = $this->upcomingItems ?? [];
 
 <div class="px-3 refract-home-container pb-5">
     
-    <!-- Header Logo Banner -->
-    <div class="d-flex justify-content-between align-items-center mt-3 mb-4">
-        <h4 class="text-white fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 1.6rem; letter-spacing: -0.5px;">
-            <i class="bi bi-triangle-half" style="color: #a88beb;"></i> Time View
-        </h4>
-        <div class="d-flex align-items-center gap-3">
-            <i class="bi bi-question-circle text-muted fs-5" style="cursor: pointer;"></i>
-            <i class="bi bi-chat-left-dots text-muted fs-5" style="cursor: pointer;"></i>
-            <!-- Notification bell -->
-            <a href="#" onclick="showNotificationsPanel(); return false;" class="position-relative text-muted">
-                <i class="bi bi-bell fs-5"></i>
-                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle d-none" id="notif-badge"></span>
-            </a>
-        </div>
-    </div>
+    <!-- Header removed to keep only global one -->
+    <div style="height: 15px;"></div>
 
     <!-- Annual Goal Card -->
     <div class="p-3 mb-4 rounded-4 text-white d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #242436 0%, #161622 100%); border: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onclick="showToast('Defina sua meta no menu do perfil!', true)">
@@ -264,18 +251,17 @@ $upcomingItems = $this->upcomingItems ?? [];
     </div>
 
     <!-- SECTION: AS TUAS LISTAS -->
-    <div class="refract-section-header">
+    <div class="refract-section-header d-flex justify-content-between align-items-center">
         <div class="refract-section-title">
             <i class="bi bi-folder-fill text-warning"></i> As tuas listas
         </div>
-        <a href="/lists" class="refract-section-link">Ver tudo <i class="bi bi-chevron-right small"></i></a>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-sm text-white rounded-pill px-2.5 py-1 fw-bold" style="background-color: #7c4dff; font-size: 0.68rem; line-height: 1;" onclick="promptCreateList()">+ Criar lista</button>
+            <a href="/lists" class="refract-section-link">Ver tudo <i class="bi bi-chevron-right small"></i></a>
+        </div>
     </div>
 
     <div class="refract-carousel mb-2">
-        <div class="refract-list-card-horizontal justify-content-center align-items-center" onclick="promptCreateList()" style="border: 1px dashed rgba(168,139,235,0.4); background: rgba(168,139,235,0.03);">
-            <i class="bi bi-plus-circle text-accent fs-4 mb-1" style="color: #a88beb;"></i>
-            <span class="small fw-bold" style="font-size: 0.72rem; color: #a88beb;">Criar lista</span>
-        </div>
         
         <?php if (empty($userLists)): ?>
             <div class="refract-list-card-horizontal justify-content-center align-items-center" style="background-color: #12121a; cursor: default;">
