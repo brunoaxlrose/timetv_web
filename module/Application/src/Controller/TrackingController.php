@@ -331,8 +331,8 @@ class TrackingController extends AbstractActionController {
             }
 
             return new JsonModel(['success' => true, 'message' => $msg]);
-        } catch (\PDOException $e) {
-            return new JsonModel(['success' => false, 'message' => 'Erro ao salvar progresso: ' . $e->getMessage()]);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 

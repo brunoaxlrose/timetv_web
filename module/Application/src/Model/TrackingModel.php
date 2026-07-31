@@ -160,10 +160,11 @@ class TrackingModel {
     public function watchAllEpisodes(int $userId, string $itemId): void {
         $stmt = $this->pdo->prepare("
             INSERT INTO usuario_episodio (id_usuario, id_episodio, ts_cancelamento)
-            SELECT :user_id, id_episodio, NULL FROM episodio WHERE id_item = :item_id
+            SELECT :user_id, id_episodio, NULL FROM episodio 
+            WHERE id_item = :item_id AND (air_date IS NULL OR air_date <= :today)
             ON CONFLICT(id_usuario, id_episodio) DO UPDATE SET ts_cancelamento = NULL
         ");
-        $stmt->execute([':user_id' => $userId, ':item_id' => $itemId]);
+        $stmt->execute([':user_id' => $userId, ':item_id' => $itemId, ':today' => date('Y-m-d')]);
     }
 
     public function unwatchAllEpisodes(int $userId, string $itemId): void {
@@ -181,10 +182,10 @@ class TrackingModel {
         $stmt = $this->pdo->prepare("
             INSERT INTO usuario_episodio (id_usuario, id_episodio, ts_cancelamento)
             SELECT :user_id, id_episodio, NULL FROM episodio 
-            WHERE id_item = :item_id AND season_number = :season
+            WHERE id_item = :item_id AND season_number = :season AND (air_date IS NULL OR air_date <= :today)
             ON CONFLICT(id_usuario, id_episodio) DO UPDATE SET ts_cancelamento = NULL
         ");
-        $stmt->execute([':user_id' => $userId, ':item_id' => $itemId, ':season' => $seasonNum]);
+        $stmt->execute([':user_id' => $userId, ':item_id' => $itemId, ':season' => $seasonNum, ':today' => date('Y-m-d')]);
     }
 
     public function unwatchSeasonEpisodes(int $userId, string $itemId, int $seasonNum): void {
@@ -208,18 +209,31 @@ class TrackingModel {
                 SELECT :user_id, id_episodio, NULL FROM episodio 
                 WHERE id_item = :item_id 
                   AND (season_number < :season OR (season_number = :season AND episode_number <= :ep_num))
+                  AND (air_date IS NULL OR air_date <= :today)
                 ON CONFLICT(id_usuario, id_episodio) DO UPDATE SET ts_cancelamento = NULL
             ");
             $stmt->execute([
                 ':user_id' => $userId,
                 ':item_id' => $itemId,
                 ':season' => $curr['season_number'],
-                ':ep_num' => $curr['episode_number']
+                ':ep_num' => $curr['episode_number'],
+                ':today' => date('Y-m-d')
             ]);
         }
     }
 
     public function watchSingleEpisode(int $userId, string $episodeId): void {
+        // Check if episode is unreleased
+        $stmt = $this->pdo->prepare("SELECT air_date FROM episodio WHERE id_episodio = :ep_id LIMIT 1");
+        $stmt->execute([':ep_id' => $episodeId]);
+        $ep = $stmt->fetch();
+        if ($ep && !empty($ep['air_date'])) {
+            $diff = strtotime($ep['air_date']) - strtotime(date('Y-m-d'));
+            if ($diff > 0) {
+                throw new \Exception('Este episódio ainda não foi lançado!');
+            }
+        }
+
         $stmt = $this->pdo->prepare("
             INSERT INTO usuario_episodio (id_usuario, id_episodio, ts_cancelamento) 
             VALUES (:user_id, :ep_id, NULL) 
