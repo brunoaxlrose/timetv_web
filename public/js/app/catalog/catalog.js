@@ -33,6 +33,15 @@ $(function() {
         applyFiltersAjax(url.toString(), null, false);
     };
 
+    window.toggleViewMode = function() {
+        const url = new URL(window.location.href);
+        const currentMode = url.searchParams.get('view_mode') || 'grid';
+        const nextMode = currentMode === 'list' ? 'grid' : 'list';
+        url.searchParams.set('view_mode', nextMode);
+        url.searchParams.set('page', '1');
+        applyFiltersAjax(url.toString(), null, true);
+    };
+
     window.resetFilters = function() {
         $('#statusFilterNone').prop('checked', true);
         $('#sortLastWatched').prop('checked', true);
@@ -66,9 +75,9 @@ $(function() {
         const ajaxOptions = {
             url: url,
             success: function(responseData) {
-                const html = $.parseHTML(responseData);
-                const $newGrid = $(html).find('#resultsGrid');
-                const $newCount = $(html).find('.d-flex.align-items-baseline.gap-2 span');
+                const $tempDiv = $('<div>').html(responseData);
+                const $newGrid = $tempDiv.find('#resultsGrid');
+                const $newCount = $tempDiv.find('.d-flex.align-items-baseline.gap-2 span');
 
                 if ($newGrid.length) {
                     $('#resultsGrid').html($newGrid.html());
@@ -155,10 +164,6 @@ $(function() {
         applyFiltersAjax(fullUrl, null, true);
     });
 
-    // Handle back/forward history navigation
-    window.onpopstate = function() {
-        applyFiltersAjax(window.location.href, null, false);
-    };
 });
 
 

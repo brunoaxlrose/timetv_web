@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+date_default_timezone_set('America/Sao_Paulo');
+
 if (session_status() === PHP_SESSION_NONE) {
     session_name('tvtime_session');
     session_set_cookie_params([

@@ -1,6 +1,7 @@
 <?php
 if (isset($page)) {
-    $this->headLink()->appendStylesheet("/css/app/catalog/{$page}.css");
-    echo '<link rel="stylesheet" href="/css/app/catalog/' . $page . '.css">';
+    $version = time();
+    $this->headLink()->appendStylesheet("/css/app/catalog/{$page}.css?v={$version}");
+    echo '<link rel="stylesheet" href="/css/app/catalog/' . $page . '.css?v=' . $version . '">';
 }
 ?>

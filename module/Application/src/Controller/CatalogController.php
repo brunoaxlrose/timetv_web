@@ -78,6 +78,7 @@ class CatalogController extends AbstractActionController {
         $tvmazeId = intval($this->params()->fromQuery('tvmaze_id', 0));
         $tmdbId = intval($this->params()->fromQuery('tmdb_id', 0));
         $malId = intval($this->params()->fromQuery('mal_id', 0));
+        $type = $this->params()->fromQuery('type', '');
         $userId = $_SESSION['user_id'];
         $pdo = $this->catalogModel->getPdo();
 
@@ -91,11 +92,23 @@ class CatalogController extends AbstractActionController {
         }
 
         if ($tmdbId > 0) {
-            $localId = \Application\Helper\TmdbHelper::importMovieFromTmdb($pdo, $tmdbId);
-            if ($localId) {
-                return $this->redirect()->toUrl('/detail?id=' . $localId);
+            if ($type === 'series' || $type === 'anime') {
+                $tvShow = \Application\Helper\TmdbHelper::getTvDetail($tmdbId);
+                $searchTitle = $tvShow['original_name'] ?? $tvShow['name'] ?? '';
+                if (!empty($searchTitle)) {
+                    $tvmazeId = \Application\Helper\TvmazeHelper::getTvmazeIdByTitle($searchTitle);
+                    if ($tvmazeId) {
+                        return $this->redirect()->toUrl('/detail?tvmaze_id=' . $tvmazeId);
+                    }
+                }
+                return $this->redirect()->toUrl('/catalog?error=tvshow_not_found');
             } else {
-                return $this->redirect()->toUrl('/catalog?error=import_failed');
+                $localId = \Application\Helper\TmdbHelper::importMovieFromTmdb($pdo, $tmdbId);
+                if ($localId) {
+                    return $this->redirect()->toUrl('/detail?id=' . $localId);
+                } else {
+                    return $this->redirect()->toUrl('/catalog?error=import_failed');
+                }
             }
         }
 
@@ -116,6 +129,14 @@ class CatalogController extends AbstractActionController {
 
         if (!$item) {
             return $this->redirect()->toRoute('catalog');
+        }
+
+        if ($item['type'] !== 'movie' && !empty($item['tvmaze_id'])) {
+            $lastSync = $item['last_sync'] ?? null;
+            if (empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
+                \Application\Helper\TvmazeHelper::syncEpisodes($pdo, $id, $item['tvmaze_id']);
+                $item = $this->catalogModel->getLocalItemById($userId, $id);
+            }
         }
 
         // Fetch/populate watch providers if null

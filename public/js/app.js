@@ -42,6 +42,12 @@ function loadPageContent(url, push = true) {
     }
 
     $.get(url, function(data) {
+        // Update browser tab title
+        const titleMatch = data.match(/<title>([\s\S]*?)<\/title>/i);
+        if (titleMatch && titleMatch[1]) {
+            document.title = titleMatch[1].trim();
+        }
+
         if (push) {
             history.pushState({ url: url }, '', url);
         }
@@ -158,67 +164,65 @@ window.addEventListener('popstate', function(e) {
 
 $(document).ready(function() {
     // --- AUTHENTICATION HANDLERS VIA JQUERY $.ajax ---
-    const $authForm = $('#authForm');
-    if ($authForm.length) {
-        $authForm.on('submit', function(e) {
-            e.preventDefault();
-            
-            const $alertBox = $('#authAlert');
-            const $spinner = $('#btnSpinner');
-            const $submitBtn = $authForm.find('button[type="submit"]');
+    $(document).on('submit', '#authForm', function(e) {
+        e.preventDefault();
+        
+        const $authForm = $(this);
+        const $alertBox = $('#authAlert');
+        const $spinner = $('#btnSpinner');
+        const $submitBtn = $authForm.find('button[type="submit"]');
 
-            $alertBox.addClass('d-none');
-            $spinner.removeClass('d-none');
-            $submitBtn.attr('disabled', 'disabled');
-            showGlobalLoader(true);
+        $alertBox.addClass('d-none');
+        $spinner.removeClass('d-none');
+        $submitBtn.attr('disabled', 'disabled');
+        showGlobalLoader(true);
 
-            $.ajax({
-                url: $authForm.attr('action'),
-                type: 'POST',
-                data: $authForm.serialize(),
-                dataType: 'json',
-                success: function(data) {
-                    if (data.success) {
-                        window.location.href = data.redirect;
-                    } else {
-                        $alertBox.text(data.message).removeClass('d-none');
-                        $spinner.addClass('d-none');
-                        $submitBtn.removeAttr('disabled');
-                        showGlobalLoader(false);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    let errMsg = 'Erro de conexão. Tente novamente.';
-                    if (xhr.status >= 400) {
-                        try {
-                            if (xhr.responseJSON && xhr.responseJSON.message) {
-                                errMsg = 'Erro no servidor: ' + xhr.responseJSON.message;
-                            } else if (xhr.responseText) {
-                                // Tenta extrair a mensagem de exceção do HTML do Laminas
-                                const parser = new DOMParser();
-                                const doc = parser.parseFromString(xhr.responseText, 'text/html');
-                                const preText = doc.querySelector('pre');
-                                const h3Text = doc.querySelector('h3');
-                                if (preText) {
-                                    errMsg = 'Erro no servidor: ' + preText.textContent.trim();
-                                } else if (h3Text) {
-                                    errMsg = 'Erro no servidor: ' + h3Text.textContent.trim();
-                                } else {
-                                    errMsg = 'Erro no servidor (' + xhr.status + '): ' + error;
-                                }
-                            }
-                        } catch (e) {
-                            errMsg = 'Erro no servidor (' + xhr.status + '): ' + error;
-                        }
-                    }
-                    $alertBox.text(errMsg).removeClass('d-none');
+        $.ajax({
+            url: $authForm.attr('action'),
+            type: 'POST',
+            data: $authForm.serialize(),
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    $alertBox.text(data.message).removeClass('d-none');
                     $spinner.addClass('d-none');
                     $submitBtn.removeAttr('disabled');
                     showGlobalLoader(false);
                 }
-            });
+            },
+            error: function(xhr, status, error) {
+                let errMsg = 'Erro de conexão. Tente novamente.';
+                if (xhr.status >= 400) {
+                    try {
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errMsg = 'Erro no servidor: ' + xhr.responseJSON.message;
+                        } else if (xhr.responseText) {
+                            // Tenta extrair a mensagem de exceção do HTML do Laminas
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(xhr.responseText, 'text/html');
+                            const preText = doc.querySelector('pre');
+                            const h3Text = doc.querySelector('h3');
+                            if (preText) {
+                                errMsg = 'Erro no servidor: ' + preText.textContent.trim();
+                            } else if (h3Text) {
+                                errMsg = 'Erro no servidor: ' + h3Text.textContent.trim();
+                            } else {
+                                errMsg = 'Erro no servidor (' + xhr.status + '): ' + error;
+                            }
+                        }
+                    } catch (e) {
+                        errMsg = 'Erro no servidor (' + xhr.status + '): ' + error;
+                    }
+                }
+                $alertBox.text(errMsg).removeClass('d-none');
+                $spinner.addClass('d-none');
+                $submitBtn.removeAttr('disabled');
+                showGlobalLoader(false);
+            }
         });
-    }
+    });
 
     // Helper: silently refresh the layout's content container via AJAX
     function reloadKeepEpisodesTab() {

@@ -122,6 +122,16 @@ return [
                     ],
                 ],
             ],
+            'api-episode-create' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/episode/create',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiCreateEpisode',
+                    ],
+                ],
+            ],
             'api-google-login' => [
                 'type' => Literal::class,
                 'options' => [

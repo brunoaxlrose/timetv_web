@@ -11,7 +11,7 @@ use Laminas\Validator\Identical;
 class RegisterInputFilter extends InputFilter {
     public function __construct() {
         $this->add([
-            'name' => 'username',
+            'name' => 'user_name',
             'required' => true,
             'filters' => [
                 ['name' => 'StringTrim'],
@@ -31,6 +31,42 @@ class RegisterInputFilter extends InputFilter {
                         'min' => 3,
                         'message' => 'O nome de usuário deve ter pelo menos 3 caracteres.'
                     ]
+                ]
+            ]
+        ]);
+
+        $this->add([
+            'name' => 'nome',
+            'required' => true,
+            'filters' => [
+                ['name' => 'StringTrim'],
+                ['name' => 'StripTags'],
+            ],
+            'validators' => [
+                [
+                    'name' => NotEmpty::class,
+                    'options' => [
+                        'message' => 'Por favor, preencha o seu nome.'
+                    ],
+                    'break_chain_on_failure' => true,
+                ]
+            ]
+        ]);
+
+        $this->add([
+            'name' => 'sobrenome',
+            'required' => true,
+            'filters' => [
+                ['name' => 'StringTrim'],
+                ['name' => 'StripTags'],
+            ],
+            'validators' => [
+                [
+                    'name' => NotEmpty::class,
+                    'options' => [
+                        'message' => 'Por favor, preencha o seu sobrenome.'
+                    ],
+                    'break_chain_on_failure' => true,
                 ]
             ]
         ]);

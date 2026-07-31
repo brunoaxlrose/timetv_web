@@ -155,7 +155,7 @@ class TmdbHelper {
                 ':banner' => $banner, 
                 ':description' => $description, 
                 ':year' => $releaseYear, 
-                ':release_date' => $movie['release_date'] ?? null,
+                ':release_date' => !empty($movie['release_date']) ? $movie['release_date'] : null,
                 ':runtime' => $runtime,
                 ':status' => $status
             ]);
@@ -164,5 +164,41 @@ class TmdbHelper {
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    public static function getTvDetail(int $tmdbId): ?array {
+        $url  = self::BASE_URL . '/tv/' . $tmdbId . '?api_key=' . self::API_KEY . '&language=pt-BR';
+        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\n", 'timeout' => 8]];
+        $json = @file_get_contents($url, false, stream_context_create($opts));
+        return $json ? json_decode($json, true) : null;
+    }
+
+    public static function getTvEpisodes(int $tmdbId): array {
+        $apiKey = self::API_KEY;
+        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        
+        $detailUrl = self::BASE_URL . "/tv/{$tmdbId}?api_key={$apiKey}&language=pt-BR";
+        $detailJson = @file_get_contents($detailUrl, false, stream_context_create($opts));
+        if (!$detailJson) return [];
+        $detail = json_decode($detailJson, true);
+        
+        $seasons = $detail['seasons'] ?? [];
+        $allEpisodes = [];
+        
+        foreach ($seasons as $s) {
+            $seasonNum = $s['season_number'] ?? null;
+            if ($seasonNum === null || $seasonNum === 0) continue;
+            
+            $seasonUrl = self::BASE_URL . "/tv/{$tmdbId}/season/{$seasonNum}?api_key={$apiKey}&language=pt-BR";
+            $seasonJson = @file_get_contents($seasonUrl, false, stream_context_create($opts));
+            if (!$seasonJson) continue;
+            
+            $seasonData = json_decode($seasonJson, true);
+            $episodes = $seasonData['episodes'] ?? [];
+            foreach ($episodes as $ep) {
+                $allEpisodes[] = $ep;
+            }
+        }
+        return $allEpisodes;
     }
 }

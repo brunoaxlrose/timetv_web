@@ -19,7 +19,7 @@ class CatalogModel {
         $stmt = $this->pdo->prepare("
             SELECT i.*, ui.status as track_status 
             FROM item i 
-            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id 
+            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id AND ui.ts_cancelamento IS NULL
             WHERE i.tvmaze_id = :tvmaze_id
             LIMIT 1
         ");
@@ -31,7 +31,7 @@ class CatalogModel {
         $stmt = $this->pdo->prepare("
             SELECT i.*, ui.status as track_status
             FROM item i
-            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id
+            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id AND ui.ts_cancelamento IS NULL
             WHERE i.tmdb_id = :tmdb_id
             LIMIT 1
         ");
@@ -43,7 +43,7 @@ class CatalogModel {
         $stmt = $this->pdo->prepare("
             SELECT i.*, ui.status as track_status
             FROM item i
-            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id
+            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id AND ui.ts_cancelamento IS NULL
             WHERE i.mal_id = :mal_id
             LIMIT 1
         ");
@@ -55,7 +55,7 @@ class CatalogModel {
         $stmt = $this->pdo->prepare("
             SELECT i.*, ui.status as track_status, ui.rating, ui.comment, COALESCE(ui.rewatch_count, 0) as rewatch_count
             FROM item i
-            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id
+            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id AND ui.ts_cancelamento IS NULL
             WHERE i.id_item = :id
             LIMIT 1
         ");
@@ -69,7 +69,7 @@ class CatalogModel {
                    (ue.id_usuario_episodio IS NOT NULL) as watched,
                    COALESCE(ue.rewatch_count, 0) as rewatch_count
             FROM episodio e
-            LEFT JOIN usuario_episodio ue ON e.id_episodio = ue.id_episodio AND ue.id_usuario = :user_id
+            LEFT JOIN usuario_episodio ue ON e.id_episodio = ue.id_episodio AND ue.id_usuario = :user_id AND ue.ts_cancelamento IS NULL
             WHERE e.id_item = :item_id
             ORDER BY e.season_number ASC, e.episode_number ASC
         ");
@@ -83,7 +83,7 @@ class CatalogModel {
                 COUNT(e.id_episodio) as total_count,
                 COUNT(ue.id_usuario_episodio) as watched_count
             FROM episodio e
-            LEFT JOIN usuario_episodio ue ON e.id_episodio = ue.id_episodio AND ue.id_usuario = :user_id
+            LEFT JOIN usuario_episodio ue ON e.id_episodio = ue.id_episodio AND ue.id_usuario = :user_id AND ue.ts_cancelamento IS NULL
             WHERE e.id_item = :item_id
         ");
         $stmt->execute([':item_id' => $itemId, ':user_id' => $userId]);
@@ -94,7 +94,7 @@ class CatalogModel {
         $stmt = $this->pdo->prepare("
             SELECT season_number, episode_number FROM episodio 
             WHERE id_item = :item_id 
-              AND id_episodio NOT IN (SELECT id_episodio FROM usuario_episodio WHERE id_usuario = :user_id)
+              AND id_episodio NOT IN (SELECT id_episodio FROM usuario_episodio WHERE id_usuario = :user_id AND ts_cancelamento IS NULL)
             ORDER BY season_number ASC, episode_number ASC
             LIMIT 1
         ");
@@ -131,7 +131,7 @@ class CatalogModel {
     public function getWatchlistStatus(int $userId, string $itemId) {
         $stmt = $this->pdo->prepare("
             SELECT status FROM usuario_item 
-            WHERE id_usuario = :user_id AND id_item = :item_id 
+            WHERE id_usuario = :user_id AND id_item = :item_id AND ts_cancelamento IS NULL
             LIMIT 1
         ");
         $stmt->execute([
@@ -342,7 +342,7 @@ class CatalogModel {
 
     public function getItemComments(int $itemId): array {
         $stmt = $this->pdo->prepare("
-            SELECT ui.comment, ui.rating, ui.ts_atualizacao, u.username, u.avatar_url, ui.id_usuario
+            SELECT ui.comment, ui.rating, ui.ts_atualizacao, u.user_name, u.avatar_url, ui.id_usuario
             FROM usuario_item ui
             JOIN usuario u ON ui.id_usuario = u.id_usuario
             WHERE ui.id_item = :item_id AND ui.comment IS NOT NULL AND ui.comment != ''

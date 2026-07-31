@@ -17,38 +17,45 @@ class AuthModel {
         return $stmt->fetch();
     }
 
-    public function isUsernameOrEmailTaken(string $username, string $email): bool {
-        $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE email = :email OR username = :username LIMIT 1");
-        $stmt->execute([':email' => $email, ':username' => $username]);
+    public function isUsernameOrEmailTaken(string $userName, string $email): bool {
+        $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE email = :email OR user_name = :user_name LIMIT 1");
+        $stmt->execute([':email' => $email, ':user_name' => $userName]);
         return (bool)$stmt->fetch();
     }
 
-    public function createUser(string $username, string $email, string $hash): int {
-        $stmt = $this->pdo->prepare("INSERT INTO usuario (username, email, password_hash) VALUES (:username, :email, :hash) RETURNING id_usuario");
+    public function createUser(string $userName, string $email, string $hash, string $nome, string $sobrenome): int {
+        $stmt = $this->pdo->prepare("INSERT INTO usuario (user_name, email, password_hash, nome, sobrenome) VALUES (:user_name, :email, :hash, :nome, :sobrenome) RETURNING id_usuario");
         $stmt->execute([
-            ':username' => $username,
+            ':user_name' => $userName,
             ':email' => $email,
-            ':hash' => $hash
+            ':hash' => $hash,
+            ':nome' => $nome,
+            ':sobrenome' => $sobrenome
         ]);
         return (int)$stmt->fetchColumn();
     }
 
-    public function isUsernameTaken(string $username, int $excludeUserId): bool {
-        $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE username = :username AND id_usuario != :id LIMIT 1");
-        $stmt->execute([':username' => $username, ':id' => $excludeUserId]);
+    public function isUsernameTaken(string $userName, int $excludeUserId): bool {
+        $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE user_name = :user_name AND id_usuario != :id LIMIT 1");
+        $stmt->execute([':user_name' => $userName, ':id' => $excludeUserId]);
         return (bool)$stmt->fetch();
     }
 
-    public function updateUsername(int $userId, string $username): bool {
-        $stmt = $this->pdo->prepare("UPDATE usuario SET username = :username WHERE id_usuario = :id");
-        return $stmt->execute([':username' => $username, ':id' => $userId]);
+    public function updateProfile(int $userId, string $userName, string $nome, string $sobrenome): bool {
+        $stmt = $this->pdo->prepare("UPDATE usuario SET user_name = :user_name, nome = :nome, sobrenome = :sobrenome WHERE id_usuario = :id");
+        return $stmt->execute([
+            ':user_name' => $userName,
+            ':nome' => $nome,
+            ':sobrenome' => $sobrenome,
+            ':id' => $userId
+        ]);
     }
 
     public function clearLibrary(int $userId): void {
-        $stmt = $this->pdo->prepare("DELETE FROM usuario_item WHERE id_usuario = :id");
+        $stmt = $this->pdo->prepare("UPDATE usuario_item SET ts_cancelamento = CURRENT_TIMESTAMP WHERE id_usuario = :id AND ts_cancelamento IS NULL");
         $stmt->execute([':id' => $userId]);
 
-        $stmt = $this->pdo->prepare("DELETE FROM usuario_episodio WHERE id_usuario = :id");
+        $stmt = $this->pdo->prepare("UPDATE usuario_episodio SET ts_cancelamento = CURRENT_TIMESTAMP WHERE id_usuario = :id AND ts_cancelamento IS NULL");
         $stmt->execute([':id' => $userId]);
     }
 

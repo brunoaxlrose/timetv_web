@@ -8,9 +8,11 @@ class DatabaseSchemaHelper {
             // 1. Usuario
             "CREATE TABLE IF NOT EXISTS usuario (
                 id_usuario SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
+                user_name VARCHAR(50) UNIQUE NOT NULL,
                 email VARCHAR(100) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
+                nome VARCHAR(100) NOT NULL DEFAULT '',
+                sobrenome VARCHAR(100) NOT NULL DEFAULT '',
                 ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 ts_cancelamento TIMESTAMP NULL
             );",
@@ -93,6 +95,8 @@ class DatabaseSchemaHelper {
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS watch_providers TEXT NULL;",
             "ALTER TABLE usuario_episodio ADD COLUMN IF NOT EXISTS rewatch_count INT DEFAULT 0;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS rewatch_count INT DEFAULT 0;",
+            "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS ts_cancelamento TIMESTAMP NULL;",
+            "ALTER TABLE usuario_episodio ADD COLUMN IF NOT EXISTS ts_cancelamento TIMESTAMP NULL;",
 
             // 7. Notificacao
             "CREATE TABLE IF NOT EXISTS notificacao (

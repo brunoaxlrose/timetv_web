@@ -17,6 +17,7 @@ class PdoFactory implements FactoryInterface {
         $password = $dbConfig['password'] ?? '';
         
         $pdo = new PDO($dsn, $username, $password);
+        $pdo->exec("SET TIME ZONE 'America/Sao_Paulo'");
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         

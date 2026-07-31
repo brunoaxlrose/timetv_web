@@ -66,21 +66,52 @@ class NotificationModel {
     }
 
     /**
+     * Sincroniza episódios de até 3 séries/animes acompanhados que não foram sincronizados nas últimas 6 horas
+     */
+    public function syncUserShows(int $userId): void {
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT i.id_item, i.tvmaze_id 
+                FROM item i
+                JOIN usuario_item ui ON ui.id_item = i.id_item AND ui.id_usuario = :uid
+                WHERE i.tvmaze_id IS NOT NULL 
+                  AND i.type != 'movie'
+                  AND ui.status IN ('watching', 'plan_to_watch')
+                  AND (i.last_sync IS NULL OR i.last_sync < CURRENT_TIMESTAMP - INTERVAL '6 hours')
+                ORDER BY i.last_sync ASC NULLS FIRST
+                LIMIT 3
+            ");
+            $stmt->execute([':uid' => $userId]);
+            $showsToSync = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($showsToSync as $show) {
+                \Application\Helper\TvmazeHelper::syncEpisodes($this->pdo, (int)$show['id_item'], (int)$show['tvmaze_id']);
+            }
+        } catch (\Throwable $e) {
+            // Silently ignore sync errors
+        }
+    }
+
+    /**
      * Gera notificações automáticas para o usuário baseado em:
      * - Novos episódios (air_date nos últimos 3 dias) de séries acompanhadas
      * - Lançamentos "em breve" (release_date nos próximos 7 dias) de itens na watchlist
      */
     public function generateNotifications(int $userId): void {
         try {
-            // 1. Novos episódios (últimos 3 dias)
+            // Sincroniza shows acompanhados que precisam de atualização
+            $this->syncUserShows($userId);
+
+            // 1. Novos episódios (últimos 3 dias, excluindo o dia atual)
             $stmt = $this->pdo->prepare("
                 SELECT e.id_episodio, e.id_item, e.title AS ep_title, e.season_number, e.episode_number,
                        e.air_date, i.title AS show_title, i.poster_url
                 FROM episodio e
                 JOIN item i ON i.id_item = e.id_item
                 JOIN usuario_item ui ON ui.id_item = e.id_item AND ui.id_usuario = :uid
-                WHERE e.air_date >= CURRENT_DATE - INTERVAL '3 days'
-                  AND e.air_date <= CURRENT_DATE
+                WHERE e.air_date IS NOT NULL AND e.air_date <> ''
+                  AND CAST(e.air_date AS DATE) >= CURRENT_DATE - INTERVAL '3 days'
+                  AND CAST(e.air_date AS DATE) < CURRENT_DATE
                   AND ui.status IN ('watching', 'plan_to_watch')
                   AND NOT EXISTS (
                       SELECT 1 FROM notificacao n
@@ -89,7 +120,7 @@ class NotificationModel {
                         AND n.id_item = e.id_item
                         AND n.mensagem LIKE '%S' || LPAD(e.season_number::text, 2, '0') || 'E' || LPAD(e.episode_number::text, 2, '0') || '%'
                   )
-                ORDER BY e.air_date DESC
+                ORDER BY CAST(e.air_date AS DATE) DESC
                 LIMIT 20
             ");
             $stmt->execute([':uid' => $userId, ':uid2' => $userId]);
@@ -103,12 +134,22 @@ class NotificationModel {
             foreach ($newEps as $ep) {
                 $epCode = 'S' . str_pad($ep['season_number'], 2, '0', STR_PAD_LEFT)
                         . 'E' . str_pad($ep['episode_number'], 2, '0', STR_PAD_LEFT);
+                
+                $dateFormatted = date('d/m/Y', strtotime($ep['air_date']));
+                
+                $airDateObj = new \DateTime($ep['air_date']);
+                $todayObj = new \DateTime(date('Y-m-d'));
+                $diff = $todayObj->diff($airDateObj);
+                $days = (int)$diff->format('%a');
+                
+                $timeLabel = ($days === 1) ? 'ontem' : "$days dias atrás";
+
                 $insertNotif->execute([
                     ':uid'      => $userId,
                     ':tipo'     => 'new_episode',
                     ':id_item'  => $ep['id_item'],
                     ':titulo'   => 'Novo episódio: ' . $ep['show_title'],
-                    ':mensagem' => $epCode . ' — ' . ($ep['ep_title'] ?: 'Sem título') . ' · ' . $ep['air_date'],
+                    ':mensagem' => $epCode . ' — ' . ($ep['ep_title'] ?: 'Sem título') . ' · ' . $dateFormatted . ' (' . $timeLabel . ')',
                 ]);
             }
 

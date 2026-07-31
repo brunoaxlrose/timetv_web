@@ -78,6 +78,70 @@ $this->partial('tracking/js.phtml', ['page' => 'stats']);
                 </div>
             </div>
         </div>
+
+        <!-- Recently Watched Feed -->
+        <?php if (!empty($this->history)): ?>
+            <div class="mt-4 px-1">
+                <h6 class="text-gray small fw-bold text-uppercase mb-3" style="font-size: 0.68rem; letter-spacing: 0.5px; color: #a5a5c0 !important;">Assistidos recentemente</h6>
+                <div class="d-flex flex-column gap-2 mb-3" id="recentHistoryContainer">
+                    <?php 
+                        $groupedHistory = [];
+                        foreach ($this->history as $h) {
+                            $lastIdx = count($groupedHistory) - 1;
+                            if ($lastIdx >= 0 && $groupedHistory[$lastIdx]['show_title'] === $h['show_title'] && $h['media_type'] === 'episode' && $groupedHistory[$lastIdx]['media_type'] === 'episode') {
+                                $groupedHistory[$lastIdx]['episode_count'] = ($groupedHistory[$lastIdx]['episode_count'] ?? 1) + 1;
+                            } else {
+                                $h['episode_count'] = 1;
+                                $groupedHistory[] = $h;
+                            }
+                        }
+
+                        $historyIndex = 0;
+                        foreach ($groupedHistory as $h): 
+                            $historyIndex++;
+                            $isHidden = $historyIndex > 10;
+                    ?>
+                        <div class="rounded-3 <?= $isHidden ? 'd-none extra-recent' : '' ?>" style="display: <?= $isHidden ? 'none' : 'flex' ?> !important; flex-direction: row !important; align-items: center !important; justify-content: space-between !important; gap: 15px !important; padding: 10px !important; background-color: #121218; border: 1px solid rgba(255,255,255,0.04); opacity: 0.95; width: 100% !important; box-sizing: border-box !important;">
+                            <div style="display: flex !important; flex-direction: row !important; align-items: center !important; gap: 15px !important; flex-grow: 1 !important; min-width: 0 !important;">
+                                <img src="<?= htmlspecialchars($h['poster_url']) ?>" style="width: 42px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); flex-shrink: 0 !important; display: block !important;" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=200';">
+                                <div style="flex-grow: 1 !important; min-width: 0 !important; text-align: left !important;">
+                                    <h6 class="text-white fw-bold mb-1 text-truncate" style="font-size: 0.8rem; margin: 0 0 2px 0 !important; line-height: 1.2;"><?= htmlspecialchars($h['show_title']) ?></h6>
+                                    <p class="mb-0" style="font-size: 0.68rem; font-weight: 500; color: #a5a5c0 !important; margin: 0 !important; line-height: 1;">
+                                        <?php if ($h['episode_count'] > 1): ?>
+                                            T<?= $h['season_number'] ?> &bull; +<?= ($h['episode_count'] - 1) ?> episódios
+                                        <?php else: ?>
+                                            <?= $h['media_type'] === 'episode' ? 'T' . $h['season_number'] . ' &bull; E' . $h['episode_number'] : 'Filme' ?>
+                                        <?php endif; ?>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="text-end small px-1" style="font-size: 0.62rem; font-weight: 500; color: #b0b0cc !important; flex-shrink: 0 !important;">
+                                <?= date('d/m/Y H:i', strtotime($h['watched_at'])) ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if (count($groupedHistory) > 10): ?>
+                    <div class="text-center mt-3">
+                        <button type="button" class="btn btn-sm btn-link text-accent text-decoration-none p-0 fw-bold" onclick="showMoreRecentHistory(this)" style="font-size: 0.75rem; color: #a88beb; background: transparent; border: none; letter-spacing: 0.5px;">VER MAIS</button>
+                    </div>
+                <?php endif; ?>
+                <div style="height: 110px;"></div>
+            </div>
+            <script>
+                function showMoreRecentHistory(btn) {
+                    var container = document.getElementById('recentHistoryContainer');
+                    var hiddenItems = container.querySelectorAll('.extra-recent.d-none');
+                    for (var i = 0; i < Math.min(hiddenItems.length, 10); i++) {
+                        hiddenItems[i].classList.remove('d-none');
+                        hiddenItems[i].style.setProperty('display', 'flex', 'important');
+                    }
+                    if (container.querySelectorAll('.extra-recent.d-none').length === 0) {
+                        btn.style.display = 'none';
+                    }
+                }
+            </script>
+        <?php endif; ?>
     </div>
 
     <!-- TAB CONTENT: TEMPO -->

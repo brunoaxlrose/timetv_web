@@ -1,0 +1,15 @@
+:root {
+    --bg-black: #08080a;
+    --bg-dark: #0f0f15;
+    --bg-card: #151520;
+    --border-dark: #1b1b26;
+    --border-light: #26263b;
+    --accent-yellow: #ffd200;
+    --accent-purple: #7c4dff;
+    --accent-blue: #38ef7d;
+    --accent-pink: #ff758f;
+    --text-white: #ffffff;
+    --text-gray: #a5a5b4;
+    --text-muted: #a5a5c0;
+    --font-family: 'Outfit', sans-serif;
+}

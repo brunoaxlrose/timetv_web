@@ -22,7 +22,8 @@ class TrackingController extends AbstractActionController {
 
         $userId = $_SESSION['user_id'];
 
-        $grouped        = $this->params()->fromQuery('grouped', '1') === '1';
+        $viewMode       = $this->params()->fromQuery('view_mode', 'grid');
+        $grouped        = ($viewMode === 'list') ? false : ($this->params()->fromQuery('grouped', '1') === '1');
         $statusFilter   = $this->params()->fromQuery('status_filter', '');
         $sortBy         = $this->params()->fromQuery('sort_by', 'last_watched');
         $providerFilter = $this->params()->fromQuery('provider', '');
@@ -38,11 +39,13 @@ class TrackingController extends AbstractActionController {
 
         $userItems = $this->trackingModel->getUserCollection($userId, $types, $sortBy, $providerFilter);
 
-        // Precalculate progress percent for all series and animes
+        // Precalculate progress percent for all series, animes and movies
         foreach ($userItems as &$item) {
             if ($item['type'] !== 'movie') {
                 $prog = $this->trackingModel->getProgress($userId, $item['id_item']);
                 $item['progress_percent'] = $prog['total_count'] > 0 ? round(($prog['watched_count'] / $prog['total_count']) * 100) : 0;
+            } else {
+                $item['progress_percent'] = ($item['track_status'] === 'completed') ? 100 : 0;
             }
         }
 
@@ -133,6 +136,23 @@ class TrackingController extends AbstractActionController {
             }
         }
 
+        $page = (int)$this->params()->fromQuery('page', 1);
+        if ($page < 1) $page = 1;
+
+        $currentPage = 1;
+        $totalPages = 1;
+        $totalItems = count($items);
+        if ($viewMode === 'list') {
+            $grouped = false; // Force flat list for pagination
+            $limit = 10;
+            $currentPage = $page;
+            $totalPages = (int)ceil($totalItems / $limit);
+            if ($totalPages < 1) $totalPages = 1;
+            if ($currentPage > $totalPages) $currentPage = $totalPages;
+            $offset = ($currentPage - 1) * $limit;
+            $items = array_slice($items, $offset, $limit);
+        }
+
         $view = new ViewModel([
             'items'          => $items,
             'grouped'        => $grouped,
@@ -142,6 +162,10 @@ class TrackingController extends AbstractActionController {
             'mediaSeries'    => $mediaSeries,
             'mediaAnime'     => $mediaAnime,
             'providerFilter' => $providerFilter,
+            'viewMode'       => $viewMode,
+            'currentPage'    => $currentPage,
+            'totalPages'     => $totalPages,
+            'totalItems'     => $totalItems,
         ]);
 
         if ($this->getRequest()->isXmlHttpRequest()) {
@@ -256,8 +280,23 @@ class TrackingController extends AbstractActionController {
 
             // Recalculate if show is fully watched to set status as completed
             if ($itemId) {
-                $remaining = $this->trackingModel->countReleasedUnwatchedEpisodes($userId, $itemId);
-                if ($remaining === 0) {
+                $dbConfig = $this->getEvent()->getApplication()->getServiceManager()->get('config')['db'] ?? [];
+                $pdo = new \PDO($dbConfig['dsn'], $dbConfig['username'], $dbConfig['password']);
+                
+                $stmtAll = $pdo->prepare("SELECT COUNT(*) FROM episodio WHERE id_item = :id_item");
+                $stmtAll->execute([':id_item' => $itemId]);
+                $totalEps = (int)$stmtAll->fetchColumn();
+
+                $stmtWatched = $pdo->prepare("
+                    SELECT COUNT(ue.id_episodio) 
+                    FROM usuario_episodio ue
+                    JOIN episodio e ON ue.id_episodio = e.id_episodio
+                    WHERE ue.id_usuario = :user_id AND e.id_item = :item_id
+                ");
+                $stmtWatched->execute([':user_id' => $userId, ':item_id' => $itemId]);
+                $watchedEps = (int)$stmtWatched->fetchColumn();
+
+                if ($totalEps > 0 && $watchedEps >= $totalEps) {
                     $this->trackingModel->updateWatchlistStatus($userId, $itemId, 'completed');
                 } else {
                     $this->trackingModel->updateWatchlistStatus($userId, $itemId, 'watching');
@@ -307,6 +346,8 @@ class TrackingController extends AbstractActionController {
         $hours = floor(($totalMinutes % 1440) / 60);
         $minutes = $totalMinutes % 60;
 
+        $history = $this->trackingModel->getActivityHistory($userId);
+
         $view = new ViewModel([
             'totalEpisodesWatched' => $stats['totalEpisodes'],
             'seriesCount' => $stats['seriesCount'],
@@ -322,6 +363,7 @@ class TrackingController extends AbstractActionController {
             'hours' => $hours,
             'minutes' => $minutes,
             'timeline' => $timeline,
+            'history' => $history,
         ]);
         
         $this->layout()->title = "Perfil - Time View";
@@ -339,5 +381,163 @@ class TrackingController extends AbstractActionController {
         $view = new ViewModel(['history' => $history]);
         $this->layout()->title = "Diário - Time View";
         return $view;
+    }
+
+    public function apiCreateEpisodeAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autorizado.']);
+        }
+
+        $userId = $_SESSION['user_id'];
+        $request = $this->getRequest();
+        if (!$request->isPost()) {
+            return new JsonModel(['success' => false, 'message' => 'Método inválido.']);
+        }
+
+        $post = $request->getPost();
+        $itemId = intval($post->get('item_id'));
+        $autoGenerate = (bool)$post->get('auto_generate', false);
+
+        if ($itemId <= 0) {
+            return new JsonModel(['success' => false, 'message' => 'Item inválido.']);
+        }
+
+        if ($autoGenerate) {
+            try {
+                $dbConfig = $this->getEvent()->getApplication()->getServiceManager()->get('config')['db'] ?? [];
+                $pdo = new \PDO($dbConfig['dsn'], $dbConfig['username'], $dbConfig['password']);
+                $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+                // Get last episode
+                $stmt = $pdo->prepare("
+                    SELECT season_number, episode_number, air_date 
+                    FROM episodio 
+                    WHERE id_item = :id_item 
+                    ORDER BY season_number DESC, episode_number DESC 
+                    LIMIT 1
+                ");
+                $stmt->execute([':id_item' => $itemId]);
+                $lastEp = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+                if ($lastEp) {
+                    $nextSeason = (int)$lastEp['season_number'];
+                    $nextNumber = (int)$lastEp['episode_number'] + 1;
+                    $lastDateStr = $lastEp['air_date'];
+                    if (empty($lastDateStr)) {
+                        $lastDateStr = date('Y-m-d');
+                    }
+                } else {
+                    $nextSeason = 1;
+                    $nextNumber = 1;
+                    $lastDateStr = date('Y-m-d', strtotime('-1 day'));
+                }
+
+                $insertedCount = 0;
+                $currentDate = new \DateTime($lastDateStr);
+
+                $pdo->beginTransaction();
+                for ($i = 0; $i < 10; $i++) {
+                    $currentDate->modify('+1 day');
+                    // Skip Sundays (telenovela pattern)
+                    if ($currentDate->format('N') == 7) {
+                        $currentDate->modify('+1 day');
+                    }
+
+                    $airDateStr = $currentDate->format('Y-m-d');
+                    $title = 'Capítulo ' . $nextNumber;
+
+                    $insert = $pdo->prepare("
+                        INSERT INTO episodio (id_item, season_number, episode_number, title, air_date, description, runtime_minutes)
+                        VALUES (:id_item, :season_number, :episode_number, :title, :air_date, 'Nenhuma sinopse disponível.', 45)
+                        ON CONFLICT (id_item, season_number, episode_number) DO NOTHING
+                    ");
+                    $insert->execute([
+                        ':id_item' => $itemId,
+                        ':season_number' => $nextSeason,
+                        ':episode_number' => $nextNumber,
+                        ':title' => $title,
+                        ':air_date' => $airDateStr
+                    ]);
+                    
+                    if ($insert->rowCount() > 0) {
+                        $insertedCount++;
+                    }
+                    $nextNumber++;
+                }
+
+                // Update total_episodes in item
+                $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM episodio WHERE id_item = :id_item");
+                $stmtCount->execute([':id_item' => $itemId]);
+                $count = $stmtCount->fetchColumn();
+
+                $updateItem = $pdo->prepare("UPDATE item SET total_episodes = :count WHERE id_item = :id_item");
+                $updateItem->execute([':count' => $count, ':id_item' => $itemId]);
+
+                $pdo->commit();
+
+                return new JsonModel([
+                    'success' => true, 
+                    'message' => "Gerados {$insertedCount} novos capítulos automáticos!"
+                ]);
+            } catch (\Exception $e) {
+                if (isset($pdo) && $pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                return new JsonModel(['success' => false, 'message' => 'Erro ao auto-gerar episódios: ' . $e->getMessage()]);
+            }
+        }
+
+        // Manual add
+        $seasonNumber = intval($post->get('season_number', 1));
+        $episodeNumber = intval($post->get('episode_number', 1));
+        $title = trim($post->get('title', ''));
+        $airDate = trim($post->get('air_date', ''));
+        $description = trim($post->get('description', ''));
+
+        if (empty($title)) {
+            $title = 'Capítulo ' . $episodeNumber;
+        }
+        if (empty($description)) {
+            $description = 'Nenhuma sinopse disponível.';
+        }
+        if (empty($airDate)) {
+            $airDate = date('Y-m-d');
+        }
+
+        try {
+            $dbConfig = $this->getEvent()->getApplication()->getServiceManager()->get('config')['db'] ?? [];
+            $pdo = new \PDO($dbConfig['dsn'], $dbConfig['username'], $dbConfig['password']);
+            $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+            $stmt = $pdo->prepare("SELECT id_episodio FROM episodio WHERE id_item = :id_item AND season_number = :sn AND episode_number = :en LIMIT 1");
+            $stmt->execute([':id_item' => $itemId, ':sn' => $seasonNumber, ':en' => $episodeNumber]);
+            if ($stmt->fetch()) {
+                return new JsonModel(['success' => false, 'message' => 'Este episódio já existe.']);
+            }
+
+            $insert = $pdo->prepare("
+                INSERT INTO episodio (id_item, season_number, episode_number, title, air_date, description, runtime_minutes)
+                VALUES (:id_item, :season_number, :episode_number, :title, :air_date, :description, 45)
+            ");
+            $insert->execute([
+                ':id_item' => $itemId,
+                ':season_number' => $seasonNumber,
+                ':episode_number' => $episodeNumber,
+                ':title' => $title,
+                ':air_date' => $airDate,
+                ':description' => $description
+            ]);
+
+            $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM episodio WHERE id_item = :id_item");
+            $stmtCount->execute([':id_item' => $itemId]);
+            $count = $stmtCount->fetchColumn();
+
+            $updateItem = $pdo->prepare("UPDATE item SET total_episodes = :count WHERE id_item = :id_item");
+            $updateItem->execute([':count' => $count, ':id_item' => $itemId]);
+
+            return new JsonModel(['success' => true, 'message' => 'Episódio adicionado com sucesso!']);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => 'Erro ao criar episódio: ' . $e->getMessage()]);
+        }
     }
 }

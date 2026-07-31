@@ -31,6 +31,9 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         </div>
     </div>
 
+    <!-- Right Info Wrapper on Desktop -->
+    <div class="refract-detail-info-wrapper">
+
     <!-- Title and Meta Info -->
     <div class="text-center px-4 mt-3">
         <h2 class="fw-extrabold text-white text-3xl mb-1" style="font-weight: 800; font-size: 1.8rem; letter-spacing: -0.5px;"><?= htmlspecialchars($item['title']) ?></h2>
@@ -115,6 +118,50 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                         }
                     }
                 }
+                
+                // Group / Deduplicate / Normalize Providers
+                $normalized = [];
+                foreach ($providersList as $prov) {
+                    $name = trim($prov['name']);
+                    $logo = $prov['logo'] ?? '';
+                    
+                    $targetName = $name;
+                    
+                    // Match normalization rules
+                    if (stripos($name, 'Paramount') !== false) {
+                        $targetName = 'Paramount+';
+                    } elseif (stripos($name, 'Prime Video') !== false || stripos($name, 'Amazon') !== false) {
+                        $targetName = 'Prime Video';
+                    } elseif (stripos($name, 'Apple TV') !== false) {
+                        $targetName = 'Apple TV+';
+                    } elseif (stripos($name, 'Disney') !== false) {
+                        $targetName = 'Disney+';
+                    } elseif (stripos($name, 'HBO') !== false || strcasecmp($name, 'Max') === 0) {
+                        $targetName = 'Max';
+                    } elseif (stripos($name, 'Star+') !== false || stripos($name, 'Star Plus') !== false) {
+                        $targetName = 'Star+';
+                    } elseif (stripos($name, 'Claro') !== false) {
+                        $targetName = 'Claro tv+';
+                    } elseif (stripos($name, 'Netflix') !== false) {
+                        $targetName = 'Netflix';
+                    }
+                    
+                    // Keep the first logo found for the normalized name
+                    if (!isset($normalized[$targetName])) {
+                        $normalized[$targetName] = $logo;
+                    } else {
+                        if (empty($normalized[$targetName]) && !empty($logo)) {
+                            $normalized[$targetName] = $logo;
+                        }
+                    }
+                }
+                
+                // Rebuild providersList
+                $providersList = [];
+                foreach ($normalized as $name => $logo) {
+                    $providersList[] = ['name' => $name, 'logo' => $logo];
+                }
+                
                 if (!empty($providersList)): 
             ?>
             <div class="mb-4 text-center">
@@ -172,13 +219,13 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                         foreach ($this->comments as $c): 
                             $commentIndex++;
                             $isHidden = $commentIndex > 3;
-                            $defaultAvatar = 'https://ui-avatars.com/api/?name=' . urlencode($c['username']) . '&background=a88beb&color=fff';
+                            $defaultAvatar = 'https://ui-avatars.com/api/?name=' . urlencode($c['user_name']) . '&background=a88beb&color=fff';
                     ?>
                         <div class="d-flex gap-2.5 pb-2.5 <?= $isHidden ? 'd-none extra-comment' : '' ?>" style="border-bottom: 1px solid rgba(255,255,255,0.03); opacity: 0.95;">
                             <img src="<?= htmlspecialchars($c['avatar_url'] ?: $defaultAvatar) ?>" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,255,255,0.08);" alt="avatar" onerror="this.src='<?= $defaultAvatar ?>';">
                             <div class="flex-grow-1 min-width-0">
                                 <div class="d-flex justify-content-between align-items-baseline">
-                                    <span class="text-white fw-bold" style="font-size: 0.75rem;"><?= htmlspecialchars($c['username']) ?></span>
+                                    <span class="text-white fw-bold" style="font-size: 0.75rem;"><?= htmlspecialchars($c['user_name']) ?></span>
                                     <span class="text-muted" style="font-size: 0.6rem;"><?= date('d/m/Y H:i', strtotime($c['ts_atualizacao'])) ?></span>
                                 </div>
                                 <?php if (!empty($c['rating'])): ?>
@@ -357,19 +404,20 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         <?php endif; ?>
     </div>
 </div>
+</div>
 
 <!-- Bottom Floating Yellow Action Bar in Refract Purple -->
 <div class="bottom-floating-bar refract-floating-bar-purple">
     <?php if ($item['status'] === 'Upcoming'): ?>
         <?php if ($item['track_status']): ?>
             <div class="d-flex w-100 gap-2">
-                <button class="btn-floating-action btn-track-toggle refract-action-btn disabled flex-grow-1" disabled style="background-color: #2c2c3e !important; color: #a5a5c0 !important; cursor: not-allowed; opacity: 0.7;">
+                <button class="btn-floating-action btn-track-toggle refract-action-btn disabled flex-grow-1" disabled style="background-color: #2c2c3e !important; color: #a5a5c0 !important; cursor: not-allowed; opacity: 0.7; height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                     <i class="bi bi-clock me-1"></i> FILME EM BREVE
                 </button>
                 <button class="btn-floating-action remove btn-track-toggle px-3" 
                         data-item-id="<?= $item['id_item'] ?>" 
                         data-action="remove"
-                        style="width: auto; min-width: 100px;">
+                        style="width: auto !important; min-width: 100px !important; height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                     REMOVER
                 </button>
             </div>
@@ -378,7 +426,8 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                     data-item-id="<?= $item['id_item'] ?? '' ?>" 
                     data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
                     data-action="add"
-                    data-status="plan_to_watch">
+                    data-status="plan_to_watch"
+                    style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                 <i class="bi bi-plus-circle me-2"></i> QUERO ASSISTIR (EM BREVE)
             </button>
         <?php endif; ?>
@@ -396,7 +445,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 <button class="btn-floating-action btn-track-toggle refract-action-btn rewatch flex-grow-1" 
                         data-item-id="<?= $item['id_item'] ?>" 
                         data-action="rewatch"
-                        style="background-color: #2ed573 !important;">
+                        style="background-color: #2ed573 !important; height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                     <i class="bi bi-arrow-repeat me-1"></i> REASSISTIR <?= $item['type'] === 'movie' ? 'FILME' : 'SÉRIE' ?>
                     <?php if ($item['type'] === 'movie' && isset($item['rewatch_count']) && $item['rewatch_count'] > 0): ?>
                         <span class="badge bg-dark ms-2" id="movie-rewatch-badge" style="background-color: rgba(0,0,0,0.5) !important; color: #ffffff !important; font-weight: 700;"><?= $item['rewatch_count'] ?>x</span>
@@ -405,7 +454,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 <button class="btn-floating-action remove btn-track-toggle px-3" 
                         data-item-id="<?= $item['id_item'] ?>" 
                         data-action="remove"
-                        style="width: auto; min-width: 100px;">
+                        style="width: auto !important; min-width: 100px !important; height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                     REMOVER
                 </button>
             </div>
@@ -413,14 +462,16 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
             <button class="btn-floating-action btn-track-toggle refract-action-btn" 
                     data-item-id="<?= $item['id_item'] ?>" 
                     data-action="add"
-                    data-status="completed">
+                    data-status="completed"
+                    style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                 <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
             </button>
         <?php else: ?>
             <button class="btn-floating-action btn-track-toggle refract-action-btn" 
                     data-item-id="<?= $item['id_item'] ?>" 
                     data-action="add"
-                    data-status="completed">
+                    data-status="completed"
+                    style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                 <i class="bi bi-check-circle-fill me-2"></i> Marcar <?= $nextEpStr ?> como visto
             </button>
         <?php endif; ?>
@@ -430,7 +481,8 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                     data-item-id="<?= $item['id_item'] ?? '' ?>" 
                     data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
                     data-action="add"
-                    data-status="completed">
+                    data-status="completed"
+                    style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                 <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
             </button>
         <?php else: ?>
@@ -438,7 +490,8 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                     data-item-id="<?= $item['id_item'] ?? '' ?>" 
                     data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
                     data-action="add"
-                    data-status="watching">
+                    data-status="watching"
+                    style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
                 + ADICIONAR SÉRIE
             </button>
         <?php endif; ?>

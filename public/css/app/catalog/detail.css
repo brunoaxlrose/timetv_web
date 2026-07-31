@@ -15,6 +15,7 @@
 .refract-detail-container {
     position: relative;
     z-index: 1;
+    padding-bottom: 160px;
 }
 .refract-top-bar {
     padding: 15px;
@@ -207,13 +208,14 @@
 }
 
 /* Desktop overrides */
-@media (min-width: 992px) {
+@media (min-width: 768px) and (min-height: 550px) {
     .refract-detail-container {
         display: grid;
         grid-template-columns: 280px 1fr;
         gap: 40px;
         align-items: start;
         padding-top: 20px;
+        padding-bottom: 20px;
     }
     
     .refract-top-bar {
@@ -233,28 +235,31 @@
         height: auto;
     }
     
-    .refract-poster-wrapper + div {
+    .refract-detail-info-wrapper {
+        grid-column: 2;
         text-align: left !important;
         padding: 0 !important;
-        grid-column: 2;
     }
     
-    .refract-poster-wrapper + div h2 {
+    .refract-detail-info-wrapper .text-center {
+        text-align: left !important;
+    }
+    
+    .refract-detail-info-wrapper h2 {
         font-size: 2.2rem;
         margin-top: 0;
     }
     
-    .refract-poster-wrapper + div .d-flex {
+    .refract-detail-info-wrapper .justify-content-center {
         justify-content: flex-start !important;
     }
     
     .tvtime-tabs.refract-tabs {
-        grid-column: 1 / -1;
         margin-top: 20px;
+        justify-content: flex-start !important;
     }
     
     .tvtime-tabs.refract-tabs + .p-3 {
-        grid-column: 1 / -1;
         padding: 0 !important;
     }
     
@@ -269,15 +274,40 @@
         margin-bottom: 0;
     }
     
+    /* Restrict giant text/comments width on desktop */
+    #tabSobreContent p,
+    .refract-creator-row,
+    #communityCommentsContainer,
+    .p-3.rounded-4.mb-4.text-start {
+        max-width: 800px !important;
+    }
+    
     .bottom-floating-bar,
     .refract-floating-bar-purple {
         position: static !important;
         transform: none !important;
         width: 100% !important;
-        max-width: none !important;
+        max-width: 800px !important;
         margin: 20px 0 !important;
         padding: 0 !important;
         background: transparent !important;
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 15px !important;
+        height: auto !important;
+    }
+    
+    .bottom-floating-bar button,
+    .refract-floating-bar-purple button {
+        height: 50px !important;
+        max-height: 50px !important;
+        width: auto !important;
+        flex-grow: 1 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 30px !important;
+        padding: 0 20px !important;
     }
 
     .horizontal-carousel {

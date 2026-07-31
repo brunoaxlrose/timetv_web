@@ -1,0 +1,162 @@
+/* ==========================================
+   Responsive Improvements for Desktop
+   ========================================== */
+@media (min-width: 768px) and (min-height: 550px) {
+    body {
+        justify-content: center;
+        background-color: #050508;
+        overflow-x: hidden;
+    }
+
+    /* For logged-out users (Login / Register pages) on Desktop */
+    .app-container.logged-out {
+        max-width: 100% !important;
+        width: 100vw !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none;
+        box-shadow: none;
+        background-color: #08080a;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .app-container.logged-out .flex-grow-1 {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        min-height: 100vh;
+        background-color: #08080a;
+    }
+
+    /* For logged-in users (Dashboard / Main App) on Desktop */
+    .app-container.logged-in {
+        max-width: 100% !important;
+        width: 100vw !important;
+        margin: 0 !important;
+        padding: 0 20px !important;
+        padding-bottom: 0 !important;
+        border: none;
+        box-shadow: none;
+        background-color: transparent;
+        display: flex;
+        flex-direction: row; /* Sidebar on left, content on right */
+        overflow-x: hidden;
+    }
+
+    .app-container.logged-in .flex-grow-1 {
+        width: calc(100% - 280px);
+        padding: 80px 30px 20px 30px !important; /* Extra padding-top for absolute top bar controls */
+        background-color: var(--bg-black);
+        border-radius: 20px;
+        border: 1px solid var(--border-dark);
+        margin: 20px 20px 20px 0;
+        min-height: calc(100vh - 40px);
+        order: 2; /* Content on the right */
+    }
+
+    /* Responsive Bottom Navbar to Sidebar (Left side on Desktop) */
+    .app-container.logged-in .bottom-navbar {
+        position: sticky;
+        top: 20px;
+        bottom: auto;
+        left: auto;
+        transform: none;
+        width: 240px;
+        height: auto;
+        min-height: calc(100vh - 40px);
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+        border-radius: 20px;
+        padding: 30px 15px;
+        margin: 20px;
+        gap: 12px;
+        background-color: rgba(18, 18, 27, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        order: 1; /* Sidebar on the left */
+    }
+
+    .app-container.logged-in .bottom-navbar .nav-item {
+        width: 100%;
+        height: 52px;
+        border-radius: 12px;
+        flex-direction: row;
+        justify-content: flex-start;
+        padding: 0 20px;
+        gap: 15px;
+    }
+
+    .app-container.logged-in .bottom-navbar .nav-item::after {
+        content: attr(title);
+        font-size: 0.95rem;
+        font-weight: 600;
+        display: inline-block;
+    }
+
+    /* Position the header (Top Bar Controls) at the top-right */
+    .app-container.logged-in .app-top-bar {
+        position: absolute;
+        top: 25px;
+        right: 40px;
+        width: auto;
+        height: auto;
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border-bottom: none;
+        z-index: 990;
+    }
+
+    .app-container.logged-in .app-top-bar__logo {
+        display: none !important;
+    }
+
+    /* Slide-out notification panel on desktop */
+    .app-container.logged-in .notif-panel {
+        top: 0;
+        right: 0;
+        left: auto;
+        margin: 0;
+        max-width: 380px;
+        height: 100vh;
+        border-left: 1px solid var(--border-dark);
+        border-top: none;
+        box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+        z-index: 1000;
+    }
+
+    /* Custom Modal centering on desktop */
+    .tvtime-modal-overlay {
+        align-items: center;
+        justify-content: center;
+    }
+
+    .tvtime-modal-sheet {
+        border-radius: 20px !important;
+        border: 1px solid var(--border-light);
+        transform: scale(0.9);
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .tvtime-modal-overlay.active .tvtime-modal-sheet {
+        transform: scale(1);
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Loader width override - Cover the whole screen on desktop */
+    #globalLoader {
+        max-width: none !important;
+        left: 0 !important;
+        transform: none !important;
+        background-color: rgba(0, 0, 0, 0.75) !important;
+        z-index: 99999 !important;
+    }
+}

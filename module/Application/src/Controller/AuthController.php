@@ -42,8 +42,10 @@ class AuthController extends AbstractActionController {
 
                 if ($user && password_verify($password, $user['password_hash'])) {
                     $_SESSION['user_id'] = $user['id_usuario'];
-                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['username'] = $user['user_name'];
                     $_SESSION['email'] = $user['email'];
+                    $_SESSION['nome'] = $user['nome'];
+                    $_SESSION['sobrenome'] = $user['sobrenome'];
                     session_write_close();
                     return new JsonModel(['success' => true, 'redirect' => '/dashboard']);
                 } else {
@@ -77,9 +79,11 @@ class AuthController extends AbstractActionController {
             }
 
             $data = $inputFilter->getValues();
-            $username = $data['username'];
+            $username = trim($data['user_name']);
             $email = $data['email'];
             $password = $data['password'];
+            $nome = $this->capitalizeName(trim($data['nome']));
+            $sobrenome = $this->capitalizeName(trim($data['sobrenome']));
 
             try {
                 if ($this->authModel->isUsernameOrEmailTaken($username, $email)) {
@@ -87,11 +91,13 @@ class AuthController extends AbstractActionController {
                 }
 
                 $hash = password_hash($password, PASSWORD_BCRYPT);
-                $userId = $this->authModel->createUser($username, $email, $hash);
+                $userId = $this->authModel->createUser($username, $email, $hash, $nome, $sobrenome);
 
                 $_SESSION['user_id'] = $userId;
                 $_SESSION['username'] = $username;
                 $_SESSION['email'] = $email;
+                $_SESSION['nome'] = $nome;
+                $_SESSION['sobrenome'] = $sobrenome;
                 session_write_close();
 
                 return new JsonModel(['success' => true, 'redirect' => '/dashboard']);
@@ -133,9 +139,15 @@ class AuthController extends AbstractActionController {
         $post = $request->getPost();
         $userId = $_SESSION['user_id'];
         $newUsername = trim($post->get('username', ''));
+        $nome = $this->capitalizeName(trim($post->get('nome', '')));
+        $sobrenome = $this->capitalizeName(trim($post->get('sobrenome', '')));
         
         if (empty($newUsername) || strlen($newUsername) < 3) {
             return new JsonModel(['success' => false, 'message' => 'Nome de usuário deve ter no mínimo 3 caracteres.']);
+        }
+
+        if (empty($nome) || empty($sobrenome)) {
+            return new JsonModel(['success' => false, 'message' => 'Nome e sobrenome são obrigatórios.']);
         }
         
         try {
@@ -170,8 +182,10 @@ class AuthController extends AbstractActionController {
                 $this->authModel->updatePassword($userId, $newHash);
             }
             
-            $this->authModel->updateUsername($userId, $newUsername);
+            $this->authModel->updateProfile($userId, $newUsername, $nome, $sobrenome);
             $_SESSION['username'] = $newUsername;
+            $_SESSION['nome'] = $nome;
+            $_SESSION['sobrenome'] = $sobrenome;
             
             return new JsonModel(['success' => true, 'message' => 'Perfil atualizado com sucesso!']);
         } catch (\PDOException $e) {
@@ -242,5 +256,17 @@ class AuthController extends AbstractActionController {
         } catch (\PDOException $e) {
             return new JsonModel(['success' => false, 'message' => 'Erro ao salvar feedback no banco de dados.']);
         }
+    }
+
+    private function capitalizeName(string $name): string {
+        $words = explode(' ', mb_strtolower(trim($name), 'UTF-8'));
+        $lowercaseWords = ['de', 'da', 'do', 'dos', 'das', 'e'];
+        $capitalizedWords = array_map(function($word) use ($lowercaseWords) {
+            if (in_array($word, $lowercaseWords)) {
+                return $word;
+            }
+            return mb_convert_case($word, MB_CASE_TITLE, 'UTF-8');
+        }, $words);
+        return implode(' ', $capitalizedWords);
     }
 }

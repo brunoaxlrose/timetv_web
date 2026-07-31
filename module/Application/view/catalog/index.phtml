@@ -83,7 +83,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                 <?php
                                     if ($item['id_item']) $detailLink = '/detail?id=' . $item['id_item'];
                                     elseif (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
-                                    elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'];
+                                    elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'] . '&type=' . $item['type'];
                                     elseif (!empty($item['mal_id'])) $detailLink = '/detail?mal_id=' . $item['mal_id'];
                                     else $detailLink = '#';
                                 ?>
@@ -126,7 +126,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                         <?php
                             $detailLink = '#';
                             if (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
-                            elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'];
+                            elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'] . '&type=' . $item['type'];
                             elseif (!empty($item['mal_id'])) $detailLink = '/detail?mal_id=' . $item['mal_id'];
                         ?>
                         <div class="col mb-3">
@@ -160,7 +160,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                         <?php
                             $detailLink = '#';
                             if (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
-                            elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'];
+                            elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'] . '&type=' . $item['type'];
                             elseif (!empty($item['mal_id'])) $detailLink = '/detail?mal_id=' . $item['mal_id'];
                         ?>
                         <div class="col mb-3">
