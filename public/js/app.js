@@ -29,8 +29,10 @@ function showToast(message, isSuccess = true) {
     toast.show();
 }
 
-function loadPageContent(url, push = true) {
-    showGlobalLoader(true);
+function loadPageContent(url, push = true, showLoader = true) {
+    if (showLoader !== false) {
+        showGlobalLoader(true);
+    }
 
     // Programmatically close settings modal if open on navigation transition
     const $settingsModal = $('#editProfileModal');

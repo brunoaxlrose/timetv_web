@@ -69,7 +69,7 @@ $this->partial('catalog/js.phtml', ['page' => 'search']);
     <!-- Search Input Box -->
     <div class="search-input-wrap d-flex align-items-center px-3 py-1 mb-4">
         <i class="bi bi-search" style="color: #a88beb; font-size: 0.95rem;"></i>
-        <input type="text" id="searchInput" class="form-control py-2" placeholder="Filmes, séries, anime..." value="<?= htmlspecialchars($search) ?>" autocomplete="off" onkeyup="handleSearchKeyUp(event)">
+        <input type="text" id="globalSearchInput" class="form-control py-2" placeholder="Filmes, séries, anime..." value="<?= htmlspecialchars($search) ?>" autocomplete="off" onkeyup="handleSearchKeyUp(event)">
         <?php if (!empty($search)): ?>
             <button type="button" class="btn btn-link text-muted p-0 ms-2" onclick="clearSearch()"><i class="bi bi-x-circle-fill"></i></button>
         <?php endif; ?>
@@ -80,7 +80,7 @@ $this->partial('catalog/js.phtml', ['page' => 'search']);
             <h6 class="text-white fw-bold">Resultados da busca</h6>
             <span class="small text-muted" id="searchResultCount"><?= count($items) ?> itens</span>
         </div>
-        <div class="row row-cols-3 g-2" id="resultsGrid">
+        <div class="row row-cols-3 g-2" id="searchResultsGrid">
             <?php if (!empty($items)): ?>
                 <?php foreach ($items as $item): ?>
                     <?php
@@ -170,7 +170,7 @@ $this->partial('catalog/js.phtml', ['page' => 'search']);
     }
 
     function doPerformSearch() {
-        const val = document.getElementById('searchInput').value.trim();
+        const val = document.getElementById('globalSearchInput').value.trim();
         if (val === '') {
             clearSearch();
             return;
@@ -179,35 +179,35 @@ $this->partial('catalog/js.phtml', ['page' => 'search']);
         // Hide default discovery screen, show results loading placeholder
         document.getElementById('discoverDefaultSection').classList.add('d-none');
         document.getElementById('searchResultsSection').classList.remove('d-none');
-        document.getElementById('resultsGrid').innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-accent" role="status" style="color: #a88beb;"><span class="visually-hidden">Carregando...</span></div></div>';
+        document.getElementById('searchResultsGrid').innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-accent" role="status" style="color: #a88beb;"><span class="visually-hidden">Carregando...</span></div></div>';
 
         // Load AJAX search response
         $.post('/search', { search: val }, function(responseData) {
             const $temp = $('<div>').html(responseData);
-            const $newGrid = $temp.find('#resultsGrid');
+            const $newGrid = $temp.find('#searchResultsGrid');
             const $newCount = $temp.find('#searchResultCount');
             
             if ($newGrid.length) {
-                $('#resultsGrid').html($newGrid.html());
+                $('#searchResultsGrid').html($newGrid.html());
             }
             if ($newCount.length) {
                 $('#searchResultCount').text($newCount.text());
             }
             
-            // Add a clear button inline if not already added
-            loadPageContent('/search?search=' + encodeURIComponent(val), false);
+            // Update browser URL silently without showing global loader overlay
+            loadPageContent('/search?search=' + encodeURIComponent(val), false, false);
         }).fail(function() {
             showToast('Erro ao realizar busca.', false);
         });
     }
 
     function clearSearch() {
-        document.getElementById('searchInput').value = '';
+        document.getElementById('globalSearchInput').value = '';
         loadPageContent('/search', false);
     }
 
     function triggerRecentSearch(term) {
-        document.getElementById('searchInput').value = term;
+        document.getElementById('globalSearchInput').value = term;
         doPerformSearch();
     }
 

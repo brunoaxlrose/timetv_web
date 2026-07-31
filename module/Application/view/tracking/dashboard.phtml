@@ -204,14 +204,14 @@ $upcomingItems = $this->upcomingItems ?? [];
     <div style="height: 15px;"></div>
 
     <!-- Annual Goal Card -->
-    <div class="p-3 mb-4 rounded-4 text-white d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #242436 0%, #161622 100%); border: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onclick="showToast('Defina sua meta no menu do perfil!', true)">
+    <!-- <div class="p-3 mb-4 rounded-4 text-white d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #242436 0%, #161622 100%); border: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onclick="showToast('Defina sua meta no menu do perfil!', true)">
         <div class="d-flex align-items-center gap-2">
             <i class="bi bi-trophy text-warning"></i>
             <span style="font-size: 0.78rem; font-weight: 600; color: #d0d0e1;">Define a tua meta de <?= date('Y') ?></span>
             <span style="font-size: 0.72rem; color: #a5a5c0;">( 🔥 Sem sequência ainda )</span>
         </div>
         <i class="bi bi-chevron-right text-muted small"></i>
-    </div>
+    </div> -->
 
     <!-- SECTION: CONTINUAR -->
     <div class="refract-section-header">
@@ -278,13 +278,13 @@ $upcomingItems = $this->upcomingItems ?? [];
     </div>
 
     <!-- SECTION: PARA VER -->
-    <div class="refract-section-header">
+    <!-- <div class="refract-section-header">
         <div class="refract-section-title">
             <i class="bi bi-bookmark-fill text-info"></i> Para ver
         </div>
-    </div>
+    </div> -->
     
-    <div class="refract-carousel">
+    <!-- <div class="refract-carousel">
         <?php if (empty($planToWatch)): ?>
             <div class="p-4 text-center text-muted w-100 rounded-4" style="background-color: #12121a; border: 1px dashed rgba(255,255,255,0.08); cursor: pointer;" onclick="loadPageContent('/search')">
                 <span class="small d-block mb-1" style="color: #c0c0d8 !important;">A tua lista de visualização está vazia.</span>
@@ -303,7 +303,7 @@ $upcomingItems = $this->upcomingItems ?? [];
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
-    </div>
+    </div> -->
 
     <!-- SECTION: MAIS POPULARES -->
     <div class="refract-section-header">
