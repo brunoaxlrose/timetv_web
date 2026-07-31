@@ -92,6 +92,7 @@ class DatabaseSchemaHelper {
             "ALTER TABLE episodio ADD COLUMN IF NOT EXISTS image_url TEXT;",
             "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS avatar_url TEXT;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS comment TEXT NULL;",
+            "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT FALSE;",
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS watch_providers TEXT NULL;",
             "ALTER TABLE usuario_episodio ADD COLUMN IF NOT EXISTS rewatch_count INT DEFAULT 0;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS rewatch_count INT DEFAULT 0;",

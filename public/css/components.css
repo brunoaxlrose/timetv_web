@@ -1241,6 +1241,27 @@
     color: #a8a8bd !important;
 }
 
+/* Global readability tuning for dark cards and modal sheets */
+.tvtime-modal-sheet .text-muted,
+.refract-card-dark .text-muted,
+.refract-time-panel .text-muted,
+.refract-status-grid .text-muted,
+.refract-profile-header .text-muted {
+    color: #c5c5dd !important;
+}
+
+.refract-release-date,
+.upcoming-countdown {
+    color: #c8c8e3 !important;
+    font-weight: 500;
+}
+
+.season-episode-meta,
+.detail-episode-meta,
+.catalog-card-meta {
+    color: #c7c7e0 !important;
+}
+
 /* Enviar Feedback Modal Button Tabs */
 .refract-feedback-tab {
     background-color: #12121a;

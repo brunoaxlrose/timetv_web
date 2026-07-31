@@ -23,18 +23,20 @@ class TrackingController extends AbstractActionController {
         $userId = $_SESSION['user_id'];
 
         $continueWatching = $this->trackingModel->getContinueWatching($userId);
-        $userLists = $this->trackingModel->getUserLists($userId);
+        $userLists = $this->trackingModel->getUserListsSummary($userId);
         $planToWatch = $this->trackingModel->getPlanToWatch($userId);
 
         $popularItems = \Application\Helper\TmdbHelper::getPopular(12);
         $upcomingItems = \Application\Helper\TmdbHelper::getUpcoming(12);
+        $launchItems = array_slice($upcomingItems, 0, 8);
 
         $view = new ViewModel([
             'continueWatching' => $continueWatching,
             'userLists'        => $userLists,
             'planToWatch'      => $planToWatch,
             'popularItems'     => $popularItems,
-            'upcomingItems'    => $upcomingItems
+            'upcomingItems'    => $upcomingItems,
+            'launchItems'      => $launchItems
         ]);
 
         if ($this->getRequest()->isXmlHttpRequest()) {
@@ -52,7 +54,7 @@ class TrackingController extends AbstractActionController {
         }
 
         $userId = $_SESSION['user_id'];
-        $userLists = $this->trackingModel->getUserLists($userId);
+        $userLists = $this->trackingModel->getUserListsSummary($userId);
 
         $view = new ViewModel([
             'userLists' => $userLists
@@ -221,6 +223,10 @@ class TrackingController extends AbstractActionController {
         $action = $post->get('action', 'add');
         $status = $post->get('status', 'watching');
 
+        if ($action === 'add' && $status === 'completed' && !$this->trackingModel->isItemReleased((string)$itemId)) {
+            return new JsonModel(['success' => false, 'message' => 'Este filme ainda não foi lançado.']);
+        }
+
         if (!$itemId && $tvmazeId > 0) {
             $pdo = $this->trackingModel->getNextUnwatchedEpisode($userId, 'dummy'); // dummy query or fetch connection
             // We can resolve connection if needed
@@ -270,6 +276,22 @@ class TrackingController extends AbstractActionController {
         $status = $post->get('status', 'watch');
         $toggleType = $post->get('toggle_type');
         $seasonNum = $post->get('season_number');
+
+        if ($status === 'watch' && $episodeId && !$this->trackingModel->isEpisodeReleased((string)$episodeId)) {
+            return new JsonModel(['success' => false, 'message' => 'Este episódio ainda não foi lançado.']);
+        }
+
+        if ($status === 'watch' && $toggleType && in_array($toggleType, ['all', 'season', 'preceding'], true)) {
+            if ($toggleType === 'all') {
+                $dbConfig = $this->getEvent()->getApplication()->getServiceManager()->get('config')['db'] ?? [];
+                $pdo = new \PDO($dbConfig['dsn'], $dbConfig['username'], $dbConfig['password']);
+                $stmtReleased = $pdo->prepare("SELECT COUNT(*) FROM episodio WHERE id_item = :id_item AND (air_date IS NULL OR air_date = '' OR CAST(air_date AS DATE) <= CURRENT_DATE)");
+                $stmtReleased->execute([':id_item' => $itemId]);
+                if ((int)$stmtReleased->fetchColumn() === 0) {
+                    return new JsonModel(['success' => false, 'message' => 'Ainda não há episódios lançados para marcar como vistos.']);
+                }
+            }
+        }
 
         try {
             if ($toggleType === 'all') {
@@ -358,6 +380,73 @@ class TrackingController extends AbstractActionController {
         }
     }
 
+    public function apiToggleFavoriteAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autenticado.']);
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        $request = $this->getRequest();
+        if (!$request->isPost()) {
+            return new JsonModel(['success' => false, 'message' => MessageHelper::METHOD_INVALID]);
+        }
+
+        $itemId = (int)$request->getPost('item_id', 0);
+        if ($itemId <= 0) {
+            return new JsonModel(['success' => false, 'message' => 'Item inválido.']);
+        }
+
+        try {
+            $isFavorite = $this->trackingModel->toggleFavorite($userId, $itemId);
+            return new JsonModel([
+                'success' => true,
+                'is_favorite' => $isFavorite,
+                'message' => $isFavorite ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.'
+            ]);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => 'Erro ao atualizar favorito.']);
+        }
+    }
+
+    public function apiGetListItemsAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'NÃ£o autorizado.']);
+        }
+
+        $userId = (int) $_SESSION['user_id'];
+        $listId = (int) $this->params()->fromQuery('list_id', 0);
+
+        if ($listId <= 0) {
+            return new JsonModel(['success' => false, 'message' => 'Lista invÃ¡lida.']);
+        }
+
+        try {
+            $items = $this->trackingModel->getListItems($userId, $listId);
+            $lists = $this->trackingModel->getUserListsSummary($userId);
+            $listName = '';
+
+            foreach ($lists as $list) {
+                if ((int) $list['id_lista'] === $listId) {
+                    $listName = $list['nome'];
+                    break;
+                }
+            }
+
+            if ($listName === '') {
+                return new JsonModel(['success' => false, 'message' => 'Lista nÃ£o encontrada.']);
+            }
+
+            return new JsonModel([
+                'success' => true,
+                'list_id' => $listId,
+                'list_name' => $listName,
+                'items' => $items,
+            ]);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => 'Erro ao carregar itens da lista.']);
+        }
+    }
+
     public function statsAction() {
         if (!isset($_SESSION['user_id'])) {
             return $this->redirect()->toRoute('login');
@@ -367,6 +456,7 @@ class TrackingController extends AbstractActionController {
         
         $stats = $this->trackingModel->getStatsSummary($userId);
         $timeline = $this->trackingModel->getStatsTimeline($userId);
+        $favorites = $this->trackingModel->getFavorites($userId);
 
         $totalMinutes = $stats['totalMinutes'];
         $days = floor($totalMinutes / 1440);
@@ -391,6 +481,7 @@ class TrackingController extends AbstractActionController {
             'minutes' => $minutes,
             'timeline' => $timeline,
             'history' => $history,
+            'favorites' => $favorites,
         ]);
         
         $this->layout()->title = "Perfil - Time View";

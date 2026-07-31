@@ -162,6 +162,16 @@ return [
                     ],
                 ],
             ],
+            'api-lists-items' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/lists/items',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiGetListItems',
+                    ],
+                ],
+            ],
             'diary' => [
                 'type' => Literal::class,
                 'options' => [
@@ -359,6 +369,16 @@ return [
                     'defaults' => [
                         'controller' => TrackingController::class,
                         'action'     => 'apiRewatchEpisode',
+                    ],
+                ],
+            ],
+            'api-toggle-favorite' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/favorite/toggle',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiToggleFavorite',
                     ],
                 ],
             ],

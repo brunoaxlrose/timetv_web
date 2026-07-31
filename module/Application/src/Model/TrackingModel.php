@@ -9,6 +9,24 @@ class TrackingModel {
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        $this->ensureFavoriteColumn();
+    }
+
+    private function ensureFavoriteColumn(): void {
+        try {
+            $stmt = $this->pdo->query("
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = 'usuario_item'
+                  AND column_name = 'is_favorite'
+                LIMIT 1
+            ");
+            if (!$stmt->fetchColumn()) {
+                $this->pdo->exec("ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT FALSE");
+            }
+        } catch (\Exception $e) {
+            // Ignore schema bootstrap failures; the app will still run read-only.
+        }
     }
 
     public function getUserCollection(int $userId, array $types, string $sortBy, string $providerFilter = ''): array {
@@ -256,6 +274,89 @@ class TrackingModel {
         $stmt->execute([':status' => $status, ':user_id' => $userId, ':item_id' => $itemId]);
     }
 
+    public function isItemReleased(string $itemId): bool {
+        $stmt = $this->pdo->prepare("SELECT type, status, release_date, release_year FROM item WHERE id_item = :item_id LIMIT 1");
+        $stmt->execute([':item_id' => $itemId]);
+        $item = $stmt->fetch();
+        if (!$item) {
+            return false;
+        }
+        $today = strtotime(date('Y-m-d'));
+
+        if (($item['type'] ?? '') !== 'movie') {
+            $stmtReleasedEpisode = $this->pdo->prepare("
+                SELECT COUNT(*)
+                FROM episodio
+                WHERE id_item = :item_id
+                  AND (air_date IS NULL OR air_date = '' OR CAST(air_date AS DATE) <= CURRENT_DATE)
+            ");
+            $stmtReleasedEpisode->execute([':item_id' => $itemId]);
+            return (int)$stmtReleasedEpisode->fetchColumn() > 0;
+        }
+
+        if (($item['status'] ?? '') === 'Upcoming') {
+            return false;
+        }
+        if (!empty($item['release_date'])) {
+            return strtotime($item['release_date']) <= $today;
+        }
+        if (!empty($item['release_year'])) {
+            return (int)$item['release_year'] < (int)date('Y');
+        }
+        return false;
+    }
+
+    public function isEpisodeReleased(string $episodeId): bool {
+        $stmt = $this->pdo->prepare("SELECT air_date FROM episodio WHERE id_episodio = :ep_id LIMIT 1");
+        $stmt->execute([':ep_id' => $episodeId]);
+        $ep = $stmt->fetch();
+        if (!$ep) {
+            return false;
+        }
+        if (!empty($ep['air_date'])) {
+            return strtotime($ep['air_date']) <= strtotime(date('Y-m-d'));
+        }
+        return true;
+    }
+
+    public function toggleFavorite(int $userId, int $itemId): bool {
+        $stmt = $this->pdo->prepare("
+            UPDATE usuario_item
+            SET is_favorite = NOT COALESCE(is_favorite, FALSE),
+                ts_atualizacao = CURRENT_TIMESTAMP,
+                ts_cancelamento = NULL
+            WHERE id_usuario = :user_id AND id_item = :item_id
+            RETURNING is_favorite
+        ");
+        $stmt->execute([':user_id' => $userId, ':item_id' => $itemId]);
+        $value = $stmt->fetchColumn();
+        if ($value === false) {
+            $stmtInsert = $this->pdo->prepare("
+                INSERT INTO usuario_item (id_usuario, id_item, status, is_favorite, ts_cancelamento)
+                VALUES (:user_id, :item_id, 'watching', TRUE, NULL)
+                ON CONFLICT (id_usuario, id_item) DO UPDATE SET is_favorite = TRUE, ts_cancelamento = NULL
+                RETURNING is_favorite
+            ");
+            $stmtInsert->execute([':user_id' => $userId, ':item_id' => $itemId]);
+            $value = $stmtInsert->fetchColumn();
+        }
+        return (bool)$value;
+    }
+
+    public function getFavorites(int $userId): array {
+        $stmt = $this->pdo->prepare("
+            SELECT i.*, ui.status as track_status, ui.is_favorite, ui.ts_atualizacao
+            FROM usuario_item ui
+            JOIN item i ON ui.id_item = i.id_item
+            WHERE ui.id_usuario = :user_id
+              AND ui.ts_cancelamento IS NULL
+              AND ui.is_favorite = TRUE
+            ORDER BY ui.ts_atualizacao DESC
+        ");
+        $stmt->execute([':user_id' => $userId]);
+        return $stmt->fetchAll();
+    }
+
     public function getStatsSummary(int $userId): array {
         $stats = [
             'totalEpisodes' => 0,
@@ -436,9 +537,30 @@ class TrackingModel {
 
     public function getContinueWatching(int $userId): array {
         $stmt = $this->pdo->prepare("
-            SELECT ui.ts_atualizacao, i.* 
+            SELECT 
+                ui.ts_atualizacao,
+                i.*,
+                next_ep.id_episodio AS next_id_episodio,
+                next_ep.season_number AS next_season_number,
+                next_ep.episode_number AS next_episode_number,
+                next_ep.title AS next_title,
+                next_ep.air_date AS next_air_date,
+                next_ep.runtime_minutes AS next_runtime_minutes
             FROM usuario_item ui
             JOIN item i ON ui.id_item = i.id_item
+            LEFT JOIN LATERAL (
+                SELECT e.id_episodio, e.season_number, e.episode_number, e.title, e.air_date, e.runtime_minutes
+                FROM episodio e
+                WHERE e.id_item = i.id_item
+                  AND e.id_episodio NOT IN (
+                      SELECT ue.id_episodio
+                      FROM usuario_episodio ue
+                      WHERE ue.id_usuario = :user_id
+                        AND ue.ts_cancelamento IS NULL
+                  )
+                ORDER BY e.season_number ASC, e.episode_number ASC
+                LIMIT 1
+            ) next_ep ON TRUE
             WHERE ui.id_usuario = :user_id AND ui.status = 'watching' AND ui.ts_cancelamento IS NULL AND i.type != 'movie'
             ORDER BY ui.ts_atualizacao DESC
         ");
@@ -447,11 +569,17 @@ class TrackingModel {
 
         $results = [];
         foreach ($shows as $show) {
-            $next = $this->getNextUnwatchedEpisode($userId, $show['id_item']);
-            if ($next) {
+            if (!empty($show['next_id_episodio'])) {
                 $results[] = [
                     'item' => $show,
-                    'next_episode' => $next
+                    'next_episode' => [
+                        'id_episodio' => $show['next_id_episodio'],
+                        'season_number' => $show['next_season_number'],
+                        'episode_number' => $show['next_episode_number'],
+                        'title' => $show['next_title'],
+                        'air_date' => $show['next_air_date'],
+                        'runtime_minutes' => $show['next_runtime_minutes'],
+                    ]
                 ];
             }
         }
@@ -491,6 +619,54 @@ class TrackingModel {
             $list['items'] = $stmtItems->fetchAll();
         }
         return $lists;
+    }
+
+    public function getUserListsSummary(int $userId): array {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                ul.id_lista,
+                ul.nome,
+                ul.ts_criacao,
+                COUNT(uli.id_item) AS item_count,
+                (
+                    SELECT i.poster_url
+                    FROM usuario_lista_item uli2
+                    JOIN item i ON i.id_item = uli2.id_item
+                    WHERE uli2.id_lista = ul.id_lista
+                    ORDER BY uli2.ts_inclusao DESC
+                    LIMIT 1
+                ) AS cover_poster_url
+            FROM usuario_lista ul
+            LEFT JOIN usuario_lista_item uli ON uli.id_lista = ul.id_lista
+            WHERE ul.id_usuario = :user_id
+            GROUP BY ul.id_lista, ul.nome, ul.ts_criacao
+            ORDER BY ul.ts_criacao DESC
+        ");
+        $stmt->execute([':user_id' => $userId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getListItems(int $userId, int $listId): array {
+        $stmt = $this->pdo->prepare("
+            SELECT 1
+            FROM usuario_lista
+            WHERE id_usuario = :user_id AND id_lista = :list_id
+            LIMIT 1
+        ");
+        $stmt->execute([':user_id' => $userId, ':list_id' => $listId]);
+        if (!$stmt->fetchColumn()) {
+            return [];
+        }
+
+        $stmtItems = $this->pdo->prepare("
+            SELECT i.id_item, i.title, i.poster_url, i.type, i.release_year
+            FROM usuario_lista_item uli
+            JOIN item i ON i.id_item = uli.id_item
+            WHERE uli.id_lista = :list_id
+            ORDER BY uli.ts_inclusao DESC
+        ");
+        $stmtItems->execute([':list_id' => $listId]);
+        return $stmtItems->fetchAll();
     }
 
     public function createList(int $userId, string $name): int {

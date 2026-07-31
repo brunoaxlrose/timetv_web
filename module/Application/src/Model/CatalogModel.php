@@ -15,6 +15,21 @@ class CatalogModel {
         return $this->pdo;
     }
 
+    private function hasColumn(string $table, string $column): bool {
+        $stmt = $this->pdo->prepare("
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = :table_name
+              AND column_name = :column_name
+            LIMIT 1
+        ");
+        $stmt->execute([
+            ':table_name' => $table,
+            ':column_name' => $column
+        ]);
+        return (bool)$stmt->fetchColumn();
+    }
+
     public function getLocalItemByTvmazeId(int $userId, string $tvmazeId) {
         $stmt = $this->pdo->prepare("
             SELECT i.*, ui.status as track_status 
@@ -60,7 +75,25 @@ class CatalogModel {
             LIMIT 1
         ");
         $stmt->execute([':id' => $itemId, ':user_id' => $userId]);
-        return $stmt->fetch();
+        $item = $stmt->fetch();
+        if (!$item) {
+            return false;
+        }
+
+        $item['is_favorite'] = false;
+        if ($this->hasColumn('usuario_item', 'is_favorite')) {
+            $stmtFav = $this->pdo->prepare("
+                SELECT COALESCE(is_favorite, FALSE)
+                FROM usuario_item
+                WHERE id_usuario = :user_id AND id_item = :id_item AND ts_cancelamento IS NULL
+                LIMIT 1
+            ");
+            $stmtFav->execute([':user_id' => $userId, ':id_item' => $itemId]);
+            $fav = $stmtFav->fetchColumn();
+            $item['is_favorite'] = ($fav !== false) ? (bool)$fav : false;
+        }
+
+        return $item;
     }
 
     public function getEpisodesWithWatchedState(int $userId, string $itemId): array {
@@ -92,7 +125,8 @@ class CatalogModel {
 
     public function getNextUnwatched(int $userId, string $itemId) {
         $stmt = $this->pdo->prepare("
-            SELECT season_number, episode_number FROM episodio 
+            SELECT id_episodio, season_number, episode_number, title, air_date, runtime_minutes
+            FROM episodio 
             WHERE id_item = :item_id 
               AND id_episodio NOT IN (SELECT id_episodio FROM usuario_episodio WHERE id_usuario = :user_id AND ts_cancelamento IS NULL)
             ORDER BY season_number ASC, episode_number ASC

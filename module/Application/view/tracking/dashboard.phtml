@@ -4,6 +4,7 @@ $userLists = $this->userLists ?? [];
 $planToWatch = $this->planToWatch ?? [];
 $popularItems = $this->popularItems ?? [];
 $upcomingItems = $this->upcomingItems ?? [];
+$launchItems = $this->launchItems ?? [];
 ?>
 
 <style>
@@ -196,6 +197,20 @@ $upcomingItems = $this->upcomingItems ?? [];
         padding: 1px 4px;
         border-radius: 3px;
     }
+    .refract-release-date {
+        font-size: 0.62rem;
+        color: #d0d0e6;
+        text-align: center;
+        margin-top: -2px;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: visible;
+        width: 100%;
+    }
+    #createListModal p.small {
+        color: #d6d6ea !important;
+        line-height: 1.45;
+    }
 </style>
 
 <div class="px-3 refract-home-container pb-5">
@@ -271,7 +286,7 @@ $upcomingItems = $this->upcomingItems ?? [];
             <?php foreach ($userLists as $list): ?>
                 <div class="refract-list-card-horizontal" onclick="loadPageContent('/lists')">
                     <span class="fw-bold text-white text-truncate w-100" style="font-size: 0.78rem;"><?= htmlspecialchars($list['nome']) ?></span>
-                    <span class="text-muted" style="font-size: 0.62rem;"><?= count($list['items']) ?> itens</span>
+                    <span class="text-muted" style="font-size: 0.62rem;"><?= (int)($list['item_count'] ?? 0) ?> itens</span>
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
@@ -353,6 +368,9 @@ $upcomingItems = $this->upcomingItems ?? [];
                     <span class="refract-meta-sub text-uppercase"><?= $item['type'] === 'movie' ? 'Film' : 'TV' ?></span>
                 </div>
                 <div class="refract-poster-title"><?= htmlspecialchars($item['title']) ?></div>
+                <?php if (!empty($item['release_date'])): ?>
+                    <div class="refract-release-date">Lança em <?= date('d/m/Y', strtotime($item['release_date'])) ?></div>
+                <?php endif; ?>
             </div>
         <?php endforeach; ?>
     </div>

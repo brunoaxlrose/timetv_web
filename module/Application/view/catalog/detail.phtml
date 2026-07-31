@@ -5,6 +5,9 @@ $progress = $this->progress;
 $cast = $this->cast;
 $nextUnwatched = $this->nextUnwatched;
 $userId = $this->userId;
+$hasReleasedContent = (bool)($this->hasReleasedContent ?? false);
+$isReleased = $hasReleasedContent;
+$reviewLocked = !$isReleased;
 
 $this->partial('catalog/css.phtml', ['page' => 'detail']);
 $this->partial('catalog/js.phtml', ['page' => 'detail']);
@@ -35,7 +38,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
     <div class="refract-detail-info-wrapper">
 
     <!-- Title and Meta Info -->
-    <div class="text-center px-4 mt-3">
+    <div class="text-center px-4 mt-3" id="detailMetaBlock" data-type="<?= htmlspecialchars($item['type']) ?>" data-release-year="<?= (int)($item['release_year'] ?? 0) ?>" data-release-date="<?= htmlspecialchars((string)($item['release_date'] ?? '')) ?>" data-status="<?= htmlspecialchars((string)($item['status'] ?? '')) ?>" data-released="<?= $isReleased ? '1' : '0' ?>">
         <h2 class="fw-extrabold text-white text-3xl mb-1" style="font-weight: 800; font-size: 1.8rem; letter-spacing: -0.5px;"><?= htmlspecialchars($item['title']) ?></h2>
         <div class="small d-flex justify-content-center align-items-center gap-2" style="color: #b0b0cc !important; font-weight: 500;">
             <?php if ($item['status'] === 'Upcoming' && !empty($item['release_date'])): ?>
@@ -48,6 +51,11 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
             <span>&bull;</span>
             <span class="text-warning"><i class="bi bi-star-fill text-warning me-1"></i> 8.5</span>
         </div>
+        <div class="mt-3 d-flex justify-content-center gap-2">
+            <button type="button" class="btn btn-sm rounded-pill px-3 py-2 btn-favorite-toggle <?= !empty($item['is_favorite']) ? 'active' : '' ?>" data-item-id="<?= $item['id_item'] ?? 0 ?>" style="background-color: <?= !empty($item['is_favorite']) ? '#ff5c7a' : 'rgba(255,255,255,0.07)' ?>; color: #fff; border: 1px solid rgba(255,255,255,0.08);">
+                <i class="bi <?= !empty($item['is_favorite']) ? 'bi-heart-fill' : 'bi-heart' ?> me-1"></i> Favorito
+            </button>
+        </div>
     </div>
 
     <!-- Tabs Switcher (Sobre / Episódios) -->
@@ -58,7 +66,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         <?php endif; ?>
     </div>
 
-    <div class="p-3 pb-5">
+    <div class="p-3 pb-5" data-locked="<?= $reviewLocked ? '1' : '0' ?>">
         <!-- TAB 1: SOBRE -->
         <div id="tabSobreContent" class="tab-content-panel">
             
@@ -182,31 +190,37 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
             <?php endif; ?>
 
             <!-- Personal Review and Star Rating -->
-            <div class="p-3 rounded-4 mb-4 text-start" style="background-color: #121218; border: 1px solid rgba(255,255,255,0.04);">
+            <div class="p-3 rounded-4 mb-4 text-start <?= $reviewLocked ? 'review-locked' : '' ?>" style="background-color: #121218; border: 1px solid rgba(255,255,255,0.04); position: relative;">
+                <?php if ($reviewLocked): ?>
+                    <div class="detail-blocker" aria-hidden="true"></div>
+                <?php endif; ?>
                 <div class="d-flex justify-content-between align-items-center mb-2.5">
                     <span class="text-white fw-bold small text-uppercase" style="letter-spacing: 0.5px; font-size: 0.7rem; color: #a5a5c0 !important;">A Minha Avaliação</span>
                     <span id="saveStatus" class="small text-muted" style="font-size: 0.65rem;"></span>
                 </div>
                 
                 <!-- Interactive Stars -->
-                <div class="d-flex justify-content-center gap-3 mb-3" id="ratingStarsContainer" style="cursor: pointer; <?= !empty($item['comment']) ? 'pointer-events: none; opacity: 0.6;' : '' ?>">
+                <div class="d-flex justify-content-center gap-3 mb-3" id="ratingStarsContainer" data-locked="<?= $reviewLocked ? '1' : '0' ?>" style="cursor: <?= $reviewLocked ? 'not-allowed' : 'pointer' ?>; <?= !empty($item['comment']) || $reviewLocked ? 'pointer-events: none; opacity: 0.35;' : '' ?>">
                     <?php 
                         $userRating = isset($item['rating']) ? (int)$item['rating'] : 0; 
                         for ($i = 1; $i <= 5; $i++): 
                             $isFilled = $i <= $userRating;
                     ?>
-                        <i class="bi <?= $isFilled ? 'bi-star-fill text-warning' : 'bi-star text-muted' ?> fs-3 star-btn" data-value="<?= $i ?>" onclick="setStarRating(<?= $i ?>)"></i>
+                        <i class="bi <?= $isFilled ? 'bi-star-fill text-warning' : 'bi-star text-muted' ?> fs-3 star-btn" data-value="<?= $i ?>" <?= $reviewLocked ? '' : 'onclick="setStarRating(' . $i . ')"' ?>></i>
                     <?php endfor; ?>
                 </div>
                 
                 <!-- Comment Textarea -->
                 <div class="mb-2">
-                    <textarea id="userComment" class="form-control border-0 text-white rounded-3 small p-2" rows="2" placeholder="Deixe um comentário sobre este título..." <?= !empty($item['comment']) ? 'disabled' : '' ?> style="font-size: 0.78rem; resize: none; background-color: #1c1c24 !important; color: #e5e5e7 !important; border: 1px solid rgba(255,255,255,0.03) !important;"><?= htmlspecialchars($item['comment'] ?? '') ?></textarea>
+                    <textarea id="userComment" class="form-control border-0 text-white rounded-3 small p-2" rows="2" placeholder="<?= $reviewLocked ? 'Disponível após o lançamento.' : 'Deixe um comentário sobre este título...' ?>" <?= !empty($item['comment']) || $reviewLocked ? 'disabled' : '' ?> style="font-size: 0.78rem; resize: none; background-color: #1c1c24 !important; color: #e5e5e7 !important; border: 1px solid rgba(255,255,255,0.03) !important;"><?= htmlspecialchars($item['comment'] ?? '') ?></textarea>
                 </div>
                 
                 <div class="d-flex justify-content-end">
-                    <button type="button" id="btnSaveReview" class="btn btn-sm rounded-pill px-3 py-1 fw-bold text-white" onclick="savePersonalReview(<?= $item['id_item'] ?>)" <?= !empty($item['comment']) ? 'disabled' : '' ?> style="font-size: 0.7rem; background: linear-gradient(135deg, #a88beb 0%, #8a63e5 100%); border: none;">Salvar Avaliação</button>
+                    <button type="button" id="btnSaveReview" class="btn btn-sm rounded-pill px-3 py-1 fw-bold text-white" onclick="savePersonalReview(<?= $item['id_item'] ?>)" <?= !empty($item['comment']) || $reviewLocked ? 'disabled' : '' ?> style="font-size: 0.7rem; background: linear-gradient(135deg, #a88beb 0%, #8a63e5 100%); border: none; pointer-events: <?= $reviewLocked ? 'none' : 'auto' ?>;"><?= $reviewLocked ? 'Disponível após lançamento' : 'Salvar Avaliação' ?></button>
                 </div>
+                <?php if ($reviewLocked): ?>
+                    <div class="small mt-2" style="color: #c8c8e3; font-size: 0.72rem;">Avaliação liberada somente após a estreia.</div>
+                <?php endif; ?>
             </div>
 
             <!-- Community Comments Section -->
@@ -309,7 +323,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                             <span class="text-gray small fw-normal"><?= $seasonWatched ?> / <?= $seasonTotal ?> eps</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <?php if ($item['track_status']): ?>
+                                <?php if ($item['track_status'] && $seasonReleased > 0): ?>
                                 <!-- Mark all series button (compact, icon-only) -->
                                 <button class="btn btn-check-all-show <?= $allWatched ? 'checked' : '' ?>" 
                                         data-item-id="<?= $item['id_item'] ?>"
@@ -320,10 +334,10 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                                     <?= $allWatched ? 'Desmarcar tudo' : 'Marcar tudo' ?>
                                 </button>
                                 <!-- Season check circle -->
-                                <button class="tvtime-circle-check btn-check-season <?= $seasonAllWatched ? 'checked' : '' ?>" 
-                                        data-season-number="<?= $seasonNum ?>" 
-                                        data-item-id="<?= $item['id_item'] ?>"
-                                        style="width: 28px; height: 28px; font-size: 0.9rem;">
+                                        <button class="tvtime-circle-check btn-check-season <?= $seasonAllWatched ? 'checked' : '' ?>" 
+                                                data-season-number="<?= $seasonNum ?>" 
+                                                data-item-id="<?= $item['id_item'] ?>"
+                                                style="width: 28px; height: 28px; font-size: 0.9rem;">
                                     <i class="bi bi-check-lg"></i>
                                 </button>
                             <?php endif; ?>
@@ -381,9 +395,11 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                                                 <?php endif; ?>
                                             </button>
                                         <?php endif; ?>
-                                        <button class="tvtime-circle-check btn-check-episode <?= $ep['watched'] ? 'checked' : '' ?>" 
+                                        <button class="tvtime-circle-check btn-check-episode <?= $ep['watched'] ? 'checked' : '' ?> <?= $isUpcoming ? 'disabled' : '' ?>" 
                                                 data-episode-id="<?= $ep['id_episodio'] ?>" 
                                                 data-item-id="<?= $item['id_item'] ?>"
+                                                data-upcoming="<?= $isUpcoming ? '1' : '0' ?>"
+                                                <?= $isUpcoming ? 'disabled' : '' ?>
                                                 style="width: 30px; height: 30px; font-size: 0.95rem;">
                                             <i class="bi bi-check-lg"></i>
                                         </button>
@@ -413,7 +429,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         <i class="bi bi-folder-plus fs-5"></i>
     </button>
 
-    <?php if ($item['status'] === 'Upcoming'): ?>
+            <?php if ($item['status'] === 'Upcoming' || !$isReleased): ?>
         <?php if ($item['track_status']): ?>
             <div class="d-flex w-100 gap-2">
                 <button class="btn-floating-action btn-track-toggle refract-action-btn disabled flex-grow-1" disabled style="background-color: #2c2c3e !important; color: #a5a5c0 !important; cursor: not-allowed; opacity: 0.7; height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
@@ -471,13 +487,20 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 </button>
             </div>
         <?php elseif ($item['type'] === 'movie'): ?>
-            <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
-                    data-item-id="<?= $item['id_item'] ?>" 
-                    data-action="add"
-                    data-status="completed"
-                    style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
-                <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
-            </button>
+            <?php if ($isReleased): ?>
+                <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
+                        data-item-id="<?= $item['id_item'] ?>" 
+                        data-action="add"
+                        data-status="completed"
+                        style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
+                    <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
+                </button>
+            <?php else: ?>
+                <button class="btn-floating-action refract-action-btn w-100 disabled" disabled
+                        style="background-color: #2c2c3e !important; color: #a5a5c0 !important; cursor: not-allowed; opacity: 0.7; height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
+                    <i class="bi bi-clock me-2"></i> FILME AINDA NÃO LANÇADO
+                </button>
+            <?php endif; ?>
         <?php else: ?>
             <?php if ($isNextUpcoming): ?>
                 <button class="btn-floating-action refract-action-btn w-100 disabled" 
@@ -497,14 +520,21 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         <?php endif; ?>
     <?php else: ?>
         <?php if ($item['type'] === 'movie'): ?>
-            <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
-                    data-item-id="<?= $item['id_item'] ?? '' ?>" 
-                    data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
-                    data-action="add"
-                    data-status="completed"
-                    style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
-                <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
-            </button>
+            <?php if ($isReleased): ?>
+                <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
+                        data-item-id="<?= $item['id_item'] ?? '' ?>" 
+                        data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
+                        data-action="add"
+                        data-status="completed"
+                        style="height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
+                    <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
+                </button>
+            <?php else: ?>
+                <button class="btn-floating-action refract-action-btn w-100 disabled" disabled
+                        style="background-color: #2c2c3e !important; color: #a5a5c0 !important; cursor: not-allowed; opacity: 0.7; height: 50px !important; max-height: 50px !important; border: none !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 30px !important; padding: 0 20px !important;">
+                    <i class="bi bi-clock me-2"></i> FILME AINDA NÃO LANÇADO
+                </button>
+            <?php endif; ?>
         <?php else: ?>
             <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
                     data-item-id="<?= $item['id_item'] ?? '' ?>" 
@@ -664,4 +694,3 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         });
     }
 </script>
-

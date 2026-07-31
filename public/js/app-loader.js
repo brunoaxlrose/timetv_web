@@ -5,7 +5,6 @@
         '/js/app/tracking.js',
         '/js/app/modals.js'
     ];
-
     files.forEach(function(src) {
         document.write('<script src="' + src + '"><\/script>');
     });

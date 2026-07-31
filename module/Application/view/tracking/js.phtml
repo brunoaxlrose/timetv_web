@@ -1,6 +1,8 @@
 <?php
 if (isset($page)) {
-    $script = ($page === 'dashboard') ? '/js/app/catalog/catalog.js' : "/js/app/tracking/{$page}.js";
+    $script = ($page === 'dashboard')
+        ? '/js/app/catalog/catalog.js?v=' . time()
+        : "/js/app/tracking/{$page}.js?v=" . time();
     $this->inlineScript()->appendFile($script);
 }
 ?>

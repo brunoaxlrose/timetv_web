@@ -6,6 +6,7 @@ $moviesCount = $this->moviesCount;
 $days = $this->days;
 $hours = $this->hours;
 $minutes = $this->minutes;
+$favorites = $this->favorites ?? [];
 
 $this->partial('tracking/css.phtml', ['page' => 'stats']);
 $this->partial('tracking/js.phtml', ['page' => 'stats']);
@@ -54,8 +55,8 @@ if (empty($initials)) {
         <!-- Visualisation Time Panel (Roxo) -->
         <div class="refract-time-panel p-4 rounded-4 mb-4 text-center">
             <h1 class="text-white fw-bold mb-1" style="font-size: 2.2rem; letter-spacing: -1px;"><?= $days ?>d <?= $hours ?>h <?= $minutes ?>m</h1>
-            <div class="text-white small opacity-75 d-flex align-items-center justify-content-center gap-1" style="font-weight: 500;">
-                Tempo de visualização <i class="bi bi-chevron-down small"></i>
+            <div class="text-white small opacity-75 d-flex align-items-center justify-content-center gap-1" style="font-weight: 500; letter-spacing: 0.2px;">
+                Tempo visto <i class="bi bi-chevron-down small"></i>
             </div>
         </div>
 
@@ -172,6 +173,20 @@ if (empty($initials)) {
                     }
                 }
             </script>
+        <?php endif; ?>
+
+        <?php if (!empty($favorites)): ?>
+            <div class="mt-4 px-1">
+                <h6 class="text-gray small fw-bold text-uppercase mb-3" style="font-size: 0.68rem; letter-spacing: 0.5px; color: #a5a5c0 !important;">Favoritos</h6>
+                <div class="d-flex gap-2 overflow-auto pb-2">
+                    <?php foreach ($favorites as $fav): ?>
+                        <a href="/detail?id=<?= $fav['id_item'] ?>" class="text-decoration-none" style="min-width: 110px;">
+                            <img src="<?= htmlspecialchars($fav['poster_url']) ?>" style="width: 110px; height: 156px; object-fit: cover; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);" alt="poster">
+                            <div class="text-white text-truncate mt-1" style="font-size: 0.72rem;"><?= htmlspecialchars($fav['title']) ?></div>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         <?php endif; ?>
     </div>
 

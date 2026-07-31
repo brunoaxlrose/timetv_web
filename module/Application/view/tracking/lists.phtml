@@ -7,24 +7,80 @@ $userLists = $this->userLists ?? [];
         font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
         color: #f2f2f7;
     }
-    .list-header-row {
-        background-color: #1c1c28;
-        border: 1px solid rgba(255,255,255,0.04);
-        border-radius: 12px;
-        padding: 14px 18px;
-        margin-bottom: 12px;
-    }
-    .refract-list-item-poster {
-        width: 100%;
-        aspect-ratio: 2/3;
-        object-fit: cover;
-        border-radius: 8px;
+    .list-summary-card {
+        background: linear-gradient(180deg, #1d1d2a 0%, #171720 100%);
         border: 1px solid rgba(255,255,255,0.05);
+        border-radius: 16px;
+        padding: 16px;
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+        overflow: hidden;
+    }
+    .list-summary-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(168,139,235,0.35);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.25);
+    }
+    .list-summary-cover {
+        width: 56px;
+        height: 80px;
+        min-width: 56px;
+        max-width: 56px;
+        display: block;
+        flex: 0 0 56px;
+        border-radius: 10px;
+        object-fit: cover;
+        border: 1px solid rgba(255,255,255,0.05);
+        background: #12121a;
+    }
+    .list-summary-cover--empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #a88beb;
+        font-size: 1.25rem;
+    }
+    .list-summary-body {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+    }
+    .list-summary-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+    .list-summary-meta {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+    .list-modal-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .list-modal-poster {
+        width: 100%;
+        aspect-ratio: 2 / 3;
+        object-fit: cover;
+        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.06);
+        background: #12121a;
+    }
+    .list-modal-title {
+        color: #fff;
+        font-size: 0.72rem;
+        line-height: 1.25;
+        margin-top: 6px;
+        min-height: 34px;
     }
 </style>
 
 <div class="px-3 refract-lists-container pb-5">
-    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mt-3 mb-4">
         <h4 class="text-white fw-bold mb-0" style="font-size: 1.5rem; letter-spacing: -0.5px;">As tuas listas</h4>
         <button class="btn btn-sm text-white rounded-pill px-3 py-1.5 fw-bold d-flex align-items-center gap-1" style="background-color: #7c4dff;" onclick="promptCreateList()">
@@ -38,51 +94,41 @@ $userLists = $this->userLists ?? [];
                 <i class="bi bi-folder2-open"></i>
             </div>
             <h6 class="text-white fw-bold">Nenhuma lista criada</h6>
-            <p class="text-gray small px-4 mb-3">Crie listas personalizadas para organizar suas séries, filmes e animes favoritos.</p>
+            <p class="text-gray small px-4 mb-3">Crie listas personalizadas para organizar seus filmes, séries, animes e novelas.</p>
         </div>
     <?php else: ?>
-        <?php foreach ($userLists as $list): ?>
-            <div class="mb-4">
-                <!-- List Title and Header -->
-                <div class="list-header-row d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="fw-bold mb-1 text-white" style="font-size: 1rem;"><?= htmlspecialchars($list['nome']) ?></h5>
-                        <span class="text-muted" style="font-size: 0.72rem;"><?= count($list['items']) ?> itens</span>
-                    </div>
-                    <button class="btn btn-link text-danger p-0" onclick="deleteList(<?= $list['id_lista'] ?>)" title="Excluir lista">
-                        <i class="bi bi-trash fs-5"></i>
-                    </button>
-                </div>
-
-                <!-- List Items Grid -->
-                <?php if (empty($list['items'])): ?>
-                    <div class="p-3 text-center rounded-3 mb-3" style="background-color: #12121a; border: 1px dashed rgba(255,255,255,0.05); font-size: 0.75rem; color: #c0c0d8 !important;">
-                        Nenhum item nesta lista ainda.
-                    </div>
-                <?php else: ?>
-                    <div class="row row-cols-3 g-2 mb-3">
-                        <?php foreach ($list['items'] as $item): ?>
-                            <div class="col mb-2 position-relative" id="list-item-card-<?= $list['id_lista'] ?>-<?= $item['id_item'] ?>">
-                                <!-- Remove from list button (red circular cross) -->
-                                <button type="button" class="btn btn-danger btn-sm rounded-circle position-absolute top-0 end-0 m-1 d-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.6rem; z-index: 10; padding: 0;" onclick="removeItemFromList(<?= $list['id_lista'] ?>, <?= $item['id_item'] ?>)" title="Remover da lista">
-                                    <i class="bi bi-x"></i>
-                                </button>
-                                <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                    <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-list-item-poster" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=200';">
-                                    <div class="text-white text-truncate mt-1 text-center" style="font-size: 0.68rem;"><?= htmlspecialchars($item['title']) ?></div>
-                                </a>
+        <div class="d-flex flex-column gap-3">
+            <?php foreach ($userLists as $list): ?>
+                <div class="list-summary-card" onclick="openListItemsModal(<?= (int)$list['id_lista'] ?>)">
+                    <div class="list-summary-body">
+                        <div class="list-summary-main">
+                            <?php if (!empty($list['cover_poster_url'])): ?>
+                                <img src="<?= htmlspecialchars($list['cover_poster_url']) ?>" class="list-summary-cover" alt="<?= htmlspecialchars($list['nome']) ?>">
+                            <?php else: ?>
+                                <div class="list-summary-cover list-summary-cover--empty">
+                                    <i class="bi bi-folder-fill"></i>
+                                </div>
+                            <?php endif; ?>
+                            <div class="list-summary-meta">
+                                <h5 class="fw-bold mb-1 text-white text-truncate" style="font-size: 1rem;"><?= htmlspecialchars($list['nome']) ?></h5>
+                                <div style="font-size: 0.75rem; color: #c9c9dd;">
+                                    <?= (int)($list['item_count'] ?? 0) ?> itens
+                                </div>
+                                <div style="font-size: 0.7rem; color: #8f8fb0; margin-top: 4px;">Toque para abrir a lista</div>
                             </div>
-                        <?php endforeach; ?>
+                        </div>
+                        <button class="btn btn-link text-danger p-0 flex-shrink-0" onclick="event.stopPropagation(); confirmDeleteList(<?= (int)$list['id_lista'] ?>, '<?= htmlspecialchars(addslashes($list['nome'])) ?>')" title="Excluir lista">
+                            <i class="bi bi-trash fs-5"></i>
+                        </button>
                     </div>
-                <?php endif; ?>
-            </div>
-        <?php endforeach; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
     <?php endif; ?>
 
     <div style="height: 120px;"></div>
 </div>
 
-<!-- Modal Dialog template for list creation (Refract Glass style) -->
 <div class="modal fade" id="createListModal" tabindex="-1" aria-hidden="true" style="z-index: 5000;">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 360px; margin: auto 15px;">
         <div class="modal-content text-white p-4" style="border-radius: 20px; background-color: #1a1a24; border: 1px solid #2d2d3e; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
@@ -90,7 +136,7 @@ $userLists = $this->userLists ?? [];
                 <i class="bi bi-folder-plus text-accent fs-4" style="color: #a88beb;"></i>
                 <h5 class="fw-bold mb-0 text-white">Criar Nova Lista</h5>
             </div>
-            <p class="small mb-4" style="font-size: 0.78rem; color: #c0c0d8 !important;">Exemplo: "Para Assistir no Fim de Semana", "Favoritos de Ação".</p>
+            <p class="small mb-4" style="font-size: 0.78rem; color: #d6d6ea !important;">Exemplo: "Para Assistir no Fim de Semana", "Favoritos de Ação".</p>
             <div class="mb-4">
                 <input type="text" id="newListNameInput" class="form-control text-white border-0 py-2 px-3" style="background-color: #0c0c12; border-radius: 10px; font-size: 0.85rem;" placeholder="Nome da lista..." required>
             </div>
@@ -102,79 +148,19 @@ $userLists = $this->userLists ?? [];
     </div>
 </div>
 
-<script>
-    function promptCreateList() {
-        const modal = new bootstrap.Modal(document.getElementById('createListModal'));
-        document.getElementById('newListNameInput').value = '';
-        modal.show();
-    }
-
-    function submitCreateList() {
-        const name = document.getElementById('newListNameInput').value.trim();
-        if (!name) {
-            showToast('O nome da lista é obrigatório!', false);
-            return;
-        }
-
-        const modalEl = document.getElementById('createListModal');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        const btn = modalEl.querySelector('button[onclick="submitCreateList()"]');
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Criando...';
-        }
-
-        $.post('/api/lists/create', { name: name }, function(res) {
-            if (res.success) {
-                modal.hide();
-                showToast(res.message, true);
-                loadPageContent('/lists', false);
-            } else {
-                showToast(res.message, false);
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerText = 'Criar';
-                }
-            }
-        }).fail(function() {
-            showToast('Erro ao criar lista.', false);
-            if (btn) {
-                btn.disabled = false;
-                btn.innerText = 'Criar';
-            }
-        });
-    }
-
-    function deleteList(listId) {
-        if (!confirm('Deseja realmente excluir esta lista? Todos os itens associados serão removidos.')) {
-            return;
-        }
-
-        $.post('/api/lists/delete', { list_id: listId }, function(res) {
-            if (res.success) {
-                showToast(res.message, true);
-                loadPageContent('/lists', false);
-            } else {
-                showToast(res.message, false);
-            }
-        }).fail(function() {
-            showToast('Erro ao excluir lista.', false);
-        });
-    }
-
-    function removeItemFromList(listId, itemId) {
-        event.stopPropagation();
-        event.preventDefault();
-
-        $.post('/api/lists/remove', { list_id: listId, item_id: itemId }, function(res) {
-            if (res.success) {
-                showToast(res.message, true);
-                loadPageContent('/lists', false);
-            } else {
-                showToast(res.message, false);
-            }
-        }).fail(function() {
-            showToast('Erro ao remover item da lista.', false);
-        });
-    }
-</script>
+<div class="modal fade" id="listItemsModal" tabindex="-1" aria-hidden="true" style="z-index: 5000;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 420px; margin: auto 12px;">
+        <div class="modal-content text-white p-3" style="border-radius: 22px; background-color: #171720; border: 1px solid #2d2d3e; box-shadow: 0 18px 40px rgba(0,0,0,0.45);">
+            <div class="d-flex align-items-center justify-content-between px-2 pt-2 pb-3">
+                <div>
+                    <h5 id="listItemsModalTitle" class="fw-bold mb-1 text-white">Lista</h5>
+                    <div id="listItemsModalCount" style="font-size: 0.72rem; color: #bdbdd6;">0 itens</div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div id="listItemsModalBody" class="px-2 pb-2">
+                <div class="text-center py-4 text-muted small">Carregando...</div>
+            </div>
+        </div>
+    </div>
+</div>

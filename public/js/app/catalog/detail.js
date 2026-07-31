@@ -66,18 +66,69 @@ var selectedRating = selectedRating || 0;
 
 // Initialize selected rating from current stars on page load
 $(function() {
+    const TODAY = new Date('2026-07-31T00:00:00');
+    const $metaBlock = $('#detailMetaBlock');
+    const releaseType = String($metaBlock.data('type') || '');
+    const releaseYear = parseInt($metaBlock.data('release-year') || '0', 10);
+    const releaseDateRaw = String($metaBlock.data('release-date') || '');
+    const releaseStatus = String($metaBlock.data('status') || '');
+    const initialReleased = String($metaBlock.data('released') || '0') === '1';
+    let forceLocked = !initialReleased;
+
+    if (releaseDateRaw) {
+        const parsed = new Date(releaseDateRaw + 'T00:00:00');
+        if (!Number.isNaN(parsed.getTime())) {
+            forceLocked = parsed > TODAY;
+        }
+    } else {
+        const visibleText = $('#detailMetaBlock').text() || '';
+        const visibleDateMatch = visibleText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (visibleDateMatch) {
+            const day = parseInt(visibleDateMatch[1], 10);
+            const month = parseInt(visibleDateMatch[2], 10) - 1;
+            const year = parseInt(visibleDateMatch[3], 10);
+            const parsedVisible = new Date(year, month, day);
+            if (!Number.isNaN(parsedVisible.getTime())) {
+                forceLocked = parsedVisible > TODAY;
+            }
+        } else if (releaseStatus === 'Upcoming') {
+            forceLocked = true;
+        } else if (releaseType === 'movie' && releaseYear >= 2026) {
+            forceLocked = true;
+        }
+    }
+
+    if (forceLocked) {
+        $metaBlock.attr('data-released', '0');
+        $('#ratingStarsContainer').attr('data-locked', '1').css({ pointerEvents: 'none', opacity: '0.35' });
+        $('#userComment').prop('disabled', true).attr('placeholder', 'Disponivel apos o lancamento.');
+        $('#btnSaveReview').prop('disabled', true).text('Disponivel apos lancamento').css('pointer-events', 'none');
+        $('.btn-track-toggle[data-status="completed"]').removeClass('btn-track-toggle').addClass('disabled').prop('disabled', true)
+            .html('<i class="bi bi-clock me-2"></i> CONTEUDO AINDA NAO LANCADO')
+            .css({ backgroundColor: '#2c2c3e', color: '#a5a5c0', cursor: 'not-allowed', opacity: '0.7' });
+    }
+
     const $filledStars = $('#ratingStarsContainer .bi-star-fill');
     if ($filledStars.length) {
         selectedRating = parseInt($filledStars.last().data('value')) || 0;
     }
 
+    if ($('#ratingStarsContainer').data('locked') === 1 || $('#ratingStarsContainer').data('locked') === '1') {
+        $('#ratingStarsContainer, #userComment, #btnSaveReview').prop('disabled', true);
+        $('#ratingStarsContainer .star-btn').css({ cursor: 'not-allowed', pointerEvents: 'none' });
+    }
+
     // Re-enable save button when user types in textarea
     $(document).off('input', '#userComment').on('input', '#userComment', function() {
-        $('#btnSaveReview').prop('disabled', false);
+        if ($('#ratingStarsContainer').data('locked') !== 1 && $('#ratingStarsContainer').data('locked') !== '1') {
+            $('#btnSaveReview').prop('disabled', false);
+        }
     });
 });
 
 window.setStarRating = function(rating) {
+    const locked = $('#ratingStarsContainer').data('locked');
+    if (locked === 1 || locked === '1') return;
     selectedRating = rating;
     $('#ratingStarsContainer .star-btn').each(function() {
         const val = parseInt($(this).data('value'));
@@ -87,10 +138,15 @@ window.setStarRating = function(rating) {
             $(this).removeClass('bi-star-fill text-warning').addClass('bi-star text-muted');
         }
     });
-    $('#btnSaveReview').prop('disabled', false); // Enable button on rating change
+    $('#btnSaveReview').prop('disabled', false);
 };
 
 window.savePersonalReview = function(itemId) {
+    const locked = $('#ratingStarsContainer').data('locked');
+    if (locked === 1 || locked === '1') {
+        showToast('Avaliação liberada somente após o lançamento.', false);
+        return;
+    }
     const commentVal = $('#userComment').val().trim();
     const $status = $('#saveStatus');
     const $btn = $('#btnSaveReview');
@@ -178,3 +234,20 @@ window.rewatchEpisode = function(episodeId, button) {
         }
     });
 };
+
+$(document).on('click', '.btn-check-episode, .btn-check-season, .btn-check-all-show', function(e) {
+    const upcoming = $(this).attr('data-upcoming') === '1' || $(this).hasClass('disabled');
+    if (upcoming) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showToast('Esse conteúdo ainda não foi lançado.', false);
+        return false;
+    }
+});
+
+$(document).on('click', '[data-locked="1"] #btnSaveReview, [data-locked="1"] .star-btn', function(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    showToast('Avaliacao liberada somente apos o lancamento.', false);
+    return false;
+});

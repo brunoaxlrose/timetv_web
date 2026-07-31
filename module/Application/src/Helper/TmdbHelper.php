@@ -12,37 +12,128 @@ class TmdbHelper {
     private const BASE_URL = 'https://api.themoviedb.org/3';
     private const IMG      = 'https://image.tmdb.org/t/p/';
 
+    private static function getCacheDir(): string {
+        $dir = dirname(__DIR__, 3) . '/data/cache/tmdb';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
+        }
+        return $dir;
+    }
+
+    private static function getCacheFile(string $key): string {
+        return self::getCacheDir() . '/' . md5($key) . '.json';
+    }
+
+    private static function readCache(string $key, int $ttlSeconds): ?array {
+        $file = self::getCacheFile($key);
+        if (!is_file($file)) {
+            return null;
+        }
+        if ((time() - filemtime($file)) > $ttlSeconds) {
+            return null;
+        }
+        $json = @file_get_contents($file);
+        return $json ? json_decode($json, true) : null;
+    }
+
+    private static function writeCache(string $key, array $data): void {
+        $file = self::getCacheFile($key);
+        @file_put_contents($file, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private static function fetchJson(string $url): ?array {
+        $cacheTtl = 0;
+        if (strpos($url, '/trending/all/week') !== false) {
+            $cacheTtl = 900;
+        } elseif (strpos($url, '/movie/upcoming') !== false) {
+            $cacheTtl = 1800;
+        } elseif (strpos($url, '/movie/') !== false || strpos($url, '/tv/') !== false) {
+            $cacheTtl = 21600;
+        }
+
+        if ($cacheTtl > 0) {
+            $cached = self::readCache($url, $cacheTtl);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
+        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $json = @file_get_contents($url, false, stream_context_create($opts));
+        $decoded = $json ? json_decode($json, true) : null;
+
+        if (is_array($decoded) && $cacheTtl > 0) {
+            self::writeCache($url, $decoded);
+        }
+
+        return $decoded;
+    }
+
+    private static function resolveMovieReleaseDate(int $tmdbId, ?array $movie = null): ?string {
+        $movie = $movie ?: self::getMovieDetail($tmdbId);
+        $fallbackDate = !empty($movie['release_date']) ? $movie['release_date'] : null;
+
+        $data = self::fetchJson(self::BASE_URL . '/movie/' . $tmdbId . '/release_dates?api_key=' . self::API_KEY);
+        if (!$data || empty($data['results']) || !is_array($data['results'])) {
+            return $fallbackDate;
+        }
+
+        $countryPriority = ['BR', 'PT', 'US'];
+        $typePriority = [3, 2, 4, 5, 1, 6];
+
+        foreach ($countryPriority as $country) {
+            foreach ($data['results'] as $result) {
+                if (($result['iso_3166_1'] ?? '') !== $country || empty($result['release_dates'])) {
+                    continue;
+                }
+
+                usort($result['release_dates'], function($a, $b) use ($typePriority) {
+                    $aRank = array_search((int)($a['type'] ?? 999), $typePriority, true);
+                    $bRank = array_search((int)($b['type'] ?? 999), $typePriority, true);
+                    $aRank = $aRank === false ? 999 : $aRank;
+                    $bRank = $bRank === false ? 999 : $bRank;
+                    return $aRank <=> $bRank;
+                });
+
+                foreach ($result['release_dates'] as $release) {
+                    $value = $release['release_date'] ?? '';
+                    if (!empty($value)) {
+                        return substr($value, 0, 10);
+                    }
+                }
+            }
+        }
+
+        return $fallbackDate;
+    }
+
     public static function searchMulti(string $query, int $limit = 20): array {
         $url = self::BASE_URL . '/search/multi?api_key=' . self::API_KEY
             . '&query=' . urlencode($query)
             . '&language=pt-BR&include_adult=false&page=1';
+        $data = self::fetchJson($url);
+        if (!$data) return [];
 
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        if (!$json) return [];
-
-        $results = json_decode($json, true)['results'] ?? [];
+        $results = $data['results'] ?? [];
         return self::formatTmdbResults($results, $limit);
     }
 
     public static function getPopular(int $limit = 12): array {
         $url = self::BASE_URL . '/trending/all/week?api_key=' . self::API_KEY . '&language=pt-BR&page=1';
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        if (!$json) return [];
+        $data = self::fetchJson($url);
+        if (!$data) return [];
 
-        $results = json_decode($json, true)['results'] ?? [];
+        $results = $data['results'] ?? [];
         return self::formatTmdbResults($results, $limit);
     }
 
     public static function getUpcoming(int $limit = 12): array {
         // Adiciona region=BR para trazer datas de lançamento do Brasil
         $url = self::BASE_URL . '/movie/upcoming?api_key=' . self::API_KEY . '&language=pt-BR&page=1&region=BR';
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        if (!$json) return [];
+        $data = self::fetchJson($url);
+        if (!$data) return [];
 
-        $results = json_decode($json, true)['results'] ?? [];
+        $results = $data['results'] ?? [];
         
         // Filtra para manter apenas filmes com data de lançamento futura (em relação a hoje)
         $today = date('Y-m-d');
@@ -92,8 +183,14 @@ class TmdbHelper {
                 $type = (in_array('JP', $origins) && in_array(16, $genres)) ? 'anime' : 'series';
             }
 
-            $title       = $r['title'] ?? $r['name'] ?? 'Sem titulo';
+            $title = $r['title'] ?? $r['name'] ?? 'Sem titulo';
             $releaseDate = $r['release_date'] ?? $r['first_air_date'] ?? '';
+            if ($type === 'movie' && !empty($r['id'])) {
+                $resolvedReleaseDate = self::resolveMovieReleaseDate((int)$r['id']);
+                if (!empty($resolvedReleaseDate)) {
+                    $releaseDate = $resolvedReleaseDate;
+                }
+            }
             $releaseYear = $releaseDate ? (int)substr($releaseDate, 0, 4) : (int)date('Y');
 
             $items[] = [
@@ -116,29 +213,31 @@ class TmdbHelper {
 
     public static function getMovieDetail(int $tmdbId): ?array {
         $url  = self::BASE_URL . '/movie/' . $tmdbId . '?api_key=' . self::API_KEY . '&language=pt-BR';
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\n", 'timeout' => 8]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        return $json ? json_decode($json, true) : null;
+        return self::fetchJson($url);
     }
 
     public static function importMovieFromTmdb(\PDO $pdo, int $tmdbId): int|false {
         $stmt = $pdo->prepare("SELECT id_item FROM item WHERE tmdb_id = :tmdb_id LIMIT 1");
         $stmt->execute([':tmdb_id' => $tmdbId]);
         $existing = $stmt->fetch();
-        if ($existing) return (int)$existing['id_item'];
+        if ($existing) {
+            self::syncMovieMetadata($pdo, (int)$existing['id_item'], $tmdbId);
+            return (int)$existing['id_item'];
+        }
 
         $movie = self::getMovieDetail($tmdbId);
         if (!$movie) return false;
 
         $title        = $movie['title'] ?? 'Sem titulo';
         $description  = trim($movie['overview'] ?? 'Nenhuma sinopse disponivel.');
-        $releaseYear  = $movie['release_date'] ? (int)substr($movie['release_date'], 0, 4) : (int)date('Y');
+        $resolvedReleaseDate = self::resolveMovieReleaseDate($tmdbId, $movie);
+        $releaseYear  = $resolvedReleaseDate ? (int)substr($resolvedReleaseDate, 0, 4) : (int)date('Y');
         $runtime      = (int)($movie['runtime'] ?? 120);
         $poster       = $movie['poster_path']   ? self::IMG . 'w500'    . $movie['poster_path']    : 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400';
         $banner       = $movie['backdrop_path'] ? self::IMG . 'original' . $movie['backdrop_path'] : 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200';
 
         $status = 'Running';
-        if (!empty($movie['release_date']) && $movie['release_date'] > date('Y-m-d')) {
+        if (!empty($resolvedReleaseDate) && $resolvedReleaseDate > date('Y-m-d')) {
             $status = 'Upcoming';
         }
 
@@ -155,12 +254,57 @@ class TmdbHelper {
                 ':banner' => $banner, 
                 ':description' => $description, 
                 ':year' => $releaseYear, 
-                ':release_date' => !empty($movie['release_date']) ? $movie['release_date'] : null,
+                ':release_date' => $resolvedReleaseDate,
                 ':runtime' => $runtime,
                 ':status' => $status
             ]);
             $row = $stmt->fetch();
             return $row ? (int)$row['id_item'] : false;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public static function syncMovieMetadata(\PDO $pdo, int $itemId, int $tmdbId): bool {
+        $movie = self::getMovieDetail($tmdbId);
+        if (!$movie) {
+            return false;
+        }
+
+        $title = $movie['title'] ?? 'Sem titulo';
+        $description = trim($movie['overview'] ?? 'Nenhuma sinopse disponivel.');
+        $releaseDate = self::resolveMovieReleaseDate($tmdbId, $movie);
+        $releaseYear = $releaseDate ? (int)substr($releaseDate, 0, 4) : (int)date('Y');
+        $runtime = (int)($movie['runtime'] ?? 120);
+        $poster = $movie['poster_path'] ? self::IMG . 'w500' . $movie['poster_path'] : 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400';
+        $banner = $movie['backdrop_path'] ? self::IMG . 'original' . $movie['backdrop_path'] : 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200';
+        $status = (!empty($releaseDate) && $releaseDate > date('Y-m-d')) ? 'Upcoming' : 'Running';
+
+        try {
+            $stmt = $pdo->prepare("
+                UPDATE item
+                SET title = :title,
+                    poster_url = :poster,
+                    banner_url = :banner,
+                    description = :description,
+                    release_year = :year,
+                    release_date = :release_date,
+                    runtime_minutes = :runtime,
+                    status = :status
+                WHERE id_item = :item_id
+            ");
+            $stmt->execute([
+                ':title' => $title,
+                ':poster' => $poster,
+                ':banner' => $banner,
+                ':description' => $description,
+                ':year' => $releaseYear,
+                ':release_date' => $releaseDate,
+                ':runtime' => $runtime,
+                ':status' => $status,
+                ':item_id' => $itemId
+            ]);
+            return true;
         } catch (\Exception $e) {
             return false;
         }

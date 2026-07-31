@@ -297,6 +297,11 @@ class CatalogController extends AbstractActionController {
             return $this->redirect()->toRoute('catalog');
         }
 
+        if ($item['type'] === 'movie' && !empty($item['tmdb_id'])) {
+            \Application\Helper\TmdbHelper::syncMovieMetadata($pdo, (int)$item['id_item'], (int)$item['tmdb_id']);
+            $item = $this->catalogModel->getLocalItemById($userId, $id);
+        }
+
         if ($item['type'] !== 'movie' && !empty($item['tvmaze_id'])) {
             $lastSync = $item['last_sync'] ?? null;
             if (empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
@@ -321,16 +326,28 @@ class CatalogController extends AbstractActionController {
 
         $episodes = [];
         $progress = null;
+        $hasReleasedContent = false;
         
         if ($item['type'] !== 'movie') {
             $episodes = $this->catalogModel->getEpisodesWithWatchedState($userId, $id);
             $progress = $this->catalogModel->getProgress($userId, $id);
+            foreach ($episodes as $episode) {
+                if (empty($episode['air_date']) || strtotime($episode['air_date']) <= strtotime(date('Y-m-d'))) {
+                    $hasReleasedContent = true;
+                    break;
+                }
+            }
         } else {
             $isWatched = ($item['track_status'] === 'completed');
             $progress = [
                 'total_count' => 1,
                 'watched_count' => $isWatched ? 1 : 0
             ];
+            if (!empty($item['release_date'])) {
+                $hasReleasedContent = strtotime($item['release_date']) <= strtotime(date('Y-m-d'));
+            } elseif (!empty($item['release_year'])) {
+                $hasReleasedContent = (int)$item['release_year'] < (int)date('Y');
+            }
         }
 
         $cast = [];
@@ -357,6 +374,7 @@ class CatalogController extends AbstractActionController {
             'item' => $item,
             'episodes' => $episodes,
             'progress' => $progress,
+            'hasReleasedContent' => $hasReleasedContent,
             'cast' => $cast,
             'nextUnwatched' => $nextUnwatched,
             'userId' => $userId,
@@ -396,6 +414,27 @@ class CatalogController extends AbstractActionController {
 
         $pdo = $this->catalogModel->getPdo();
         try {
+            $stmtItem = $pdo->prepare("SELECT status, release_date, type FROM item WHERE id_item = :iid LIMIT 1");
+            $stmtItem->execute([':iid' => $itemId]);
+            $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
+            if (!$item) {
+                return new JsonModel(['success' => false, 'message' => 'Item inválido.']);
+            }
+
+            $isReleased = ($item['status'] ?? '') !== 'Upcoming';
+            $today = strtotime(date('Y-m-d'));
+            if (!empty($item['release_date'])) {
+                $isReleased = $isReleased && strtotime($item['release_date']) <= $today;
+            } elseif (!empty($item['release_year'])) {
+                $isReleased = $isReleased && ((int)$item['release_year'] < (int)date('Y'));
+            } else {
+                $isReleased = false;
+            }
+
+            if (!$isReleased) {
+                return new JsonModel(['success' => false, 'message' => 'Você só pode avaliar após o lançamento.']);
+            }
+
             // First, make sure the user tracks this item (default to plan_to_watch if not tracking yet)
             $stmtCheck = $pdo->prepare("SELECT id_usuario_item FROM usuario_item WHERE id_usuario = :uid AND id_item = :iid LIMIT 1");
             $stmtCheck->execute([':uid' => $userId, ':iid' => $itemId]);
