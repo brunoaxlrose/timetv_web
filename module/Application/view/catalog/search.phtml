@@ -1,0 +1,221 @@
+<?php
+$search = $this->search ?? '';
+$items = $this->items ?? [];
+$popularItems = $this->popularItems ?? [];
+$recentSearches = $this->recentSearches ?? [];
+
+$this->partial('catalog/css.phtml', ['page' => 'search']);
+$this->partial('catalog/js.phtml', ['page' => 'search']);
+?>
+
+<style>
+    .refract-search-container {
+        font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+        color: #f2f2f7;
+    }
+    .search-input-wrap {
+        background-color: #1c1c1e !important;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.06);
+    }
+    .search-input-wrap input {
+        background-color: transparent !important;
+        border: none !important;
+        color: #ffffff !important;
+        font-size: 0.85rem;
+    }
+    .search-input-wrap input::placeholder {
+        color: #636366 !important;
+    }
+    .recent-header {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #8e8e93;
+        letter-spacing: 0.5px;
+    }
+    .recent-search-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        cursor: pointer;
+        font-size: 0.82rem;
+        color: #d1d1d6;
+        text-decoration: none;
+    }
+    .recent-search-item:hover {
+        color: #ffffff;
+    }
+    .trending-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #8e8e93;
+        letter-spacing: 0.5px;
+        margin-top: 1.5rem;
+        margin-bottom: 0.8rem;
+    }
+</style>
+
+<div class="px-3 refract-search-container pb-5">
+    <!-- Search Header -->
+    <div class="d-flex align-items-center justify-content-between mt-3 mb-3">
+        <h4 class="text-white fw-bold mb-0" style="font-size: 1.5rem; letter-spacing: -0.5px;">Pesquisar</h4>
+    </div>
+
+    <!-- Search Input Box -->
+    <div class="search-input-wrap d-flex align-items-center px-3 py-1 mb-4">
+        <i class="bi bi-search" style="color: #a88beb; font-size: 0.95rem;"></i>
+        <input type="text" id="searchInput" class="form-control py-2" placeholder="Filmes, séries, anime..." value="<?= htmlspecialchars($search) ?>" autocomplete="off" onkeyup="handleSearchKeyUp(event)">
+        <?php if (!empty($search)): ?>
+            <button type="button" class="btn btn-link text-muted p-0 ms-2" onclick="clearSearch()"><i class="bi bi-x-circle-fill"></i></button>
+        <?php endif; ?>
+    </div>
+
+    <div id="searchResultsSection" class="<?= empty($search) ? 'd-none' : '' ?>">
+        <div class="d-flex justify-content-between align-items-baseline mb-3">
+            <h6 class="text-white fw-bold">Resultados da busca</h6>
+            <span class="small text-muted" id="searchResultCount"><?= count($items) ?> itens</span>
+        </div>
+        <div class="row row-cols-3 g-2" id="resultsGrid">
+            <?php if (!empty($items)): ?>
+                <?php foreach ($items as $item): ?>
+                    <?php
+                        if ($item['id_item']) $detailLink = '/detail?id=' . $item['id_item'];
+                        elseif (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
+                        elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'] . '&type=' . $item['type'];
+                        else $detailLink = '#';
+                    ?>
+                    <div class="col mb-3">
+                        <div class="position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3; border: 1px solid rgba(255,255,255,0.06); background-color: #12121a;">
+                            <a href="<?= $detailLink ?>">
+                                <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=200';">
+                            </a>
+                            <div class="position-absolute top-0 start-0 w-100 d-flex justify-content-between p-2" style="background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);">
+                                <span class="badge bg-black bg-opacity-70 p-1 d-flex align-items-center justify-content-center" style="width: 18px; height: 18px; border-radius: 4px;">
+                                    <i class="bi <?= $item['type'] === 'movie' ? 'bi-film' : 'bi-tv' ?>" style="font-size: 0.6rem;"></i>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="text-white text-truncate mt-1 text-center" style="font-size: 0.68rem; font-weight: 500;"><?= htmlspecialchars($item['title']) ?></div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="col-12 text-center py-5">
+                    <div class="mb-2 text-muted" style="font-size: 3rem;"><i class="bi bi-search"></i></div>
+                    <span class="small text-muted">Nenhum resultado encontrado.</span>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Discover / Landing view when search is empty -->
+    <div id="discoverDefaultSection" class="<?= !empty($search) ? 'd-none' : '' ?>">
+        
+        <!-- Recent Searches Widget -->
+        <?php if (!empty($recentSearches)): ?>
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="recent-header">Pesquisas recentes</span>
+                    <button class="btn btn-link text-accent text-decoration-none p-0 fw-bold" onclick="clearRecentSearches()" style="font-size: 0.72rem; color: #a88beb;">Limpar</button>
+                </div>
+                <div class="d-flex flex-column">
+                    <?php foreach ($recentSearches as $term): ?>
+                        <div class="recent-search-item" onclick="triggerRecentSearch('<?= htmlspecialchars(addslashes($term)) ?>')">
+                            <i class="bi bi-clock text-muted"></i>
+                            <span><?= htmlspecialchars($term) ?></span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- Trending Section -->
+        <div class="trending-title">Trending</div>
+        <div class="row row-cols-3 g-2">
+            <?php foreach ($popularItems as $item): ?>
+                <?php
+                    if (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
+                    elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'] . '&type=' . $item['type'];
+                    else $detailLink = '#';
+                ?>
+                <div class="col mb-3">
+                    <div class="position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3; border: 1px solid rgba(255,255,255,0.06); background-color: #12121a;">
+                        <a href="<?= $detailLink ?>">
+                            <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=200';">
+                        </a>
+                        <div class="position-absolute top-0 start-0 w-100 d-flex justify-content-between p-2" style="background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);">
+                            <span class="badge bg-black bg-opacity-70 p-1 d-flex align-items-center justify-content-center" style="width: 18px; height: 18px; border-radius: 4px;">
+                                <i class="bi <?= $item['type'] === 'movie' ? 'bi-film' : 'bi-tv' ?>" style="font-size: 0.6rem;"></i>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-white text-truncate mt-1 text-center" style="font-size: 0.68rem; font-weight: 500;"><?= htmlspecialchars($item['title']) ?></div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <div style="height: 120px;"></div>
+</div>
+
+<script>
+    function handleSearchKeyUp(event) {
+        if (event.key === 'Enter') {
+            doPerformSearch();
+        }
+    }
+
+    function doPerformSearch() {
+        const val = document.getElementById('searchInput').value.trim();
+        if (val === '') {
+            clearSearch();
+            return;
+        }
+
+        // Hide default discovery screen, show results loading placeholder
+        document.getElementById('discoverDefaultSection').classList.add('d-none');
+        document.getElementById('searchResultsSection').classList.remove('d-none');
+        document.getElementById('resultsGrid').innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-accent" role="status" style="color: #a88beb;"><span class="visually-hidden">Carregando...</span></div></div>';
+
+        // Load AJAX search response
+        $.post('/search', { search: val }, function(responseData) {
+            const $temp = $('<div>').html(responseData);
+            const $newGrid = $temp.find('#resultsGrid');
+            const $newCount = $temp.find('#searchResultCount');
+            
+            if ($newGrid.length) {
+                $('#resultsGrid').html($newGrid.html());
+            }
+            if ($newCount.length) {
+                $('#searchResultCount').text($newCount.text());
+            }
+            
+            // Add a clear button inline if not already added
+            loadPageContent('/search?search=' + encodeURIComponent(val), false);
+        }).fail(function() {
+            showToast('Erro ao realizar busca.', false);
+        });
+    }
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        loadPageContent('/search', false);
+    }
+
+    function triggerRecentSearch(term) {
+        document.getElementById('searchInput').value = term;
+        doPerformSearch();
+    }
+
+    function clearRecentSearches() {
+        $.getJSON('/search?clear_recent=1', function(res) {
+            if (res.success) {
+                loadPageContent('/search', false);
+            }
+        });
+    }
+</script>

@@ -22,150 +22,19 @@ class TrackingController extends AbstractActionController {
 
         $userId = $_SESSION['user_id'];
 
-        $viewMode       = $this->params()->fromQuery('view_mode', 'grid');
-        $grouped        = ($viewMode === 'list') ? false : ($this->params()->fromQuery('grouped', '1') === '1');
-        $statusFilter   = $this->params()->fromQuery('status_filter', '');
-        $sortBy         = $this->params()->fromQuery('sort_by', 'last_watched');
-        $providerFilter = $this->params()->fromQuery('provider', '');
-        
-        $mediaMovies = $this->params()->fromQuery('media_movies', '1') === '1';
-        $mediaSeries = $this->params()->fromQuery('media_series', '1') === '1';
-        $mediaAnime  = $this->params()->fromQuery('media_anime', '1') === '1';
+        $continueWatching = $this->trackingModel->getContinueWatching($userId);
+        $userLists = $this->trackingModel->getUserLists($userId);
+        $planToWatch = $this->trackingModel->getPlanToWatch($userId);
 
-        $types = [];
-        if ($mediaMovies) $types[] = 'movie';
-        if ($mediaSeries) $types[] = 'series';
-        if ($mediaAnime) $types[] = 'anime';
-
-        $userItems = $this->trackingModel->getUserCollection($userId, $types, $sortBy, $providerFilter);
-
-        // Precalculate progress percent for all series, animes and movies
-        foreach ($userItems as &$item) {
-            if ($item['type'] !== 'movie') {
-                $prog = $this->trackingModel->getProgress($userId, $item['id_item']);
-                $item['progress_percent'] = $prog['total_count'] > 0 ? round(($prog['watched_count'] / $prog['total_count']) * 100) : 0;
-            } else {
-                $item['progress_percent'] = ($item['track_status'] === 'completed') ? 100 : 0;
-            }
-        }
-
-        $items = [];
-        if ($grouped) {
-            $groupedList = [
-                'watching' => [],
-                'up_to_date' => [],
-                'completed' => []
-            ];
-
-            foreach ($userItems as &$item) {
-                if ($item['type'] !== 'movie') {
-                    $remaining = $this->trackingModel->countReleasedUnwatchedEpisodes($userId, $item['id_item']);
-                    $item['next_episode'] = $this->trackingModel->getNextUnwatchedEpisode($userId, $item['id_item']);
-
-                    if ($item['track_status'] === 'completed') {
-                        $groupedList['completed'][] = $item;
-                    } elseif ($remaining === 0) {
-                        $groupedList['up_to_date'][] = $item;
-                    } else {
-                        $groupedList['watching'][] = $item;
-                    }
-                } else {
-                    $item['next_episode'] = null;
-                    if ($item['track_status'] === 'completed') {
-                        $groupedList['completed'][] = $item;
-                    } else {
-                        $groupedList['watching'][] = $item;
-                    }
-                }
-            }
-            unset($item);
-
-            if (!empty($statusFilter)) {
-                if ($statusFilter === 'watching') {
-                    $groupedList['up_to_date'] = [];
-                    $groupedList['completed'] = [];
-                } elseif ($statusFilter === 'visto') {
-                    $groupedList['watching'] = [];
-                    $groupedList['up_to_date'] = [];
-                } elseif ($statusFilter === 'em_dia') {
-                    $groupedList['watching'] = [];
-                    $groupedList['completed'] = [];
-                }
-            }
-
-            $items = $groupedList;
-        } else {
-            if (!empty($statusFilter)) {
-                $filteredFlat = [];
-                foreach ($userItems as &$item) {
-                    if ($item['type'] !== 'movie') {
-                        $remaining = $this->trackingModel->countReleasedUnwatchedEpisodes($userId, $item['id_item']);
-                        $item['next_episode'] = $this->trackingModel->getNextUnwatchedEpisode($userId, $item['id_item']);
-
-                        $status = 'watching';
-                        if ($item['track_status'] === 'completed') {
-                            $status = 'completed';
-                        } elseif ($remaining === 0) {
-                            $status = 'up_to_date';
-                        }
-                    } else {
-                        $item['next_episode'] = null;
-                        $status = ($item['track_status'] === 'completed') ? 'completed' : 'watching';
-                    }
-
-                    if ($statusFilter === 'watching' && $status === 'watching') {
-                        $filteredFlat[] = $item;
-                    } elseif ($statusFilter === 'visto' && $status === 'completed') {
-                        $filteredFlat[] = $item;
-                    } elseif ($statusFilter === 'em_dia' && $status === 'up_to_date') {
-                        $filteredFlat[] = $item;
-                    }
-                }
-                unset($item);
-                $items = $filteredFlat;
-            } else {
-                foreach ($userItems as &$item) {
-                    if ($item['type'] !== 'movie') {
-                        $item['next_episode'] = $this->trackingModel->getNextUnwatchedEpisode($userId, $item['id_item']);
-                    } else {
-                        $item['next_episode'] = null;
-                    }
-                }
-                unset($item);
-                $items = $userItems;
-            }
-        }
-
-        $page = (int)$this->params()->fromQuery('page', 1);
-        if ($page < 1) $page = 1;
-
-        $currentPage = 1;
-        $totalPages = 1;
-        $totalItems = count($items);
-        if ($viewMode === 'list') {
-            $grouped = false; // Force flat list for pagination
-            $limit = 10;
-            $currentPage = $page;
-            $totalPages = (int)ceil($totalItems / $limit);
-            if ($totalPages < 1) $totalPages = 1;
-            if ($currentPage > $totalPages) $currentPage = $totalPages;
-            $offset = ($currentPage - 1) * $limit;
-            $items = array_slice($items, $offset, $limit);
-        }
+        $popularItems = \Application\Helper\TmdbHelper::getPopular(12);
+        $upcomingItems = \Application\Helper\TmdbHelper::getUpcoming(12);
 
         $view = new ViewModel([
-            'items'          => $items,
-            'grouped'        => $grouped,
-            'statusFilter'   => $statusFilter,
-            'sortBy'         => $sortBy,
-            'mediaMovies'    => $mediaMovies,
-            'mediaSeries'    => $mediaSeries,
-            'mediaAnime'     => $mediaAnime,
-            'providerFilter' => $providerFilter,
-            'viewMode'       => $viewMode,
-            'currentPage'    => $currentPage,
-            'totalPages'     => $totalPages,
-            'totalItems'     => $totalItems,
+            'continueWatching' => $continueWatching,
+            'userLists'        => $userLists,
+            'planToWatch'      => $planToWatch,
+            'popularItems'     => $popularItems,
+            'upcomingItems'    => $upcomingItems
         ]);
 
         if ($this->getRequest()->isXmlHttpRequest()) {
@@ -175,6 +44,164 @@ class TrackingController extends AbstractActionController {
         }
 
         return $view;
+    }
+
+    public function listsAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return $this->redirect()->toRoute('login');
+        }
+
+        $userId = $_SESSION['user_id'];
+        $userLists = $this->trackingModel->getUserLists($userId);
+
+        $view = new ViewModel([
+            'userLists' => $userLists
+        ]);
+
+        if ($this->getRequest()->isXmlHttpRequest()) {
+            $view->setTerminal(true);
+        } else {
+            $this->layout()->title = "As minhas listas - Time View";
+        }
+
+        return $view;
+    }
+
+    public function apiCreateListAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autorizado.']);
+        }
+
+        $userId = $_SESSION['user_id'];
+        $request = $this->getRequest();
+        if (!$request->isPost()) {
+            return new JsonModel(['success' => false, 'message' => 'Método inválido.']);
+        }
+
+        $name = trim($request->getPost('name', ''));
+        if (empty($name)) {
+            return new JsonModel(['success' => false, 'message' => 'Nome da lista é obrigatório.']);
+        }
+
+        try {
+            $listId = $this->trackingModel->createList($userId, $name);
+            return new JsonModel(['success' => true, 'list_id' => $listId, 'message' => 'Lista criada com sucesso!']);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => 'Erro ao criar lista.']);
+        }
+    }
+
+    public function apiDeleteListAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autorizado.']);
+        }
+
+        $userId = $_SESSION['user_id'];
+        $request = $this->getRequest();
+        if (!$request->isPost()) {
+            return new JsonModel(['success' => false, 'message' => 'Método inválido.']);
+        }
+
+        $listId = intval($request->getPost('list_id', 0));
+        if ($listId <= 0) {
+            return new JsonModel(['success' => false, 'message' => 'Lista inválida.']);
+        }
+
+        try {
+            $this->trackingModel->deleteList($userId, $listId);
+            return new JsonModel(['success' => true, 'message' => 'Lista excluída com sucesso.']);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => 'Erro ao excluir lista.']);
+        }
+    }
+
+    public function apiAddToListAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autorizado.']);
+        }
+
+        $userId = $_SESSION['user_id'];
+        $request = $this->getRequest();
+        if (!$request->isPost()) {
+            return new JsonModel(['success' => false, 'message' => 'Método inválido.']);
+        }
+
+        $listId = intval($request->getPost('list_id', 0));
+        $itemId = intval($request->getPost('item_id', 0));
+        $tvmazeId = intval($request->getPost('tvmaze_id', 0));
+        $tmdbId = intval($request->getPost('tmdb_id', 0));
+        $type = $request->getPost('type', 'series');
+
+        if ($listId <= 0) {
+            return new JsonModel(['success' => false, 'message' => 'Lista inválida.']);
+        }
+
+        try {
+            // Import item if not present in DB
+            if ($itemId <= 0) {
+                $dbConfig = $this->getEvent()->getApplication()->getServiceManager()->get('config')['db'] ?? [];
+                $pdo = new \PDO($dbConfig['dsn'], $dbConfig['username'], $dbConfig['password']);
+                if ($tvmazeId > 0) {
+                    $itemId = \Application\Helper\TvmazeHelper::importFromTVMaze($pdo, $tvmazeId);
+                } elseif ($tmdbId > 0) {
+                    if ($type === 'movie') {
+                        $itemId = \Application\Helper\TmdbHelper::importMovieFromTmdb($pdo, $tmdbId);
+                    } else {
+                        $itemId = \Application\Helper\TvmazeHelper::importFromTmdb($pdo, $tmdbId);
+                    }
+                }
+            }
+
+            if ($itemId <= 0) {
+                return new JsonModel(['success' => false, 'message' => 'Item inválido.']);
+            }
+
+            $this->trackingModel->addToList($listId, $itemId);
+            return new JsonModel(['success' => true, 'message' => 'Adicionado à lista com sucesso.']);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => 'Erro ao adicionar à lista.']);
+        }
+    }
+
+    public function apiRemoveFromListAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autorizado.']);
+        }
+
+        $request = $this->getRequest();
+        if (!$request->isPost()) {
+            return new JsonModel(['success' => false, 'message' => 'Método inválido.']);
+        }
+
+        $listId = intval($request->getPost('list_id', 0));
+        $itemId = intval($request->getPost('item_id', 0));
+
+        if ($listId <= 0 || $itemId <= 0) {
+            return new JsonModel(['success' => false, 'message' => 'Parâmetros inválidos.']);
+        }
+
+        try {
+            $this->trackingModel->removeFromList($listId, $itemId);
+            return new JsonModel(['success' => true, 'message' => 'Removido da lista.']);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => 'Erro ao remover da lista.']);
+        }
+    }
+
+    public function apiGetItemListsAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return new JsonModel(['success' => false, 'message' => 'Não autorizado.']);
+        }
+
+        $userId = $_SESSION['user_id'];
+        $itemId = intval($this->params()->fromQuery('item_id', 0));
+
+        try {
+            $lists = $this->trackingModel->getItemLists($userId, $itemId);
+            return new JsonModel(['success' => true, 'lists' => $lists]);
+        } catch (\Exception $e) {
+            return new JsonModel(['success' => false, 'message' => 'Erro ao carregar listas.']);
+        }
     }
 
     public function apiToggleTrackAction() {

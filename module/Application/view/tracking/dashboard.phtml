@@ -1,485 +1,450 @@
 <?php
-$items = $this->items;
-$grouped = $this->grouped;
-$statusFilter = $this->statusFilter;
-$sortBy = $this->sortBy;
-$mediaMovies = $this->mediaMovies;
-$mediaSeries = $this->mediaSeries;
-$mediaAnime = $this->mediaAnime;
-$providerFilter = $this->providerFilter ?? '';
-$viewMode = $this->viewMode ?? 'grid';
-$currentPage = $this->currentPage ?? 1;
-$totalPages = $this->totalPages ?? 1;
-$totalItems = $this->totalItems ?? 0;
-
-$totalCount = $totalItems;
-if ($viewMode === 'grid') {
-    if ($grouped) {
-        $totalCount = count($items['watching'] ?? []) + count($items['up_to_date'] ?? []) + count($items['completed'] ?? []);
-    } else {
-        $totalCount = count($items);
-    }
-}
-
-$this->partial('tracking/css.phtml', ['page' => 'dashboard']);
-$this->partial('tracking/js.phtml', ['page' => 'dashboard']);
+$continueWatching = $this->continueWatching ?? [];
+$userLists = $this->userLists ?? [];
+$planToWatch = $this->planToWatch ?? [];
+$popularItems = $this->popularItems ?? [];
+$upcomingItems = $this->upcomingItems ?? [];
 ?>
 
-<div class="px-3 py-2">
-    <!-- Header with Collection controls -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div class="d-flex align-items-baseline gap-2">
-            <h4 class="text-white mb-0" style="font-weight: 800; font-size: 1.5rem; letter-spacing: -0.5px;">A Minha Coleção</h4>
-            <span class="small" style="font-size: 0.75rem; font-weight: 600; color: #a0a0c0 !important;"><?= $totalCount ?> itens</span>
+<style>
+    .refract-home-container {
+        font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+        color: #f2f2f7;
+    }
+    .refract-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 1.5rem;
+        margin-bottom: 0.8rem;
+    }
+    .refract-section-title {
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: -0.2px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #ffffff;
+        margin-bottom: 0;
+    }
+    .refract-section-link {
+        font-size: 0.78rem;
+        color: #a88beb;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    
+    /* Horizontal Carousel scroll container */
+    .refract-carousel {
+        display: flex;
+        overflow-x: auto;
+        gap: 12px;
+        padding-bottom: 8px;
+        scroll-behavior: smooth;
+    }
+    .refract-carousel::-webkit-scrollbar {
+        height: 4px;
+    }
+    .refract-carousel::-webkit-scrollbar-thumb {
+        background-color: rgba(255,255,255,0.08);
+        border-radius: 4px;
+    }
+
+    /* Continuar Card */
+    .refract-continue-card {
+        flex: 0 0 220px;
+        position: relative;
+        aspect-ratio: 16/9;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.06);
+        background-color: #12121a;
+    }
+    .refract-continue-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .refract-continue-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 8px 12px;
+        background: linear-gradient(to top, rgba(12,12,18,0.95) 0%, rgba(12,12,18,0.7) 60%, rgba(12,12,18,0) 100%);
+    }
+    .refract-continue-badge {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background-color: rgba(0,0,0,0.65);
+        color: #ffd200;
+        font-size: 0.55rem;
+        font-weight: 700;
+        padding: 3px 6px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .refract-continue-title {
+        font-size: 0.8rem;
+        font-weight: 700;
+        margin-bottom: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #ffffff;
+    }
+    .refract-continue-subtitle {
+        font-size: 0.65rem;
+        color: #a5a5c0;
+        margin-bottom: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .refract-continue-check {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background-color: rgba(255,255,255,0.15);
+        border: 1px solid rgba(255,255,255,0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        z-index: 10;
+    }
+    .refract-continue-check:hover {
+        background-color: #ffd200;
+        border-color: #ffd200;
+        color: #000000;
+        transform: scale(1.1);
+    }
+    
+    /* Lists Widget styles */
+    .refract-list-box {
+        background-color: #1c1c28;
+        border: 1px solid rgba(255,255,255,0.04);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        text-align: center;
+    }
+    .refract-list-card-horizontal {
+        flex: 0 0 160px;
+        background-color: #1c1c28;
+        border: 1px solid rgba(255,255,255,0.04);
+        border-radius: 12px;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 90px;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    /* Poster Card (Para ver, Populares, Em breve) */
+    .refract-poster-item {
+        flex: 0 0 100px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .refract-poster-wrap {
+        width: 100px;
+        aspect-ratio: 2/3;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.06);
+        background-color: #12121a;
+        position: relative;
+    }
+    .refract-poster-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .refract-poster-title {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #e2e2e9;
+        margin-bottom: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: center;
+    }
+    .refract-meta-sub {
+        position: absolute;
+        bottom: 4px;
+        left: 4px;
+        background-color: rgba(0,0,0,0.7);
+        color: #ffd200;
+        font-size: 0.52rem;
+        font-weight: 700;
+        padding: 1px 4px;
+        border-radius: 3px;
+    }
+</style>
+
+<div class="px-3 refract-home-container pb-5">
+    
+    <!-- Header Logo Banner -->
+    <div class="d-flex justify-content-between align-items-center mt-3 mb-4">
+        <h4 class="text-white fw-bold mb-0 d-flex align-items-center gap-2" style="font-size: 1.6rem; letter-spacing: -0.5px;">
+            <i class="bi bi-triangle-half" style="color: #a88beb;"></i> Time View
+        </h4>
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-question-circle text-muted fs-5" style="cursor: pointer;"></i>
+            <i class="bi bi-chat-left-dots text-muted fs-5" style="cursor: pointer;"></i>
+            <!-- Notification bell -->
+            <a href="#" onclick="showNotificationsPanel(); return false;" class="position-relative text-muted">
+                <i class="bi bi-bell fs-5"></i>
+                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle d-none" id="notif-badge"></span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Annual Goal Card -->
+    <div class="p-3 mb-4 rounded-4 text-white d-flex align-items-center justify-content-between" style="background: linear-gradient(135deg, #242436 0%, #161622 100%); border: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onclick="showToast('Defina sua meta no menu do perfil!', true)">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-trophy text-warning"></i>
+            <span style="font-size: 0.78rem; font-weight: 600; color: #d0d0e1;">Define a tua meta de <?= date('Y') ?></span>
+            <span style="font-size: 0.72rem; color: #a5a5c0;">( 🔥 Sem sequência ainda )</span>
+        </div>
+        <i class="bi bi-chevron-right text-muted small"></i>
+    </div>
+
+    <!-- SECTION: CONTINUAR -->
+    <div class="refract-section-header">
+        <div class="refract-section-title">
+            <i class="bi bi-play-circle-fill text-accent" style="color: #a88beb;"></i> Continuar
+        </div>
+    </div>
+    
+    <div class="refract-carousel" id="continueCarousel">
+        <?php if (empty($continueWatching)): ?>
+            <div class="p-4 text-center text-muted w-100 rounded-4" style="background-color: #12121a; border: 1px dashed rgba(255,255,255,0.08);">
+                <i class="bi bi-play-btn fs-4 mb-2 d-block"></i>
+                <span class="small">Nenhuma série em andamento. Adicione na Coleção!</span>
+            </div>
+        <?php else: ?>
+            <?php foreach ($continueWatching as $cw): ?>
+                <?php
+                    $item = $cw['item'];
+                    $next = $cw['next_episode'];
+                ?>
+                <div class="refract-continue-card" id="continue-card-<?= $next['id_episodio'] ?>">
+                    <a href="/detail?id=<?= $item['id_item'] ?>">
+                        <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-continue-img" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=300';">
+                    </a>
+                    <span class="refract-continue-badge">Em curso</span>
+                    <div class="refract-continue-overlay">
+                        <div class="refract-continue-title"><?= htmlspecialchars($item['title']) ?></div>
+                        <div class="refract-continue-subtitle">S<?= sprintf('%02d', $next['season_number']) ?> &bull; E<?= sprintf('%02d', $next['episode_number']) ?> &bull; <?= htmlspecialchars($next['title']) ?></div>
+                    </div>
+                    <!-- Checkmark button to mark watched instantly -->
+                    <div class="refract-continue-check" onclick="markNextEpisodeWatched(this, <?= $next['id_episodio'] ?>, <?= $item['id_item'] ?>)" title="Marcar episódio como visto">
+                        <i class="bi bi-check-lg"></i>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+
+    <!-- SECTION: AS TUAS LISTAS -->
+    <div class="refract-section-header">
+        <div class="refract-section-title">
+            <i class="bi bi-folder-fill text-warning"></i> As tuas listas
+        </div>
+        <a href="/lists" class="refract-section-link">Ver tudo <i class="bi bi-chevron-right small"></i></a>
+    </div>
+
+    <div class="refract-carousel mb-2">
+        <div class="refract-list-card-horizontal justify-content-center align-items-center" onclick="promptCreateList()" style="border: 1px dashed rgba(168,139,235,0.4); background: rgba(168,139,235,0.03);">
+            <i class="bi bi-plus-circle text-accent fs-4 mb-1" style="color: #a88beb;"></i>
+            <span class="small fw-bold" style="font-size: 0.72rem; color: #a88beb;">Criar lista</span>
         </div>
         
-        <div class="d-flex align-items-center gap-3">
-            <!-- Layout Toggle Icon (List / Grid) -->
-            <i class="bi <?= $viewMode === 'list' ? 'bi-grid-3x3-gap' : 'bi-list-ul' ?>" style="cursor: pointer; font-size: 1.1rem; color: #a5a5c0;" onclick="toggleViewMode()" title="<?= $viewMode === 'list' ? 'Visualizar em Grade' : 'Visualizar em Lista' ?>"></i>
-            <!-- Grid Layout Toggle Icon (Only relevant in grid mode) -->
-            <?php if ($viewMode === 'grid'): ?>
-                <i class="bi <?= $grouped ? 'bi-grid-3x3-gap' : 'bi-grid-3x3-gap-fill text-warning' ?>" style="cursor: pointer; font-size: 1.1rem; color: #a5a5c0;" onclick="toggleGroupedLayout()" title="Alternar agrupamento"></i>
-            <?php endif; ?>
-            <!-- Sliders/Filter Modal Icon -->
-            <i class="bi bi-sliders" style="cursor: pointer; font-size: 1.1rem; color: #a5a5c0;" onclick="openFilterModal()" title="Filtrar & Ordenar"></i>
-            <!-- Media Types Filter Icon -->
-            <i class="bi bi-folder" style="cursor: pointer; font-size: 1.1rem; color: #a5a5c0;" onclick="openMediaTypeModal()" title="Tipos de Mídia"></i>
-        </div>
-    </div>
-
-    <!-- Items Grid/List matching Refract Coleção style -->
-    <div class="mt-2">
-        <!-- Skeleton Loading Container -->
-        <div id="skeletonContainer" class="d-none">
-            <div class="row row-cols-3 row-cols-md-4 row-cols-lg-6 g-2">
-                <?php for ($i = 0; $i < 6; $i++): ?>
-                    <div class="col mb-3">
-                        <div class="refract-skeleton-card"></div>
-                        <div class="refract-skeleton-text title"></div>
-                        <div class="refract-skeleton-text meta"></div>
-                    </div>
-                <?php endfor; ?>
+        <?php if (empty($userLists)): ?>
+            <div class="refract-list-card-horizontal justify-content-center align-items-center" style="background-color: #12121a; cursor: default;">
+                <span class="text-muted text-center" style="font-size: 0.68rem; line-height: 1.3;">Cria a tua primeira lista para organizar conteúdos!</span>
             </div>
-        </div>
-
-        <div id="resultsGrid">
-            <?php if ($viewMode === 'list'): ?>
-                <!-- List View (Paginated) -->
-                <?php if (empty($items)): ?>
-                    <div class="text-center py-5">
-                        <div class="mb-3 text-muted" style="font-size: 3rem;">
-                            <i class="bi bi-folder-plus"></i>
-                        </div>
-                        <h6 class="text-white fw-bold">Sua coleção está vazia</h6>
-                        <p class="text-gray small px-4 mb-3">Pesquise suas séries e filmes preferidos para adicioná-los aqui.</p>
-                    </div>
-                <?php else: ?>
-                    <div style="display: flex !important; flex-direction: column !important; gap: 8px !important; margin-bottom: 25px !important;">
-                        <?php foreach ($items as $item): ?>
-                            <div class="rounded-3" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: space-between !important; gap: 15px !important; padding: 10px !important; background-color: #121218 !important; border: 1px solid rgba(255,255,255,0.04) !important; width: 100% !important; box-sizing: border-box !important;">
-                                <div style="display: flex !important; flex-direction: row !important; align-items: center !important; gap: 15px !important; flex-grow: 1 !important; min-width: 0 !important;">
-                                    <a href="/detail?id=<?= $item['id_item'] ?? '' ?>" style="flex-shrink: 0 !important; display: block !important;">
-                                        <img src="<?= htmlspecialchars($item['poster_url'] ?? '') ?>" style="width: 48px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); display: block !important;" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=200';">
-                                    </a>
-                                    <div style="flex-grow: 1 !important; min-width: 0 !important; text-align: left !important;">
-                                        <h6 class="text-white fw-bold" style="font-size: 0.85rem; margin: 0 0 2px 0 !important; line-height: 1.2;">
-                                            <a href="/detail?id=<?= $item['id_item'] ?? '' ?>" class="text-decoration-none text-white"><?= htmlspecialchars($item['title'] ?? '') ?></a>
-                                        </h6>
-                                        <div style="display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 6px !important; font-size: 0.7rem; color: #b0b0cc !important; font-weight: 500; margin: 0 0 6px 0 !important; line-height: 1;">
-                                            <span class="badge bg-black text-uppercase" style="font-size: 0.52rem; color: #a88beb !important; border: 1px solid rgba(168,139,235,0.25);"><?= htmlspecialchars($item['type'] === 'series' ? 'Série' : ($item['type'] === 'anime' ? 'Anime' : 'Filme')) ?></span>
-                                            &bull; <span><?= $item['release_year'] ?></span>
-                                            <?php if ($item['type'] !== 'movie' && !empty($item['next_episode'])): ?>
-                                                &bull; <span class="text-warning">Próximo: T<?= $item['next_episode']['season_number'] ?>E<?= $item['next_episode']['episode_number'] ?></span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php if (isset($item['progress_percent'])): ?>
-                                            <div style="display: flex !important; flex-direction: row !important; align-items: center !important; gap: 10px !important; width: 140px !important;">
-                                                <div style="flex-grow: 1 !important; height: 4px !important; background-color: rgba(255,255,255,0.1) !important; border-radius: 2px !important; margin: 0 !important; overflow: hidden !important; position: relative !important; display: block !important;">
-                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important; border-radius: 2px !important;"></div>
-                                                </div>
-                                                <span style="font-size: 0.65rem; color: #a5a5c0; font-weight: bold; flex-shrink: 0 !important;"><?= $item['progress_percent'] ?>%</span>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                                <div style="flex-shrink: 0 !important; padding-right: 8px;">
-                                    <a href="/detail?id=<?= $item['id_item'] ?>" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-bold" style="border-color: rgba(255,255,255,0.15); color: var(--text-gray); font-size: 0.72rem; background-color: rgba(255,255,255,0.02);">Acessar</a>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <!-- Pagination Controls -->
-                    <?php if ($totalPages > 1): ?>
-                        <nav aria-label="Navegação da Coleção" class="mt-4 mb-2">
-                            <ul class="pagination pagination-sm justify-content-center gap-1">
-                                <?php $queryParams = $_GET; ?>
-                                
-                                <!-- Previous Page -->
-                                <li class="page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
-                                    <?php 
-                                        $queryParams['page'] = $currentPage - 1; 
-                                        $prevUrl = '/catalog?' . http_build_query($queryParams);
-                                    ?>
-                                    <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center" href="<?= $currentPage <= 1 ? '#' : $prevUrl ?>" style="width: 32px; height: 32px; background-color: #121218; color: #a88beb;"><i class="bi bi-chevron-left"></i></a>
-                                </li>
-
-                                <!-- Page Numbers -->
-                                <?php for ($p = 1; $p <= $totalPages; $p++): ?>
-                                    <?php 
-                                        $queryParams['page'] = $p; 
-                                        $pageUrl = '/catalog?' . http_build_query($queryParams);
-                                        $isActive = ($p === $currentPage);
-                                    ?>
-                                    <li class="page-item <?= $isActive ? 'active' : '' ?>">
-                                        <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold" href="<?= $pageUrl ?>" style="width: 32px; height: 32px; background-color: <?= $isActive ? '#7c4dff' : '#121218' ?>; color: <?= $isActive ? '#ffffff' : '#a88beb' ?>;"><?= $p ?></a>
-                                    </li>
-                                <?php endfor; ?>
-
-                                <!-- Next Page -->
-                                <li class="page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
-                                    <?php 
-                                        $queryParams['page'] = $currentPage + 1; 
-                                        $nextUrl = '/catalog?' . http_build_query($queryParams);
-                                    ?>
-                                    <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center" href="<?= $currentPage >= $totalPages ? '#' : $nextUrl ?>" style="width: 32px; height: 32px; background-color: #121218; color: #a88beb;"><i class="bi bi-chevron-right"></i></a>
-                                </li>
-                            </ul>
-                        </nav>
-                    <?php endif; ?>
-                <?php endif; ?>
-
-            <?php else: ?>
-                <!-- Grid View -->
-                <?php if ($grouped): ?>
-                    <!-- Grouped by status (A ver, Em dia, Visto) -->
-                    <?php 
-                        $hasItems = !empty($items['watching']) || !empty($items['up_to_date']) || !empty($items['completed']);
-                    ?>
-                    
-                    <?php if (!$hasItems): ?>
-                        <div class="text-center py-5">
-                            <div class="mb-3 text-muted" style="font-size: 3rem;">
-                                <i class="bi bi-folder-plus"></i>
-                            </div>
-                            <h6 class="text-white fw-bold">Sua coleção está vazia</h6>
-                            <p class="text-gray small px-4 mb-3">Pesquise suas séries e filmes preferidos para adicioná-los aqui.</p>
-                        </div>
-                    <?php else: ?>
-                        <!-- 1. A ver (Watching) -->
-                        <?php if (!empty($items['watching'])): ?>
-                            <div class="d-flex justify-content-between align-items-center mb-3 mt-2 px-1">
-                                <h6 class="text-warning small fw-bold text-uppercase m-0 d-flex align-items-center gap-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                                    <span class="refract-dot orange"></span> A ver
-                                </h6>
-                                <span class="text-muted small" style="font-size: 0.65rem;"><?= count($items['watching']) ?></span>
-                            </div>
-                            <div class="row row-cols-3 row-cols-md-4 row-cols-lg-6 g-2 mb-4">
-                                <?php foreach ($items['watching'] as $item): ?>
-                                    <div class="col mb-3">
-                                        <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
-                                            <a href="/detail?id=<?= $item['id_item'] ?>">
-                                                <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
-                                            </a>
-                                            <?php if (isset($item['progress_percent'])): ?>
-                                                <div class="position-absolute bottom-0 start-0 w-100" style="height: 3px !important; background-color: rgba(255,255,255,0.15) !important; border-radius: 0 !important; overflow: hidden !important; margin: 0 !important; z-index: 10 !important; display: block !important;">
-                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important;"></div>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="px-1 text-start mt-1">
-                                            <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                                <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
-                                            </a>
-                                            <div class="text-muted d-flex align-items-center flex-wrap gap-1" style="font-size: 0.68rem; margin-top: 1px; color: #b0b0cc !important; font-weight: 500;">
-                                                <span><?= $item['release_year'] ?></span>
-                                                <?php if ($item['type'] !== 'movie' && !empty($item['next_episode'])): ?>
-                                                    &bull; <span class="text-warning fw-bold">T<?= $item['next_episode']['season_number'] ?>E<?= $item['next_episode']['episode_number'] ?></span>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- 2. Em dia (Up to date) -->
-                        <?php if (!empty($items['up_to_date'])): ?>
-                            <div class="d-flex justify-content-between align-items-center mb-3 mt-2 px-1">
-                                <h6 class="text-success small fw-bold text-uppercase m-0 d-flex align-items-center gap-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">
-                                    <span class="refract-dot green"></span> Em dia
-                                </h6>
-                                <span class="text-muted small" style="font-size: 0.65rem;"><?= count($items['up_to_date']) ?></span>
-                            </div>
-                            <div class="row row-cols-3 row-cols-md-4 row-cols-lg-6 g-2 mb-4">
-                                <?php foreach ($items['up_to_date'] as $item): ?>
-                                    <div class="col mb-3">
-                                        <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
-                                            <a href="/detail?id=<?= $item['id_item'] ?>">
-                                                <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
-                                            </a>
-                                            <?php if (isset($item['progress_percent'])): ?>
-                                                <div class="position-absolute bottom-0 start-0 w-100" style="height: 3px !important; background-color: rgba(255,255,255,0.15) !important; border-radius: 0 !important; overflow: hidden !important; margin: 0 !important; z-index: 10 !important; display: block !important;">
-                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important;"></div>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="px-1 text-start mt-1">
-                                            <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                                <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
-                                            </a>
-                                            <div class="text-muted" style="font-size: 0.68rem; margin-top: 1px; color: #b0b0cc !important; font-weight: 500;"><?= $item['release_year'] ?></div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-
-                        <!-- 3. Visto (Completed) -->
-                        <?php if (!empty($items['completed'])): ?>
-                            <div class="d-flex justify-content-between align-items-center mb-3 mt-2 px-1">
-                                <h6 class="text-accent small fw-bold text-uppercase mb-3 mt-2 d-flex align-items-center gap-2" style="color: #a88beb !important; font-size: 0.7rem; letter-spacing: 0.5px;">
-                                    <span class="refract-dot purple"></span> Visto
-                                </h6>
-                                <span class="text-muted small" style="font-size: 0.65rem;"><?= count($items['completed']) ?></span>
-                            </div>
-                            <div class="row row-cols-3 row-cols-md-4 row-cols-lg-6 g-2 mb-4">
-                                <?php foreach ($items['completed'] as $item): ?>
-                                    <div class="col mb-3">
-                                        <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
-                                            <a href="/detail?id=<?= $item['id_item'] ?>">
-                                                <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
-                                            </a>
-                                            <?php if (isset($item['progress_percent'])): ?>
-                                                <div class="position-absolute bottom-0 start-0 w-100" style="height: 3px !important; background-color: rgba(255,255,255,0.15) !important; border-radius: 0 !important; overflow: hidden !important; margin: 0 !important; z-index: 10 !important; display: block !important;">
-                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important;"></div>
-                                                </div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="px-1 text-start mt-1">
-                                            <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                                <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
-                                            </a>
-                                            <div class="text-muted" style="font-size: 0.68rem; margin-top: 1px; color: #b0b0cc !important; font-weight: 500;"><?= $item['release_year'] ?></div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-                    <?php endif; ?>
-                <?php else: ?>
-                    <!-- Flat view (Grid) -->
-                    <?php if (empty($items)): ?>
-                        <div class="text-center py-5">
-                            <div class="mb-3 text-muted" style="font-size: 3rem;">
-                                <i class="bi bi-folder-plus"></i>
-                            </div>
-                            <h6 class="text-white fw-bold">Sua coleção está vazia</h6>
-                            <p class="text-gray small px-4 mb-3">Pesquise suas séries e filmes preferidos para adicioná-los aqui.</p>
-                        </div>
-                    <?php else: ?>
-                        <div class="row row-cols-3 row-cols-md-4 row-cols-lg-6 g-2">
-                            <?php foreach ($items as $item): ?>
-                                <div class="col mb-3">
-                                    <div class="refract-poster-card position-relative overflow-hidden rounded-3 shadow-sm" style="aspect-ratio: 2/3;">
-                                        <a href="/detail?id=<?= $item['id_item'] ?>">
-                                            <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img w-100 h-100 object-fit-cover" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400'; this.onerror=null;">
-                                        </a>
-                                        <?php if (isset($item['progress_percent'])): ?>
-                                            <div class="position-absolute bottom-0 start-0 w-100" style="height: 3px !important; background-color: rgba(255,255,255,0.15) !important; border-radius: 0 !important; overflow: hidden !important; margin: 0 !important; z-index: 10 !important; display: block !important;">
-                                                <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important;"></div>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="px-1 text-start mt-1">
-                                        <a href="/detail?id=<?= $item['id_item'] ?>" class="text-decoration-none">
-                                            <div class="text-white fw-bold text-truncate" style="font-size: 0.72rem; line-height: 1.2;"><?= htmlspecialchars($item['title']) ?></div>
-                                        </a>
-                                        <div class="text-muted d-flex align-items-center flex-wrap gap-1" style="font-size: 0.68rem; margin-top: 1px; color: #b0b0cc !important; font-weight: 500;">
-                                            <span><?= $item['release_year'] ?></span>
-                                            <?php if ($item['type'] !== 'movie' && !empty($item['next_episode'])): ?>
-                                                &bull; <span class="text-warning fw-bold">T<?= $item['next_episode']['season_number'] ?>E<?= $item['next_episode']['episode_number'] ?></span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                <?php endif; ?>
-            <?php endif; ?>
-        </div> <!-- end of resultsGrid -->
+        <?php else: ?>
+            <?php foreach ($userLists as $list): ?>
+                <div class="refract-list-card-horizontal" onclick="loadPageContent('/lists')">
+                    <span class="fw-bold text-white text-truncate w-100" style="font-size: 0.78rem;"><?= htmlspecialchars($list['nome']) ?></span>
+                    <span class="text-muted" style="font-size: 0.62rem;"><?= count($list['items']) ?> itens</span>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
+
+    <!-- SECTION: PARA VER -->
+    <div class="refract-section-header">
+        <div class="refract-section-title">
+            <i class="bi bi-bookmark-fill text-info"></i> Para ver
+        </div>
+    </div>
+    
+    <div class="refract-carousel">
+        <?php if (empty($planToWatch)): ?>
+            <div class="p-4 text-center text-muted w-100 rounded-4" style="background-color: #12121a; border: 1px dashed rgba(255,255,255,0.08); cursor: pointer;" onclick="loadPageContent('/search')">
+                <span class="small d-block mb-1">A tua lista de visualização está vazia.</span>
+                <span class="small text-accent fw-bold" style="color: #a88beb;">Adiciona algo para ver <i class="bi bi-arrow-right"></i></span>
+            </div>
+        <?php else: ?>
+            <?php foreach ($planToWatch as $item): ?>
+                <div class="refract-poster-item">
+                    <div class="refract-poster-wrap">
+                        <a href="/detail?id=<?= $item['id_item'] ?>">
+                            <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=200';">
+                        </a>
+                        <span class="refract-meta-sub text-uppercase"><?= $item['type'] === 'movie' ? 'Film' : 'TV' ?></span>
+                    </div>
+                    <div class="refract-poster-title"><?= htmlspecialchars($item['title']) ?></div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+
+    <!-- SECTION: MAIS POPULARES -->
+    <div class="refract-section-header">
+        <div class="refract-section-title">
+            <i class="bi bi-fire text-danger"></i> Mais populares
+        </div>
+    </div>
+
+    <div class="refract-carousel">
+        <?php foreach ($popularItems as $item): ?>
+            <?php
+                if (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
+                elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'] . '&type=' . $item['type'];
+                else $detailLink = '#';
+            ?>
+            <div class="refract-poster-item">
+                <div class="refract-poster-wrap">
+                    <a href="<?= $detailLink ?>">
+                        <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=200';">
+                    </a>
+                    <span class="refract-meta-sub text-uppercase"><?= $item['type'] === 'movie' ? 'Film' : 'TV' ?></span>
+                </div>
+                <div class="refract-poster-title"><?= htmlspecialchars($item['title']) ?></div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+
+    <!-- SECTION: EM BREVE -->
+    <div class="refract-section-header">
+        <div class="refract-section-title">
+            <i class="bi bi-calendar-event-fill text-success"></i> Em breve
+        </div>
+    </div>
+
+    <div class="refract-carousel">
+        <?php foreach ($upcomingItems as $item): ?>
+            <?php
+                if (!empty($item['tvmaze_id'])) $detailLink = '/detail?tvmaze_id=' . $item['tvmaze_id'];
+                elseif (!empty($item['tmdb_id'])) $detailLink = '/detail?tmdb_id=' . $item['tmdb_id'] . '&type=' . $item['type'];
+                else $detailLink = '#';
+            ?>
+            <div class="refract-poster-item">
+                <div class="refract-poster-wrap">
+                    <a href="<?= $detailLink ?>">
+                        <img src="<?= htmlspecialchars($item['poster_url']) ?>" class="refract-poster-img" alt="poster" onerror="this.src='https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=200';">
+                    </a>
+                    <span class="refract-meta-sub text-uppercase"><?= $item['type'] === 'movie' ? 'Film' : 'TV' ?></span>
+                </div>
+                <div class="refract-poster-title"><?= htmlspecialchars($item['title']) ?></div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+
+    <div style="height: 120px;"></div>
 </div>
 
-<!-- Advanced Filter Modal (Dashboard Layout) -->
-<div id="filterModal" class="tvtime-modal-overlay">
-    <div class="tvtime-modal-sheet text-start" style="border-radius: 20px 20px 0 0; background-color: #1e1e2d; border-top: 1px solid #2d2d3e; max-width: 440px;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="text-white fw-bold" style="font-size: 1.1rem;">Filtrar & Ordenar</span>
-            <div class="d-flex align-items-center gap-2">
-                <span class="text-muted small me-2" style="cursor: pointer; font-size: 0.8rem;" onclick="resetFilters()">Repor tudo</span>
-                <button type="button" class="btn-close btn-close-white" onclick="closeFilterModal()"></button>
+<!-- Modal Dialog template for list creation (Refract Glass style) -->
+<div class="modal fade" id="createListModal" tabindex="-1" aria-hidden="true" style="z-index: 5000;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 360px; margin: auto 15px;">
+        <div class="modal-content text-white p-4" style="border-radius: 20px; background-color: #1a1a24; border: 1px solid #2d2d3e; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-folder-plus text-accent fs-4" style="color: #a88beb;"></i>
+                <h5 class="fw-bold mb-0 text-white">Criar Nova Lista</h5>
+            </div>
+            <p class="small text-muted mb-4" style="font-size: 0.78rem;">Exemplo: "Para Assistir no Fim de Semana", "Favoritos de Ação".</p>
+            <div class="mb-4">
+                <input type="text" id="newListNameInput" class="form-control text-white border-0 py-2 px-3" style="background-color: #0c0c12; border-radius: 10px; font-size: 0.85rem;" placeholder="Nome da lista..." required>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-secondary rounded-pill w-50 small fw-bold py-2" data-bs-dismiss="modal" style="background-color: #2c2c3e; border: none; font-size: 0.78rem;">Cancelar</button>
+                <button type="button" class="btn rounded-pill w-50 small fw-bold py-2 text-white" onclick="submitCreateList()" style="background-color: #7c4dff; border: none; font-size: 0.78rem;">Criar</button>
             </div>
         </div>
-        <div class="text-muted small mb-4" style="font-size: 0.8rem;">Personaliza a visualização da tua coleção.</div>
-
-        <form id="filterForm" action="/catalog" method="GET">
-            <input type="hidden" name="media_movies" value="<?= $mediaMovies ? '1' : '0' ?>">
-            <input type="hidden" name="media_series" value="<?= $mediaSeries ? '1' : '0' ?>">
-            <input type="hidden" name="media_anime" value="<?= $mediaAnime ? '1' : '0' ?>">
-            <input type="hidden" name="view_mode" value="<?= htmlspecialchars($viewMode) ?>">
-
-            <!-- Agrupado por estado -->
-            <div class="d-flex align-items-center justify-content-between mb-4">
-                <div>
-                    <span class="text-white small fw-bold">Agrupado por estado</span>
-                    <div class="text-muted" style="font-size: 0.65rem; margin-top: 1px;">Organiza a tua biblioteca em secções por estado.</div>
-                </div>
-                <div class="form-check form-switch p-0 m-0">
-                    <input class="form-check-input" type="checkbox" name="grouped" value="1" <?= $grouped ? 'checked' : '' ?> style="width: 38px; height: 18px;">
-                </div>
-            </div>
-
-            <!-- Filtrar por estado -->
-            <h6 class="text-gray small fw-bold text-uppercase mb-3" style="font-size: 0.65rem; letter-spacing: 0.5px;">Filtrar por estado</h6>
-            <div class="d-flex flex-wrap gap-2 mb-4">
-                <input type="radio" class="btn-check" name="status_filter" id="statusFilterNone" value="" <?= empty($statusFilter) ? 'checked' : '' ?>>
-                <label class="pill-btn m-0" for="statusFilterNone">Tudo</label>
-
-                <input type="radio" class="btn-check" name="status_filter" id="statusFilterWatching" value="watching" <?= $statusFilter === 'watching' ? 'checked' : '' ?>>
-                <label class="pill-btn m-0" for="statusFilterWatching">A ver</label>
-
-                <input type="radio" class="btn-check" name="status_filter" id="statusFilterUpToDate" value="em_dia" <?= $statusFilter === 'em_dia' ? 'checked' : '' ?>>
-                <label class="pill-btn m-0" for="statusFilterUpToDate">Em dia</label>
-
-                <input type="radio" class="btn-check" name="status_filter" id="statusFilterCompleted" value="visto" <?= $statusFilter === 'visto' ? 'checked' : '' ?>>
-                <label class="pill-btn m-0" for="statusFilterCompleted">Visto</label>
-            </div>
-
-            <!-- Filtrar por Streaming -->
-            <h6 class="text-gray small fw-bold text-uppercase mb-3 mt-4" style="font-size: 0.65rem; letter-spacing: 0.5px;">Filtrar por Streaming</h6>
-            <div class="d-flex flex-wrap gap-2 mb-4">
-                <input type="radio" class="btn-check" name="provider" id="providerNone" value="" <?= empty($providerFilter) ? 'checked' : '' ?>>
-                <label class="pill-btn m-0" for="providerNone">Todos</label>
-
-                <?php 
-                $topProviders = [
-                    'Netflix' => 'https://image.tmdb.org/t/p/original/p1ed140BT8k2j40Qb7V12X63m40.jpg',
-                    'Amazon Prime Video' => 'https://image.tmdb.org/t/p/original/dQ432Fz3HqjWkY5O9IQsfC1W7nI.jpg',
-                    'Disney Plus' => 'https://image.tmdb.org/t/p/original/97v592u51Cl8t1i75V4871l4e4L.jpg',
-                    'Globoplay' => 'https://image.tmdb.org/t/p/original/3iUf1O6ZsfwO3mYv3P0p3m40a.jpg',
-                    'HBO Max' => 'https://image.tmdb.org/t/p/original/hW1QZlI0Mh9QsfS16e6zM40W40a.jpg',
-                    'Apple TV' => 'https://image.tmdb.org/t/p/original/6sp47wM80n2fNqZ40g8uXyW1c0u.jpg',
-                    'Crunchyroll' => 'https://image.tmdb.org/t/p/original/dI55WwO3sH87ePZ7q9Qp9P6m40a.jpg'
-                ];
-                foreach ($topProviders as $name => $logo):
-                    $inputId = 'provider_' . str_replace(' ', '_', $name);
-                ?>
-                    <input type="radio" class="btn-check" name="provider" id="<?= $inputId ?>" value="<?= htmlspecialchars($name) ?>" <?= $providerFilter === $name ? 'checked' : '' ?>>
-                    <label class="pill-btn m-0 d-flex align-items-center gap-1.5" for="<?= $inputId ?>" style="padding: 4px 10px; font-size: 0.72rem; background-color: #121218; border: 1px solid rgba(255,255,255,0.06); color: #e5e5e7; display: inline-flex; align-items: center; gap: 6px;">
-                        <img src="<?= $logo ?>" style="width: 14px; height: 14px; border-radius: 3px; object-fit: cover;" alt="">
-                        <?= htmlspecialchars($name === 'Amazon Prime Video' ? 'Prime Video' : ($name === 'Disney Plus' ? 'Disney+' : $name)) ?>
-                    </label>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Ordenar por -->
-            <h6 class="text-gray small fw-bold text-uppercase mb-3" style="font-size: 0.65rem; letter-spacing: 0.5px;">Ordenar por</h6>
-            <div class="refract-card-dark p-3 rounded-4 d-flex flex-column gap-3 mb-4">
-                <div class="d-flex align-items-center justify-content-between">
-                    <label class="text-white small fw-bold m-0" for="sortLastWatched">Último visto</label>
-                    <input class="form-check-input bg-transparent border-secondary" type="radio" name="sort_by" id="sortLastWatched" value="last_watched" <?= $sortBy === 'last_watched' ? 'checked' : '' ?>>
-                </div>
-                <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #2d2d3e; padding-top: 12px;">
-                    <label class="text-white small fw-bold m-0" for="sortLastAdded">Último adicionado</label>
-                    <input class="form-check-input bg-transparent border-secondary" type="radio" name="sort_by" id="sortLastAdded" value="last_added" <?= $sortBy === 'last_added' ? 'checked' : '' ?>>
-                </div>
-                <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #2d2d3e; padding-top: 12px;">
-                    <label class="text-white small fw-bold m-0" for="sortLastPremiered">Última estreia</label>
-                    <input class="form-check-input bg-transparent border-secondary" type="radio" name="sort_by" id="sortLastPremiered" value="last_premiered" <?= $sortBy === 'last_premiered' ? 'checked' : '' ?>>
-                </div>
-            </div>
-
-            <!-- Action Button -->
-            <button type="submit" class="btn w-100 py-3 rounded-pill fw-bold text-white mb-2" style="background-color: #7c4dff !important; border: none; font-size: 0.85rem;">Aplicar filtros</button>
-        </form>
-    </div>
-</div>
-
-<!-- Media Type Modal Overlay -->
-<div id="mediaTypeModal" class="tvtime-modal-overlay">
-    <div class="tvtime-modal-sheet text-start" style="border-radius: 20px 20px 0 0; background-color: #1e1e2d; border-top: 1px solid #2d2d3e; max-width: 440px;">
-        <div class="d-flex align-items-center justify-content-between mb-1">
-            <span class="text-white fw-bold" style="font-size: 1.1rem;">Tipos de mídia</span>
-            <button type="button" class="btn-close btn-close-white" onclick="closeMediaTypeModal()"></button>
-        </div>
-        <div class="text-muted small mb-4" style="font-size: 0.8rem;">Filtra que tipos de mídia aparecem apenas nesta vista.</div>
-
-        <form id="mediaTypeForm" action="/catalog" method="GET">
-            <input type="hidden" name="grouped" value="<?= $grouped ? '1' : '0' ?>">
-            <input type="hidden" name="status_filter" value="<?= htmlspecialchars($statusFilter) ?>">
-            <input type="hidden" name="sort_by" value="<?= htmlspecialchars($sortBy) ?>">
-            <input type="hidden" name="provider" value="<?= htmlspecialchars($providerFilter) ?>">
-            <input type="hidden" name="view_mode" value="<?= htmlspecialchars($viewMode) ?>">
-
-            <div class="refract-card-dark p-3 rounded-4 d-flex flex-column gap-3 mb-4">
-                <!-- Filmes -->
-                <div class="d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="d-flex align-items-center justify-content-center rounded" style="width: 32px; height: 32px; background-color: rgba(54, 162, 235, 0.15);">
-                            <i class="bi bi-film text-info" style="font-size: 1.1rem;"></i>
-                        </div>
-                        <span class="text-white small fw-bold">Filmes</span>
-                    </div>
-                    <div class="form-check form-switch p-0 m-0">
-                        <input type="hidden" name="media_movies" value="0">
-                        <input class="form-check-input" type="checkbox" name="media_movies" value="1" <?= $mediaMovies ? 'checked' : '' ?> style="width: 38px; height: 18px;">
-                    </div>
-                </div>
-
-                <!-- Séries -->
-                <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #2d2d3e; padding-top: 12px;">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="d-flex align-items-center justify-content-center rounded" style="width: 32px; height: 32px; background-color: rgba(255, 159, 64, 0.15);">
-                            <i class="bi bi-tv text-warning" style="font-size: 1.1rem;"></i>
-                        </div>
-                        <span class="text-white small fw-bold">Séries</span>
-                    </div>
-                    <div class="form-check form-switch p-0 m-0">
-                        <input type="hidden" name="media_series" value="0">
-                        <input class="form-check-input" type="checkbox" name="media_series" value="1" <?= $mediaSeries ? 'checked' : '' ?> style="width: 38px; height: 18px;">
-                    </div>
-                </div>
-
-                <!-- Anime -->
-                <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #2d2d3e; padding-top: 12px;">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="d-flex align-items-center justify-content-center rounded" style="width: 32px; height: 32px; background-color: rgba(168, 139, 235, 0.15);">
-                            <i class="bi bi-stars" style="color: #a88beb; font-size: 1.1rem;"></i>
-                        </div>
-                        <span class="text-white small fw-bold">Anime</span>
-                    </div>
-                    <div class="form-check form-switch p-0 m-0">
-                        <input type="hidden" name="media_anime" value="0">
-                        <input class="form-check-input" type="checkbox" name="media_anime" value="1" <?= $mediaAnime ? 'checked' : '' ?> style="width: 38px; height: 18px;">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Submit Button -->
-            <button type="submit" class="btn w-100 py-3 rounded-pill fw-bold text-white mb-2" style="background-color: #7c4dff !important; border: none; font-size: 0.85rem;">Aplicar filtros</button>
-        </form>
     </div>
 </div>
 
 <script>
-    function toggleViewMode() {
-        var url = new URL(window.location.href);
-        var currentMode = url.searchParams.get('view_mode') || 'grid';
-        var nextMode = currentMode === 'list' ? 'grid' : 'list';
-        url.searchParams.set('view_mode', nextMode);
-        url.searchParams.set('page', '1');
-        window.location.href = url.toString();
+    function promptCreateList() {
+        const modal = new bootstrap.Modal(document.getElementById('createListModal'));
+        document.getElementById('newListNameInput').value = '';
+        modal.show();
+    }
+
+    function submitCreateList() {
+        const name = document.getElementById('newListNameInput').value.trim();
+        if (!name) {
+            showToast('O nome da lista é obrigatório!', false);
+            return;
+        }
+
+        const modalEl = document.getElementById('createListModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+
+        $.post('/api/lists/create', { name: name }, function(res) {
+            if (res.success) {
+                modal.hide();
+                showToast(res.message, true);
+                loadPageContent('/dashboard', false);
+            } else {
+                showToast(res.message, false);
+            }
+        }).fail(function() {
+            showToast('Erro ao criar lista.', false);
+        });
+    }
+
+    function markNextEpisodeWatched(element, episodeId, itemId) {
+        event.stopPropagation();
+        event.preventDefault();
+        
+        // Show indicator on checking
+        element.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+        
+        $.post('/api/episode', {
+            episode_id: episodeId,
+            item_id: itemId,
+            status: 'watch'
+        }, function(res) {
+            if (res.success) {
+                showToast('Episódio marcado como assistido!', true);
+                // Dynamically refresh dashboard content
+                loadPageContent('/dashboard', false);
+            } else {
+                showToast(res.message, false);
+                element.innerHTML = '<i class="bi bi-check-lg"></i>';
+            }
+        }).fail(function() {
+            showToast('Erro ao atualizar episódio.', false);
+            element.innerHTML = '<i class="bi bi-check-lg"></i>';
+        });
     }
 </script>

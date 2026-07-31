@@ -407,7 +407,12 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
 </div>
 
 <!-- Bottom Floating Yellow Action Bar in Refract Purple -->
-<div class="bottom-floating-bar refract-floating-bar-purple">
+<div class="bottom-floating-bar refract-floating-bar-purple d-flex align-items-center gap-2">
+    <!-- Folder List Button -->
+    <button class="btn btn-outline-light rounded-circle refract-add-to-list-btn" onclick="openAddToListModal(<?= $item['id_item'] ?? 0 ?>, <?= $item['tvmaze_id'] ?? 0 ?>, <?= $item['tmdb_id'] ?? 0 ?>, '<?= $item['type'] ?>')" style="width: 50px; height: 50px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); display: inline-flex; align-items: center; justify-content: center; background-color: rgba(255,255,255,0.05); color: #ffffff; flex-shrink: 0;" title="Adicionar à lista">
+        <i class="bi bi-folder-plus fs-5"></i>
+    </button>
+
     <?php if ($item['status'] === 'Upcoming'): ?>
         <?php if ($item['track_status']): ?>
             <div class="d-flex w-100 gap-2">
@@ -422,7 +427,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 </button>
             </div>
         <?php else: ?>
-            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+            <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
                     data-item-id="<?= $item['id_item'] ?? '' ?>" 
                     data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
                     data-action="add"
@@ -459,7 +464,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 </button>
             </div>
         <?php elseif ($item['type'] === 'movie'): ?>
-            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+            <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
                     data-item-id="<?= $item['id_item'] ?>" 
                     data-action="add"
                     data-status="completed"
@@ -467,7 +472,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
             </button>
         <?php else: ?>
-            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+            <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
                     data-item-id="<?= $item['id_item'] ?>" 
                     data-action="add"
                     data-status="completed"
@@ -477,7 +482,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         <?php endif; ?>
     <?php else: ?>
         <?php if ($item['type'] === 'movie'): ?>
-            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+            <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
                     data-item-id="<?= $item['id_item'] ?? '' ?>" 
                     data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
                     data-action="add"
@@ -486,7 +491,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 <i class="bi bi-check-circle-fill me-2"></i> MARCAR FILME COMO ASSISTIDO
             </button>
         <?php else: ?>
-            <button class="btn-floating-action btn-track-toggle refract-action-btn" 
+            <button class="btn-floating-action btn-track-toggle refract-action-btn w-100" 
                     data-item-id="<?= $item['id_item'] ?? '' ?>" 
                     data-tvmaze-id="<?= $item['tvmaze_id'] ?? '' ?>"
                     data-action="add"
@@ -497,4 +502,137 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         <?php endif; ?>
     <?php endif; ?>
 </div>
+
+<!-- Modal Dialog for adding to specific lists -->
+<div class="modal fade" id="addToSpecificListModal" tabindex="-1" aria-hidden="true" style="z-index: 5000;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 360px; margin: auto 15px;">
+        <div class="modal-content text-white p-4" style="border-radius: 20px; background-color: #1a1a24; border: 1px solid #2d2d3e; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-folder2-open text-accent fs-4" style="color: #a88beb;"></i>
+                    <h5 class="fw-bold mb-0 text-white" style="font-size: 1.05rem;">Adicionar às Listas</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div id="listCheckboxesContainer" class="d-flex flex-column gap-2 mb-4" style="max-height: 200px; overflow-y: auto; padding-right: 5px;">
+                <!-- Dynamically populated checkboxes -->
+            </div>
+
+            <div class="d-flex gap-2">
+                <input type="text" id="quickListCreateInput" class="form-control text-white border-0 py-2 px-3 flex-grow-1" style="background-color: #0c0c12; border-radius: 10px; font-size: 0.78rem;" placeholder="Nova lista...">
+                <button type="button" class="btn text-white rounded-pill px-3 py-1.5 fw-bold" style="background-color: #7c4dff; font-size: 0.75rem;" onclick="quickCreateListFromDetail()">Criar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var currentItemData = {
+        itemId: 0,
+        tvmazeId: 0,
+        tmdbId: 0,
+        type: 'series'
+    };
+
+    function openAddToListModal(itemId, tvmazeId, tmdbId, type) {
+        currentItemData = {
+            itemId: itemId,
+            tvmazeId: tvmazeId,
+            tmdbId: tmdbId,
+            type: type
+        };
+
+        const container = document.getElementById('listCheckboxesContainer');
+        container.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-accent" role="status"></div></div>';
+        
+        const modal = new bootstrap.Modal(document.getElementById('addToSpecificListModal'));
+        modal.show();
+
+        // Load checklists
+        $.getJSON('/api/lists/item-lists?item_id=' + itemId, function(res) {
+            if (res.success && res.lists) {
+                if (res.lists.length === 0) {
+                    container.innerHTML = '<span class="small text-muted text-center py-2 d-block">Você não tem listas criadas ainda.</span>';
+                } else {
+                    container.innerHTML = '';
+                    res.lists.forEach(function(list) {
+                        const div = document.createElement('div');
+                        div.className = 'd-flex align-items-center justify-content-between p-2 rounded-3';
+                        div.style.backgroundColor = '#12121a';
+                        
+                        const label = document.createElement('label');
+                        label.className = 'text-white small m-0 fw-bold flex-grow-1';
+                        label.style.cursor = 'pointer';
+                        label.style.fontSize = '0.78rem';
+                        label.htmlFor = 'list-chk-' + list.id_lista;
+                        label.innerText = list.nome;
+
+                        const chk = document.createElement('input');
+                        chk.type = 'checkbox';
+                        chk.className = 'form-check-input';
+                        chk.style.cursor = 'pointer';
+                        chk.id = 'list-chk-' + list.id_lista;
+                        chk.checked = list.has_item;
+                        chk.onchange = function() {
+                            toggleItemInList(list.id_lista, chk.checked);
+                        };
+
+                        div.appendChild(label);
+                        div.appendChild(chk);
+                        container.appendChild(div);
+                    });
+                }
+            } else {
+                container.innerHTML = '<span class="small text-danger text-center py-2 d-block">Erro ao carregar listas.</span>';
+            }
+        }).fail(function() {
+            container.innerHTML = '<span class="small text-danger text-center py-2 d-block">Erro ao carregar listas.</span>';
+        });
+    }
+
+    function toggleItemInList(listId, add) {
+        const url = add ? '/api/lists/add' : '/api/lists/remove';
+        $.post(url, {
+            list_id: listId,
+            item_id: currentItemData.itemId,
+            tvmaze_id: currentItemData.tvmazeId,
+            tmdb_id: currentItemData.tmdbId,
+            type: currentItemData.type
+        }, function(res) {
+            if (res.success) {
+                showToast(res.message, true);
+                // If it imported the item, update the itemId locally
+                if (res.item_id) {
+                    currentItemData.itemId = res.item_id;
+                }
+            } else {
+                showToast(res.message, false);
+            }
+        }).fail(function() {
+            showToast('Erro ao atualizar item na lista.', false);
+        });
+    }
+
+    function quickCreateListFromDetail() {
+        const name = document.getElementById('quickListCreateInput').value.trim();
+        if (!name) {
+            showToast('O nome da lista é obrigatório!', false);
+            return;
+        }
+
+        $.post('/api/lists/create', { name: name }, function(res) {
+            if (res.success) {
+                showToast(res.message, true);
+                document.getElementById('quickListCreateInput').value = '';
+                // Reload list checklists in modal
+                openAddToListModal(currentItemData.itemId, currentItemData.tvmazeId, currentItemData.tmdbId, currentItemData.type);
+            } else {
+                showToast(res.message, false);
+            }
+        }).fail(function() {
+            showToast('Erro ao criar lista.', false);
+        });
+    }
+</script>
 

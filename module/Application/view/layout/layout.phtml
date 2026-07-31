@@ -133,17 +133,23 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
 
 
         <?php if (isset($_SESSION['user_id'])): ?>
-        <!-- Mobile Bottom Tab Bar (Refract Style Floating Glass Bar) -->
+        <!-- Mobile Bottom Tab Bar (Refract Style Floating Glass Bar with 5 tabs) -->
         <?php $requestUri = $_SERVER['REQUEST_URI'] ?? ''; ?>
         <div class="bottom-navbar">
-            <a href="/dashboard" class="nav-item <?= (strpos($requestUri, '/dashboard') !== false || $requestUri === '/' || $requestUri === '') ? 'active' : '' ?>" title="Início">
+            <a href="/dashboard" class="nav-item <?= ($requestUri === '/dashboard' || $requestUri === '/' || $requestUri === '') ? 'active' : '' ?>" title="Início">
                 <i class="bi bi-house-fill"></i>
             </a>
-            <a href="/catalog" class="nav-item <?= (strpos($requestUri, '/catalog') !== false || strpos($requestUri, '/detail') !== false) ? 'active' : '' ?>" title="Pesquisar">
-                <i class="bi bi-search"></i>
+            <a href="/lists" class="nav-item <?= (strpos($requestUri, '/lists') !== false) ? 'active' : '' ?>" title="Listas">
+                <i class="bi bi-heart-fill"></i>
+            </a>
+            <a href="/catalog" class="nav-item <?= (strpos($requestUri, '/catalog') !== false || strpos($requestUri, '/detail') !== false) ? 'active' : '' ?>" title="Coleção">
+                <i class="bi bi-collection-play-fill"></i>
             </a>
             <a href="/stats" class="nav-item <?= (strpos($requestUri, '/stats') !== false) ? 'active' : '' ?>" title="Perfil">
                 <i class="bi bi-person-fill"></i>
+            </a>
+            <a href="/search" class="nav-item <?= (strpos($requestUri, '/search') !== false) ? 'active' : '' ?>" title="Pesquisar">
+                <i class="bi bi-search"></i>
             </a>
         </div>
         <?php endif; ?>

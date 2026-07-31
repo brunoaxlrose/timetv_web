@@ -11,9 +11,11 @@ use Application\Model\CatalogModel;
 
 class CatalogController extends AbstractActionController {
     private $catalogModel;
+    private $trackingModel;
 
-    public function __construct(CatalogModel $catalogModel) {
+    public function __construct(CatalogModel $catalogModel, \Application\Model\TrackingModel $trackingModel) {
         $this->catalogModel = $catalogModel;
+        $this->trackingModel = $trackingModel;
     }
 
     public function indexAction() {
@@ -23,49 +25,213 @@ class CatalogController extends AbstractActionController {
 
         $userId = $_SESSION['user_id'];
 
-        $searchPost = trim($this->params()->fromPost('search', ''));
-        $searchGet  = trim($this->params()->fromQuery('search', ''));
-        $search     = $searchPost !== '' ? $searchPost : $searchGet;
-        
-        $grouped      = $this->params()->fromQuery('grouped', '1') === '1';
-        $statusFilter = $this->params()->fromQuery('status_filter', '');
-        $sortBy       = $this->params()->fromQuery('sort_by', 'last_watched');
+        $viewMode       = $this->params()->fromQuery('view_mode', 'grid');
+        $grouped        = ($viewMode === 'list') ? false : ($this->params()->fromQuery('grouped', '1') === '1');
+        $statusFilter   = $this->params()->fromQuery('status_filter', '');
+        $sortBy         = $this->params()->fromQuery('sort_by', 'last_watched');
+        $providerFilter = $this->params()->fromQuery('provider', '');
         
         $mediaMovies = $this->params()->fromQuery('media_movies', '1') === '1';
         $mediaSeries = $this->params()->fromQuery('media_series', '1') === '1';
         $mediaAnime  = $this->params()->fromQuery('media_anime', '1') === '1';
 
-        $items = [];
+        $types = [];
+        if ($mediaMovies) $types[] = 'movie';
+        if ($mediaSeries) $types[] = 'series';
+        if ($mediaAnime) $types[] = 'anime';
 
+        $userItems = $this->trackingModel->getUserCollection($userId, $types, $sortBy, $providerFilter);
+
+        // Precalculate progress percent for all series, animes and movies
+        foreach ($userItems as &$item) {
+            if ($item['type'] !== 'movie') {
+                $prog = $this->trackingModel->getProgress($userId, $item['id_item']);
+                $item['progress_percent'] = $prog['total_count'] > 0 ? round(($prog['watched_count'] / $prog['total_count']) * 100) : 0;
+            } else {
+                $item['progress_percent'] = ($item['track_status'] === 'completed') ? 100 : 0;
+            }
+        }
+
+        $items = [];
+        if ($grouped) {
+            $groupedList = [
+                'watching' => [],
+                'up_to_date' => [],
+                'completed' => []
+            ];
+
+            foreach ($userItems as &$item) {
+                if ($item['type'] !== 'movie') {
+                    $remaining = $this->trackingModel->countReleasedUnwatchedEpisodes($userId, $item['id_item']);
+                    $item['next_episode'] = $this->trackingModel->getNextUnwatchedEpisode($userId, $item['id_item']);
+
+                    if ($item['track_status'] === 'completed') {
+                        $groupedList['completed'][] = $item;
+                    } elseif ($remaining === 0) {
+                        $groupedList['up_to_date'][] = $item;
+                    } else {
+                        $groupedList['watching'][] = $item;
+                    }
+                } else {
+                    $item['next_episode'] = null;
+                    if ($item['track_status'] === 'completed') {
+                        $groupedList['completed'][] = $item;
+                    } else {
+                        $groupedList['watching'][] = $item;
+                    }
+                }
+            }
+            unset($item);
+
+            if (!empty($statusFilter)) {
+                if ($statusFilter === 'watching') {
+                    $groupedList['up_to_date'] = [];
+                    $groupedList['completed'] = [];
+                } elseif ($statusFilter === 'visto') {
+                    $groupedList['watching'] = [];
+                    $groupedList['up_to_date'] = [];
+                } elseif ($statusFilter === 'em_dia') {
+                    $groupedList['watching'] = [];
+                    $groupedList['completed'] = [];
+                }
+            }
+
+            $items = $groupedList;
+        } else {
+            if (!empty($statusFilter)) {
+                $filteredFlat = [];
+                foreach ($userItems as &$item) {
+                    if ($item['type'] !== 'movie') {
+                        $remaining = $this->trackingModel->countReleasedUnwatchedEpisodes($userId, $item['id_item']);
+                        $item['next_episode'] = $this->trackingModel->getNextUnwatchedEpisode($userId, $item['id_item']);
+
+                        $status = 'watching';
+                        if ($item['track_status'] === 'completed') {
+                            $status = 'completed';
+                        } elseif ($remaining === 0) {
+                            $status = 'up_to_date';
+                        }
+                    } else {
+                        $item['next_episode'] = null;
+                        $status = ($item['track_status'] === 'completed') ? 'completed' : 'watching';
+                    }
+
+                    if ($statusFilter === 'watching' && $status === 'watching') {
+                        $filteredFlat[] = $item;
+                    } elseif ($statusFilter === 'visto' && $status === 'completed') {
+                        $filteredFlat[] = $item;
+                    } elseif ($statusFilter === 'em_dia' && $status === 'up_to_date') {
+                        $filteredFlat[] = $item;
+                    }
+                }
+                unset($item);
+                $items = $filteredFlat;
+            } else {
+                foreach ($userItems as &$item) {
+                    if ($item['type'] !== 'movie') {
+                        $item['next_episode'] = $this->trackingModel->getNextUnwatchedEpisode($userId, $item['id_item']);
+                    } else {
+                        $item['next_episode'] = null;
+                    }
+                }
+                unset($item);
+                $items = $userItems;
+            }
+        }
+
+        $page = (int)$this->params()->fromQuery('page', 1);
+        if ($page < 1) $page = 1;
+
+        $currentPage = 1;
+        $totalPages = 1;
+        $totalItems = count($items);
+        if ($viewMode === 'list') {
+            $grouped = false; // Force flat list for pagination
+            $limit = 10;
+            $currentPage = $page;
+            $totalPages = (int)ceil($totalItems / $limit);
+            if ($totalPages < 1) $totalPages = 1;
+            if ($currentPage > $totalPages) $currentPage = $totalPages;
+            $offset = ($currentPage - 1) * $limit;
+            $items = array_slice($items, $offset, $limit);
+        }
+
+        $view = new ViewModel([
+            'items'          => $items,
+            'grouped'        => $grouped,
+            'statusFilter'   => $statusFilter,
+            'sortBy'         => $sortBy,
+            'mediaMovies'    => $mediaMovies,
+            'mediaSeries'    => $mediaSeries,
+            'mediaAnime'     => $mediaAnime,
+            'providerFilter' => $providerFilter,
+            'viewMode'       => $viewMode,
+            'currentPage'    => $currentPage,
+            'totalPages'     => $totalPages,
+            'totalItems'     => $totalItems,
+        ]);
+
+        if ($this->getRequest()->isXmlHttpRequest()) {
+            $view->setTerminal(true);
+        } else {
+            $this->layout()->title = "Coleção - Time View";
+        }
+
+        return $view;
+    }
+
+    public function searchAction() {
+        if (!isset($_SESSION['user_id'])) {
+            return $this->redirect()->toRoute('login');
+        }
+
+        $userId = $_SESSION['user_id'];
+
+        $searchPost = trim($this->params()->fromPost('search', ''));
+        $searchGet  = trim($this->params()->fromQuery('search', ''));
+        $search     = $searchPost !== '' ? $searchPost : $searchGet;
+
+        // Trending / popular items (trending)
+        $popularItems = TmdbHelper::getPopular(12);
+
+        $items = [];
         if (!empty($search)) {
             $rawItems = $this->catalogModel->searchAllDatabases($search, $userId);
             foreach ($rawItems as $r) {
-                if ($r['type'] === 'movie' && !$mediaMovies) continue;
-                if ($r['type'] === 'series' && !$mediaSeries) continue;
-                if ($r['type'] === 'anime' && !$mediaAnime) continue;
                 $items[] = $r;
             }
-        } else {
-            $popularItems = TmdbHelper::getPopular(12);
-            $upcomingItems = TmdbHelper::getUpcoming(12);
+        }
+
+        // Add recent searches logic (save searches in session so the user can clear them)
+        if (!isset($_SESSION['recent_searches'])) {
+            $_SESSION['recent_searches'] = [];
+        }
+        if (!empty($search)) {
+            // Add to top of list, prevent duplicates
+            $_SESSION['recent_searches'] = array_values(array_unique(array_merge([$search], $_SESSION['recent_searches'])));
+            // Keep last 5 searches
+            $_SESSION['recent_searches'] = array_slice($_SESSION['recent_searches'], 0, 5);
+        }
+
+        $clearRecent = $this->params()->fromQuery('clear_recent', '0') === '1';
+        if ($clearRecent) {
+            $_SESSION['recent_searches'] = [];
+            return new JsonModel(['success' => true]);
         }
 
         $view = new ViewModel([
             'items' => $items,
             'search' => $search,
-            'mediaMovies' => $mediaMovies,
-            'mediaSeries' => $mediaSeries,
-            'mediaAnime' => $mediaAnime,
-            'popularItems' => $popularItems ?? [],
-            'upcomingItems' => $upcomingItems ?? []
+            'popularItems' => $popularItems,
+            'recentSearches' => $_SESSION['recent_searches']
         ]);
-        
+
         if ($this->getRequest()->isXmlHttpRequest()) {
             $view->setTerminal(true);
         } else {
             $this->layout()->title = "Pesquisar - Time View";
         }
-        
+
         return $view;
     }
 

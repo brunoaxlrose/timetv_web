@@ -92,6 +92,76 @@ return [
                     ],
                 ],
             ],
+            'lists' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/lists',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'lists',
+                    ],
+                ],
+            ],
+            'search' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/search',
+                    'defaults' => [
+                        'controller' => CatalogController::class,
+                        'action'     => 'search',
+                    ],
+                ],
+            ],
+            'api-lists-create' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/lists/create',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiCreateList',
+                    ],
+                ],
+            ],
+            'api-lists-delete' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/lists/delete',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiDeleteList',
+                    ],
+                ],
+            ],
+            'api-lists-add' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/lists/add',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiAddToList',
+                    ],
+                ],
+            ],
+            'api-lists-remove' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/lists/remove',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiRemoveFromList',
+                    ],
+                ],
+            ],
+            'api-lists-item-lists' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/lists/item-lists',
+                    'defaults' => [
+                        'controller' => TrackingController::class,
+                        'action'     => 'apiGetItemLists',
+                    ],
+                ],
+            ],
             'diary' => [
                 'type' => Literal::class,
                 'options' => [

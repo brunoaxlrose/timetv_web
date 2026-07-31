@@ -108,6 +108,19 @@ class DatabaseSchemaHelper {
                 mensagem TEXT NOT NULL,
                 lida BOOLEAN NOT NULL DEFAULT FALSE,
                 ts_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );",
+            "CREATE TABLE IF NOT EXISTS usuario_lista (
+                id_lista SERIAL PRIMARY KEY,
+                id_usuario INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+                nome VARCHAR(255) NOT NULL,
+                ts_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );",
+            "CREATE TABLE IF NOT EXISTS usuario_lista_item (
+                id_lista_item SERIAL PRIMARY KEY,
+                id_lista INT NOT NULL REFERENCES usuario_lista(id_lista) ON DELETE CASCADE,
+                id_item INT NOT NULL REFERENCES item(id_item) ON DELETE CASCADE,
+                ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT unique_lista_item UNIQUE (id_lista, id_item)
             );"
         ];
 

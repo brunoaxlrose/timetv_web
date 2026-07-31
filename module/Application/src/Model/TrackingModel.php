@@ -419,4 +419,111 @@ class TrackingModel {
             return 1;
         }
     }
+
+    public function getContinueWatching(int $userId): array {
+        $stmt = $this->pdo->prepare("
+            SELECT ui.ts_atualizacao, i.* 
+            FROM usuario_item ui
+            JOIN item i ON ui.id_item = i.id_item
+            WHERE ui.id_usuario = :user_id AND ui.status = 'watching' AND ui.ts_cancelamento IS NULL AND i.type != 'movie'
+            ORDER BY ui.ts_atualizacao DESC
+        ");
+        $stmt->execute([':user_id' => $userId]);
+        $shows = $stmt->fetchAll();
+
+        $results = [];
+        foreach ($shows as $show) {
+            $next = $this->getNextUnwatchedEpisode($userId, $show['id_item']);
+            if ($next) {
+                $results[] = [
+                    'item' => $show,
+                    'next_episode' => $next
+                ];
+            }
+        }
+        return $results;
+    }
+
+    public function getPlanToWatch(int $userId): array {
+        $stmt = $this->pdo->prepare("
+            SELECT ui.status as track_status, ui.ts_atualizacao, i.* 
+            FROM usuario_item ui
+            JOIN item i ON ui.id_item = i.id_item
+            WHERE ui.id_usuario = :user_id AND ui.status = 'plan_to_watch' AND ui.ts_cancelamento IS NULL
+            ORDER BY ui.ts_atualizacao DESC
+        ");
+        $stmt->execute([':user_id' => $userId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getUserLists(int $userId): array {
+        $stmt = $this->pdo->prepare("
+            SELECT * FROM usuario_lista 
+            WHERE id_usuario = :user_id 
+            ORDER BY ts_criacao DESC
+        ");
+        $stmt->execute([':user_id' => $userId]);
+        $lists = $stmt->fetchAll();
+
+        foreach ($lists as &$list) {
+            $stmtItems = $this->pdo->prepare("
+                SELECT i.* 
+                FROM usuario_lista_item uli
+                JOIN item i ON uli.id_item = i.id_item
+                WHERE uli.id_lista = :id_lista
+                ORDER BY uli.ts_inclusao DESC
+            ");
+            $stmtItems->execute([':id_lista' => $list['id_lista']]);
+            $list['items'] = $stmtItems->fetchAll();
+        }
+        return $lists;
+    }
+
+    public function createList(int $userId, string $name): int {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO usuario_lista (id_usuario, nome)
+            VALUES (:user_id, :nome)
+            RETURNING id_lista
+        ");
+        $stmt->execute([':user_id' => $userId, ':nome' => $name]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function deleteList(int $userId, int $listId): void {
+        $stmt = $this->pdo->prepare("
+            DELETE FROM usuario_lista 
+            WHERE id_usuario = :user_id AND id_lista = :list_id
+        ");
+        $stmt->execute([':user_id' => $userId, ':list_id' => $listId]);
+    }
+
+    public function addToList(int $listId, int $itemId): void {
+        $stmt = $this->pdo->prepare("
+            INSERT INTO usuario_lista_item (id_lista, id_item)
+            VALUES (:list_id, :item_id)
+            ON CONFLICT DO NOTHING
+        ");
+        $stmt->execute([':list_id' => $listId, ':item_id' => $itemId]);
+    }
+
+    public function removeFromList(int $listId, int $itemId): void {
+        $stmt = $this->pdo->prepare("
+            DELETE FROM usuario_lista_item 
+            WHERE id_lista = :list_id AND id_item = :item_id
+        ");
+        $stmt->execute([':list_id' => $listId, ':item_id' => $itemId]);
+    }
+
+    public function getItemLists(int $userId, int $itemId): array {
+        $stmt = $this->pdo->prepare("
+            SELECT ul.id_lista, ul.nome, 
+                   (uli.id_lista_item IS NOT NULL) as has_item
+            FROM usuario_lista ul
+            LEFT JOIN usuario_lista_item uli ON ul.id_lista = uli.id_lista AND uli.id_item = :item_id
+            WHERE ul.id_usuario = :user_id
+            ORDER BY ul.ts_criacao DESC
+        ");
+        $stmt->execute([':user_id' => $userId, ':item_id' => $itemId]);
+        return $stmt->fetchAll();
+    }
 }
