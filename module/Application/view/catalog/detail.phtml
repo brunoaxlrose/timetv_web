@@ -621,6 +621,12 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
             return;
         }
 
+        const btn = document.querySelector('#addToSpecificListModal button[onclick="quickCreateListFromDetail()"]');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Criando...';
+        }
+
         $.post('/api/lists/create', { name: name }, function(res) {
             if (res.success) {
                 showToast(res.message, true);
@@ -629,9 +635,17 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 openAddToListModal(currentItemData.itemId, currentItemData.tvmazeId, currentItemData.tmdbId, currentItemData.type);
             } else {
                 showToast(res.message, false);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = 'Criar';
+                }
             }
         }).fail(function() {
             showToast('Erro ao criar lista.', false);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'Criar';
+            }
         });
     }
 </script>

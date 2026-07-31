@@ -118,6 +118,11 @@ $userLists = $this->userLists ?? [];
 
         const modalEl = document.getElementById('createListModal');
         const modal = bootstrap.Modal.getInstance(modalEl);
+        const btn = modalEl.querySelector('button[onclick="submitCreateList()"]');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Criando...';
+        }
 
         $.post('/api/lists/create', { name: name }, function(res) {
             if (res.success) {
@@ -126,9 +131,17 @@ $userLists = $this->userLists ?? [];
                 loadPageContent('/lists', false);
             } else {
                 showToast(res.message, false);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = 'Criar';
+                }
             }
         }).fail(function() {
             showToast('Erro ao criar lista.', false);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = 'Criar';
+            }
         });
     }
 

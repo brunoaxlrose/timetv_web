@@ -13,22 +13,33 @@ $this->partial('tracking/js.phtml', ['page' => 'stats']);
 
 
 <!-- Profile Header (Refract style, without followers) -->
+<?php
+$nome = $_SESSION['nome'] ?? '';
+$sobrenome = $_SESSION['sobrenome'] ?? '';
+$initials = '';
+if (!empty($nome)) {
+    $initials .= mb_strtoupper(mb_substr($nome, 0, 1));
+}
+if (!empty($sobrenome)) {
+    $initials .= mb_strtoupper(mb_substr($sobrenome, 0, 1));
+}
+if (empty($initials)) {
+    $initials = 'TV';
+}
+?>
 <div class="d-flex align-items-center justify-content-between px-3 mt-4 mb-4">
     <div class="d-flex align-items-center gap-3">
         <div class="position-relative">
-            <img src="<?= htmlspecialchars($_SESSION['avatar_url'] ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=150') ?>" class="rounded-circle border border-2" style="width: 68px; height: 68px; object-fit: cover; border-color: #a88beb !important;" alt="avatar">
+            <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" style="width: 68px; height: 68px; background: linear-gradient(135deg, #7c4dff, #a88beb); font-size: 1.5rem; letter-spacing: 0.5px; border: 2px solid #a88beb;">
+                <?= htmlspecialchars($initials) ?>
+            </div>
         </div>
         <div>
             <h5 class="text-white fw-bold mb-0 d-flex align-items-center gap-1" style="font-size: 1.2rem;">
                 <?= htmlspecialchars(trim(($_SESSION['nome'] ?? '') . ' ' . ($_SESSION['sobrenome'] ?? ''))) ?>
             </h5>
-            <span class="text-muted small" style="font-size: 0.78rem;">@<?= htmlspecialchars($_SESSION['username'] ?? 'usuario') ?></span>
+            <span class="small" style="font-size: 0.78rem; color: #a5a5c0 !important; font-weight: 500;">@<?= htmlspecialchars($_SESSION['username'] ?? 'usuario') ?></span>
         </div>
-    </div>
-    <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-light rounded-pill px-3 py-1.5 fw-bold" style="border-color: rgba(255,255,255,0.15); font-size: 0.72rem; color: #e2e2e9;" data-bs-toggle="modal" data-bs-target="#editProfileModal">
-            Editar perfil
-        </button>
     </div>
 </div>
 
