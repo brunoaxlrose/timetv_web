@@ -163,13 +163,13 @@ $this->partial('catalog/js.phtml', ['page' => 'search']);
 </div>
 
 <script>
-    function handleSearchKeyUp(event) {
+    window.handleSearchKeyUp = function(event) {
         if (event.key === 'Enter') {
             doPerformSearch();
         }
-    }
+    };
 
-    function doPerformSearch() {
+    window.doPerformSearch = function() {
         const val = document.getElementById('globalSearchInput').value.trim();
         if (val === '') {
             clearSearch();
@@ -199,23 +199,23 @@ $this->partial('catalog/js.phtml', ['page' => 'search']);
         }).fail(function() {
             showToast('Erro ao realizar busca.', false);
         });
-    }
+    };
 
-    function clearSearch() {
+    window.clearSearch = function() {
         document.getElementById('globalSearchInput').value = '';
         loadPageContent('/search', false);
-    }
+    };
 
-    function triggerRecentSearch(term) {
+    window.triggerRecentSearch = function(term) {
         document.getElementById('globalSearchInput').value = term;
         doPerformSearch();
-    }
+    };
 
-    function clearRecentSearches() {
+    window.clearRecentSearches = function() {
         $.getJSON('/search?clear_recent=1', function(res) {
             if (res.success) {
                 loadPageContent('/search', false);
             }
         });
-    }
+    };
 </script>
