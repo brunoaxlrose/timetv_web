@@ -13,6 +13,8 @@ use Application\Controller\Api\FeedbackController;
 use Application\Controller\Api\MobileController;
 use Laminas\Router\Http\Literal;
 
+$isProduction = getenv('APP_ENV') === 'production' || getenv('RENDER') === 'true';
+
 return [
     'router' => [
         'routes' => [
@@ -677,8 +679,8 @@ return [
         ],
     ],
     'view_manager' => [
-        'display_not_found_reason' => true,
-        'display_exceptions'       => true,
+        'display_not_found_reason' => !$isProduction,
+        'display_exceptions'       => !$isProduction,
         'doctype'                  => 'HTML5',
         'not_found_template'       => 'error/404',
         'exception_template'       => 'error/index',
