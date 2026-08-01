@@ -1,9 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const DEFAULT_API_URL = 'http://localhost:8080';
+const LOCAL_API_URL = process.env.EXPO_PUBLIC_LOCAL_API_URL || 'http://192.168.0.18:8080';
+const PRODUCTION_API_URL = process.env.EXPO_PUBLIC_PRODUCTION_API_URL || 'https://cinefio-api.onrender.com';
+const API_ENV = process.env.EXPO_PUBLIC_API_ENV || 'production';
 const USER_KEY = 'timeview:user';
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL
+  || (API_ENV === 'local' ? LOCAL_API_URL : PRODUCTION_API_URL);
 
 export type ApiResponse<T> = {
   success: boolean;
