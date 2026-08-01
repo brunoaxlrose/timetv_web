@@ -15,10 +15,17 @@ RUN apt-get update && apt-get install -y \
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
 # Configure Apache DocumentRoot to point to the new public directory
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+RUN sed -ri -e "s!/var/www/html!${APACHE_DOCUMENT_ROOT}!g" /etc/apache2/sites-available/*.conf \
+    && printf '%s\n' \
+        '<Directory "/var/www/html/public">' \
+        '    Options FollowSymLinks' \
+        '    AllowOverride All' \
+        '    Require all granted' \
+        '</Directory>' \
+        > /etc/apache2/conf-available/cinefio-public.conf \
+    && a2enconf cinefio-public
 
 # Configure custom permissions and server name
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
