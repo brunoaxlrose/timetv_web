@@ -3,7 +3,12 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 require '/var/www/html/vendor/autoload.php';
 
-$pdo = new PDO('pgsql:host=db;port=5432;dbname=tvtime_db', 'tvtime', 'tvtime_pass');
+$host = getenv('DB_HOST') ?: 'db';
+$port = getenv('DB_PORT') ?: '5432';
+$database = getenv('DB_NAME') ?: 'tvtime_db';
+$username = getenv('DB_USER') ?: '';
+$password = getenv('DB_PASSWORD') ?: '';
+$pdo = new PDO("pgsql:host={$host};port={$port};dbname={$database}", $username, $password);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 // Amor à Vida tvmaze_id = 265

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build: .
@@ -13,9 +11,9 @@ services:
       - APACHE_RUN_GROUP=www-data
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=tvtime_db
-      - DB_USER=tvtime
-      - DB_PASSWORD=tvtime_pass
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
     depends_on:
       - db
     restart: always
@@ -24,9 +22,9 @@ services:
     image: postgres:15-alpine
     container_name: tvtime_db
     environment:
-      - POSTGRES_DB=tvtime_db
-      - POSTGRES_USER=tvtime
-      - POSTGRES_PASSWORD=tvtime_pass
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
       - "5433:5432"
     volumes:

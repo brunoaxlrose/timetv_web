@@ -1,8 +1,11 @@
 vendor/
+.env
+**/.env
+!.env.example
+!**/.env.example
 cookie.txt
 config/autoload/local.php
 module/data/
-mobile/.env
 mobile/.gradle-apk-cache/
 mobile/.gradle-build-cache/
 mobile/.gradle-cache/
