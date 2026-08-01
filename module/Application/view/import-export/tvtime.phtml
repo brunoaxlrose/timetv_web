@@ -10,7 +10,7 @@
         <p class="small text-gray mb-3" style="font-size: 0.82rem; line-height: 1.6;">
             Instala a extensão <strong>Refract's TV Time Out</strong> no Chrome:
         </p>
-        <a href="https://chromewebstore.google.com" target="_blank" class="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none fw-bold" style="color: #a88beb; font-size: 0.82rem;">
+        <a href="https://chromewebstore.google.com" target="_blank" class="d-inline-flex align-items-center gap-2 mb-3 text-decoration-none fw-bold" style="color: #D99951; font-size: 0.82rem;">
             <i class="bi bi-globe"></i> Refract's TV Time Out na Chrome Web Store
         </a>
         <ol class="small text-gray ps-3 mb-0" style="font-size: 0.82rem; line-height: 1.8;">
@@ -34,7 +34,7 @@
         <div class="d-flex flex-column gap-3">
             <!-- Movies -->
             <div class="position-relative p-4 rounded-3 text-center cursor-pointer" onclick="$('#movies_file').click()" style="background-color: #12121a; border: 1.5px dashed #2b2b3a; border-radius: 12px;">
-                <i class="bi bi-film fs-3 mb-2" style="color: #a88beb;"></i>
+                <i class="bi bi-film fs-3 mb-2" style="color: #D99951;"></i>
                 <div class="fw-bold text-white small" id="movies_label" style="font-size: 0.82rem;">tvtime-movies-YYYY-MM-DD.json</div>
                 <div class="small" style="font-size: 0.72rem; color: #6e6e82; margin-top: 2px;">Opcional — os teus filmes vistos e watchlist</div>
                 <input type="file" id="movies_file" accept=".json" class="d-none" onclick="event.stopPropagation()">
@@ -42,7 +42,7 @@
 
             <!-- Series -->
             <div class="position-relative p-4 rounded-3 text-center cursor-pointer" onclick="$('#series_file').click()" style="background-color: #12121a; border: 1.5px dashed #2b2b3a; border-radius: 12px;">
-                <i class="bi bi-tv fs-3 mb-2" style="color: #a88beb;"></i>
+                <i class="bi bi-tv fs-3 mb-2" style="color: #D99951;"></i>
                 <div class="fw-bold text-white small" id="series_label" style="font-size: 0.82rem;">tvtime-series-YYYY-MM-DD.json</div>
                 <div class="small" style="font-size: 0.72rem; color: #6e6e82; margin-top: 2px;">Opcional — as tuas séries e progresso de episódios</div>
                 <input type="file" id="series_file" accept=".json" class="d-none" onclick="event.stopPropagation()">
@@ -50,7 +50,7 @@
 
             <!-- Lists -->
             <div class="position-relative p-4 rounded-3 text-center cursor-pointer" onclick="$('#lists_file').click()" style="background-color: #12121a; border: 1.5px dashed #2b2b3a; border-radius: 12px;">
-                <i class="bi bi-list-task fs-3 mb-2" style="color: #a88beb;"></i>
+                <i class="bi bi-list-task fs-3 mb-2" style="color: #D99951;"></i>
                 <div class="fw-bold text-white small" id="lists_label" style="font-size: 0.82rem;">tvtime-lists-YYYY-MM-DD.json</div>
                 <div class="small" style="font-size: 0.72rem; color: #6e6e82; margin-top: 2px;">Opcional — as tuas listas personalizadas TV Time</div>
                 <input type="file" id="lists_file" accept=".json" class="d-none" onclick="event.stopPropagation()">
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateBtnState() {
         if (moviesInput.files.length > 0 || seriesInput.files.length > 0 || listsInput.files.length > 0) {
             importBtn.disabled = false;
-            importBtn.style.backgroundColor = '#7c4dff';
+            importBtn.style.backgroundColor = '#D99951';
             importBtn.style.color = '#ffffff';
         } else {
             importBtn.disabled = true;

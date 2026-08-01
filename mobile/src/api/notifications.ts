@@ -9,6 +9,7 @@ export type NotificationItem = {
   message?: string;
   content?: string;
   ts_criacao?: string;
+  ts_inclusao?: string;
   created_at?: string;
 };
 

@@ -3,37 +3,37 @@ export type Item = {
   tvmaze_id?: number | null;
   tmdb_id?: number | null;
   mal_id?: number | null;
-  title: string;
-  type: 'movie' | 'series' | 'anime' | string;
-  poster_url: string;
-  banner_url?: string;
-  description?: string;
-  release_year?: number;
-  release_date?: string;
-  track_status?: string | null;
-  is_favorite?: boolean;
+  titulo: string;
+  tipo: 'movie' | 'series' | 'anime' | string;
+  url_poster: string;
+  url_banner?: string;
+  descricao?: string;
+  ano_lancamento?: number;
+  data_lancamento?: string;
+  status_acompanhamento?: string | null;
+  eh_favorito?: boolean;
   progress_percent?: number;
   progress?: {
     total_count: number;
     watched_count: number;
   };
   next_episode?: Episode | null;
-  rating?: number | null;
-  comment?: string | null;
-  rewatch_count?: number;
-  genres?: string;
-  watch_providers?: string;
+  nota?: number | null;
+  comentario?: string | null;
+  quantidade_reassistida?: number;
+  generos?: string;
+  provedores_streaming?: string;
 };
 
 export type Episode = {
   id_episodio: number;
-  season_number: number;
-  episode_number: number;
-  title: string;
-  air_date?: string | null;
-  runtime_minutes?: number | null;
-  watched?: boolean;
-  rewatch_count?: number;
+  numero_temporada: number;
+  numero_episodio: number;
+  titulo: string;
+  data_exibicao?: string | null;
+  duracao_minutos?: number | null;
+  assistido?: boolean;
+  quantidade_reassistida?: number;
 };
 
 export type UserList = {
@@ -44,7 +44,20 @@ export type UserList = {
 };
 
 export type CastMember = {
+  person_id?: number;
+  source?: 'tmdb' | 'tvmaze' | 'jikan' | string;
   name: string;
   character?: string | null;
   image_url?: string | null;
+};
+
+export type Person = {
+  person_id: number;
+  source: string;
+  name: string;
+  image_url?: string | null;
+  biography?: string;
+  birthday?: string | null;
+  place_of_birth?: string | null;
+  department?: string | null;
 };

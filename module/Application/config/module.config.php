@@ -516,6 +516,16 @@ return [
                     ],
                 ],
             ],
+            'api-v1-mobile-person' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route' => '/api/v1/mobile/person',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action' => 'person',
+                    ],
+                ],
+            ],
             'api-notifications' => [
                 'type' => Literal::class,
                 'options' => [

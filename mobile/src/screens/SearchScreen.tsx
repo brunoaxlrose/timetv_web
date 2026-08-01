@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { searchCatalog } from '../api/mobile';
 import { PosterCard } from '../components/PosterCard';
@@ -13,16 +13,20 @@ export function SearchScreen({ onOpenItem }: { onOpenItem: (item: Item) => void 
   const [popular, setPopular] = useState<Item[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const requestId = useRef(0);
 
   async function runSearch(value: string) {
+    const currentRequest = ++requestId.current;
     setLoading(true);
+    if (value.trim()) setItems([]);
     try {
       const response = await searchCatalog(value);
+      if (currentRequest !== requestId.current) return;
       setItems(response.data?.items || []);
       setPopular(response.data?.popular || []);
       setRecent(response.data?.recent_searches || []);
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   }
 
@@ -42,7 +46,7 @@ export function SearchScreen({ onOpenItem }: { onOpenItem: (item: Item) => void 
       <Text style={styles.title}>Pesquisar</Text>
       <TextInput
         value={query}
-        onChangeText={setQuery}
+        onChangeText={(value) => { requestId.current += 1; setItems([]); setQuery(value); }}
         placeholder="Filmes, series, anime..."
         placeholderTextColor={colors.muted}
         style={styles.input}

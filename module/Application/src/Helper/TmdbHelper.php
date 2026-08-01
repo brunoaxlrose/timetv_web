@@ -47,6 +47,8 @@ class TmdbHelper {
             $cacheTtl = 900;
         } elseif (strpos($url, '/movie/upcoming') !== false) {
             $cacheTtl = 1800;
+        } elseif (strpos($url, '/discover/') !== false) {
+            $cacheTtl = 21600;
         } elseif (strpos($url, '/movie/') !== false || strpos($url, '/tv/') !== false) {
             $cacheTtl = 21600;
         }
@@ -58,7 +60,7 @@ class TmdbHelper {
             }
         }
 
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
         $json = @file_get_contents($url, false, stream_context_create($opts));
         $decoded = $json ? json_decode($json, true) : null;
 
@@ -118,18 +120,24 @@ class TmdbHelper {
         return self::formatTmdbResults($results, $limit);
     }
 
-    public static function getPopular(int $limit = 12): array {
-        $url = self::BASE_URL . '/trending/all/week?api_key=' . self::API_KEY . '&language=pt-BR&page=1';
+    public static function getPopular(int $limit = 12, int $page = 1): array {
+        $page = max(1, $page);
+        $url = self::BASE_URL . '/trending/all/week?api_key=' . self::API_KEY . '&language=pt-BR&page=' . $page;
         $data = self::fetchJson($url);
         if (!$data) return [];
 
-        $results = $data['results'] ?? [];
+        $today = date('Y-m-d');
+        $results = array_values(array_filter($data['results'] ?? [], static function(array $result) use ($today): bool {
+            $releaseDate = $result['release_date'] ?? $result['first_air_date'] ?? '';
+            return $releaseDate === '' || $releaseDate <= $today;
+        }));
         return self::formatTmdbResults($results, $limit);
     }
 
-    public static function getUpcoming(int $limit = 12): array {
+    public static function getUpcoming(int $limit = 12, int $page = 1): array {
         // Adiciona region=BR para trazer datas de lançamento do Brasil
-        $url = self::BASE_URL . '/movie/upcoming?api_key=' . self::API_KEY . '&language=pt-BR&page=1&region=BR';
+        $page = max(1, $page);
+        $url = self::BASE_URL . '/movie/upcoming?api_key=' . self::API_KEY . '&language=pt-BR&page=' . $page . '&region=BR';
         $data = self::fetchJson($url);
         if (!$data) return [];
 
@@ -151,6 +159,61 @@ class TmdbHelper {
         }
 
         return self::formatTmdbResults($upcomingResults, $limit);
+    }
+
+    public static function getCalendarReleases(string $startDate, string $endDate, int $limit = 80): array {
+        $sources = [
+            ['path' => 'movie', 'start' => 'primary_release_date.gte', 'end' => 'primary_release_date.lte'],
+            ['path' => 'tv', 'start' => 'first_air_date.gte', 'end' => 'first_air_date.lte'],
+        ];
+        $events = [];
+
+        foreach ($sources as $source) {
+            $sourceEvents = [];
+            $sourceLimit = max(20, (int)ceil($limit / count($sources)));
+            for ($page = 1; $page <= 5 && count($sourceEvents) < $sourceLimit; $page++) {
+                $url = self::BASE_URL . '/discover/' . $source['path'] . '?api_key=' . self::API_KEY
+                    . '&language=pt-BR&region=BR&sort_by=popularity.desc&include_adult=false&page=' . $page
+                    . '&' . $source['start'] . '=' . urlencode($startDate)
+                    . '&' . $source['end'] . '=' . urlencode($endDate);
+                $data = self::fetchJson($url);
+                $results = $data['results'] ?? [];
+                if (!$results) break;
+                foreach ($results as $result) {
+                    if (count($sourceEvents) >= $sourceLimit) break;
+                    $date = $result['release_date'] ?? $result['first_air_date'] ?? '';
+                    if ($date === '') continue;
+                    $isMovie = $source['path'] === 'movie';
+                    $origins = $result['origin_country'] ?? [];
+                    $genres = $result['genre_ids'] ?? [];
+                    $type = $isMovie ? 'movie' : ((in_array('JP', $origins, true) && in_array(16, $genres, true)) ? 'anime' : 'series');
+                    $sourceEvents[] = [
+                    'id_item' => null,
+                    'tmdb_id' => (int)($result['id'] ?? 0),
+                    'tvmaze_id' => null,
+                    'mal_id' => null,
+                    'titulo' => $result['title'] ?? $result['name'] ?? 'Sem título',
+                    'tipo' => $type,
+                    'url_poster' => !empty($result['poster_path']) ? self::IMG . 'w500' . $result['poster_path'] : '',
+                    'url_banner' => !empty($result['backdrop_path']) ? self::IMG . 'original' . $result['backdrop_path'] : '',
+                    'ano_lancamento' => (int)substr($date, 0, 4),
+                    'data_lancamento' => $date,
+                    'data_evento' => $date,
+                    'id_episodio' => null,
+                    'numero_temporada' => null,
+                    'numero_episodio' => null,
+                    'titulo_episodio' => null,
+                    'status_acompanhamento' => null,
+                    'assistido' => false,
+                    'origem' => 'tmdb',
+                    ];
+                }
+            }
+            $events = array_merge($events, $sourceEvents);
+        }
+
+        usort($events, static fn(array $a, array $b): int => strcmp($a['data_evento'], $b['data_evento']));
+        return array_slice($events, 0, $limit);
     }
 
     private static function formatTmdbResults(array $results, int $limit): array {
@@ -197,15 +260,15 @@ class TmdbHelper {
                 'id_item'      => null,
                 'tvmaze_id'    => null,
                 'tmdb_id'      => $r['id'],
-                'title'        => $title,
-                'type'         => $type,
-                'poster_url'   => $poster,
-                'banner_url'   => $banner,
-                'description'  => $overview,
-                'release_year' => $releaseYear,
-                'release_date' => $releaseDate,
-                'track_status' => null,
-                'source'       => 'tmdb'
+                'titulo' => $title,
+                'tipo' => $type,
+                'url_poster' => $poster,
+                'url_banner' => $banner,
+                'descricao' => $overview,
+                'ano_lancamento' => $releaseYear,
+                'data_lancamento' => $releaseDate,
+                'status_acompanhamento' => null,
+                'origem' => 'tmdb'
             ];
         }
         return $items;
@@ -227,6 +290,8 @@ class TmdbHelper {
         $cast = [];
         foreach (array_slice($data['cast'], 0, $limit) as $person) {
             $cast[] = [
+                'person_id' => (int)($person['id'] ?? 0),
+                'source' => 'tmdb',
                 'name' => $person['name'] ?? 'Sem nome',
                 'character' => $person['character'] ?? '',
                 'image_url' => !empty($person['profile_path']) ? self::IMG . 'w185' . $person['profile_path'] : null,
@@ -234,6 +299,59 @@ class TmdbHelper {
         }
 
         return $cast;
+    }
+
+    public static function getPersonCredits(int $personId, int $limit = 60): ?array {
+        $url = self::BASE_URL . '/person/' . $personId . '?api_key=' . self::API_KEY
+            . '&language=pt-BR&append_to_response=combined_credits';
+        $data = self::fetchJson($url);
+        if (!$data || empty($data['id'])) return null;
+
+        $credits = [];
+        $seen = [];
+        foreach (($data['combined_credits']['cast'] ?? []) as $credit) {
+            $mediaType = $credit['media_type'] ?? '';
+            if (!in_array($mediaType, ['movie', 'tv'], true) || empty($credit['id'])) continue;
+            $character = strtolower(trim((string)($credit['character'] ?? '')));
+            if ($character !== '' && preg_match('/\b(self|himself|herself|guest|ele mesmo|ela mesma)\b/i', $character)) continue;
+            $key = $mediaType . ':' . $credit['id'];
+            if (isset($seen[$key])) continue;
+            $seen[$key] = true;
+            $date = $credit['release_date'] ?? $credit['first_air_date'] ?? '';
+            $origins = $credit['origin_country'] ?? [];
+            $genres = $credit['genre_ids'] ?? [];
+            $type = $mediaType === 'movie' ? 'movie' : ((in_array('JP', $origins, true) && in_array(16, $genres, true)) ? 'anime' : 'series');
+            $credits[] = [
+                'id_item' => null,
+                'tmdb_id' => (int)$credit['id'],
+                'tvmaze_id' => null,
+                'mal_id' => null,
+                'titulo' => $credit['title'] ?? $credit['name'] ?? 'Sem título',
+                'tipo' => $type,
+                'url_poster' => !empty($credit['poster_path']) ? self::IMG . 'w500' . $credit['poster_path'] : '',
+                'url_banner' => !empty($credit['backdrop_path']) ? self::IMG . 'original' . $credit['backdrop_path'] : '',
+                'descricao' => trim($credit['overview'] ?? ''),
+                'ano_lancamento' => $date ? (int)substr($date, 0, 4) : null,
+                'data_lancamento' => $date ?: null,
+                'personagem' => $credit['character'] ?? '',
+                'popularidade' => (float)($credit['popularity'] ?? 0),
+            ];
+        }
+        usort($credits, static fn(array $a, array $b): int => ($b['popularidade'] <=> $a['popularidade']) ?: (($b['ano_lancamento'] ?? 0) <=> ($a['ano_lancamento'] ?? 0)));
+
+        return [
+            'person' => [
+                'person_id' => (int)$data['id'],
+                'source' => 'tmdb',
+                'name' => $data['name'] ?? 'Sem nome',
+                'image_url' => !empty($data['profile_path']) ? self::IMG . 'h632' . $data['profile_path'] : null,
+                'biography' => trim($data['biography'] ?? ''),
+                'birthday' => $data['birthday'] ?? null,
+                'place_of_birth' => $data['place_of_birth'] ?? null,
+                'department' => $data['known_for_department'] ?? null,
+            ],
+            'credits' => array_slice($credits, 0, $limit),
+        ];
     }
 
     public static function importMovieFromTmdb(\PDO $pdo, int $tmdbId): int|false {
@@ -273,18 +391,18 @@ class TmdbHelper {
 
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO item (tmdb_id, title, type, poster_url, banner_url, description, release_year, release_date, total_episodes, runtime_minutes, status, genres)
-                VALUES (:tmdb_id, :title, 'movie', :poster, :banner, :description, :year, :release_date, 1, :runtime, :status, :genres)
+                INSERT INTO item (tmdb_id, titulo, tipo, url_poster, url_banner, descricao, ano_lancamento, data_lancamento, total_episodios, duracao_minutos, status, generos, ts_ultima_sincronizacao)
+                VALUES (:tmdb_id, :titulo, 'movie', :poster, :banner, :descricao, :ano_lancamento, :data_lancamento, 1, :runtime, :status, :genres, CURRENT_TIMESTAMP)
                 RETURNING id_item
             ");
             $stmt->execute([
-                ':tmdb_id' => $tmdbId, 
-                ':title' => $title, 
+                ':tmdb_id' => $tmdbId,
+                ':titulo' => $title,
                 ':poster' => $poster,
-                ':banner' => $banner, 
-                ':description' => $description, 
-                ':year' => $releaseYear, 
-                ':release_date' => $resolvedReleaseDate,
+                ':banner' => $banner,
+                ':descricao' => $description,
+                ':ano_lancamento' => $releaseYear,
+                ':data_lancamento' => $resolvedReleaseDate,
                 ':runtime' => $runtime,
                 ':status' => $status,
                 ':genres' => $genresStr
@@ -324,15 +442,15 @@ class TmdbHelper {
         try {
             $stmt = $pdo->prepare("
                 UPDATE item
-                SET title = :title,
-                    poster_url = :poster,
-                    banner_url = :banner,
-                    description = :description,
-                    release_year = :year,
-                    release_date = :release_date,
-                    runtime_minutes = :runtime,
+                SET titulo = :title,
+                    url_poster = :poster,
+                    url_banner = :banner,
+                    descricao = :description,
+                    ano_lancamento = :ano_lancamento,
+                    data_lancamento = :data_lancamento,
+                    duracao_minutos = :runtime,
                     status = :status,
-                    genres = :genres
+                    generos = :genres
                 WHERE id_item = :item_id
             ");
             $stmt->execute([
@@ -340,8 +458,8 @@ class TmdbHelper {
                 ':poster' => $poster,
                 ':banner' => $banner,
                 ':description' => $description,
-                ':year' => $releaseYear,
-                ':release_date' => $releaseDate,
+                ':ano_lancamento' => $releaseYear,
+                ':data_lancamento' => $releaseDate,
                 ':runtime' => $runtime,
                 ':status' => $status,
                 ':genres' => $genresStr,
@@ -355,14 +473,14 @@ class TmdbHelper {
 
     public static function getTvDetail(int $tmdbId): ?array {
         $url  = self::BASE_URL . '/tv/' . $tmdbId . '?api_key=' . self::API_KEY . '&language=pt-BR';
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\n", 'timeout' => 8]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\n", 'timeout' => 8]];
         $json = @file_get_contents($url, false, stream_context_create($opts));
         return $json ? json_decode($json, true) : null;
     }
 
     public static function getTvEpisodes(int $tmdbId): array {
         $apiKey = self::API_KEY;
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
         
         $detailUrl = self::BASE_URL . "/tv/{$tmdbId}?api_key={$apiKey}&language=pt-BR";
         $detailJson = @file_get_contents($detailUrl, false, stream_context_create($opts));
@@ -422,23 +540,23 @@ class TmdbHelper {
 
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO item (tmdb_id, title, type, poster_url, banner_url, description, release_year, release_date, total_episodes, runtime_minutes, status, genres, last_sync)
-                VALUES (:tmdb_id, :title, :type, :poster, :banner, :description, :year, :release_date, :total_episodes, :runtime, :status, :genres, CURRENT_TIMESTAMP)
+                INSERT INTO item (tmdb_id, titulo, tipo, url_poster, url_banner, descricao, ano_lancamento, data_lancamento, total_episodios, duracao_minutos, status, generos, ts_ultima_sincronizacao)
+                VALUES (:tmdb_id, :titulo, :tipo, :poster, :banner, :descricao, :ano_lancamento, :data_lancamento, :total_episodios, :runtime, :status, :generos, CURRENT_TIMESTAMP)
                 RETURNING id_item
             ");
             $stmt->execute([
                 ':tmdb_id' => $tmdbId,
-                ':title' => $title,
-                ':type' => $type,
+                ':titulo' => $title,
+                ':tipo' => $type,
                 ':poster' => $poster,
                 ':banner' => $banner,
-                ':description' => $description,
-                ':year' => $releaseYear,
-                ':release_date' => $releaseDate,
-                ':total_episodes' => (int)($tv['number_of_episodes'] ?? 0),
+                ':descricao' => $description,
+                ':ano_lancamento' => $releaseYear,
+                ':data_lancamento' => $releaseDate,
+                ':total_episodios' => (int)($tv['number_of_episodes'] ?? 0),
                 ':runtime' => $runtime,
                 ':status' => $tv['status'] ?? 'Running',
-                ':genres' => $genresStr,
+                ':generos' => $genresStr,
             ]);
             $row = $stmt->fetch();
             if (!$row) return false;
@@ -478,45 +596,45 @@ class TmdbHelper {
         try {
             $stmt = $pdo->prepare("
                 UPDATE item
-                SET title = :title,
-                    type = :type,
-                    poster_url = :poster,
-                    banner_url = :banner,
-                    description = :description,
-                    release_year = :year,
-                    release_date = :release_date,
-                    total_episodes = :total_episodes,
-                    runtime_minutes = :runtime,
+                SET titulo = :titulo,
+                    tipo = :tipo,
+                    url_poster = :poster,
+                    url_banner = :banner,
+                    descricao = :descricao,
+                    ano_lancamento = :ano_lancamento,
+                    data_lancamento = :data_lancamento,
+                    total_episodios = :total_episodios,
+                    duracao_minutos = :runtime,
                     status = :status,
-                    genres = :genres,
-                    last_sync = CURRENT_TIMESTAMP
+                    generos = :generos,
+                    ts_ultima_sincronizacao = CURRENT_TIMESTAMP
                 WHERE id_item = :item_id
             ");
             $stmt->execute([
-                ':title' => $title,
-                ':type' => $type,
+                ':titulo' => $title,
+                ':tipo' => $type,
                 ':poster' => $poster,
                 ':banner' => $banner,
-                ':description' => $description,
-                ':year' => $releaseYear,
-                ':release_date' => $releaseDate,
-                ':total_episodes' => count($episodes) ?: (int)($tv['number_of_episodes'] ?? 0),
+                ':descricao' => $description,
+                ':ano_lancamento' => $releaseYear,
+                ':data_lancamento' => $releaseDate,
+                ':total_episodios' => count($episodes) ?: (int)($tv['number_of_episodes'] ?? 0),
                 ':runtime' => $runtime,
                 ':status' => $tv['status'] ?? 'Running',
-                ':genres' => $genresStr,
+                ':generos' => $genresStr,
                 ':item_id' => $itemId,
             ]);
 
             $stmtEpisode = $pdo->prepare("
-                INSERT INTO episodio (id_item, season_number, episode_number, title, air_date, image_url, description, runtime_minutes, rating)
-                VALUES (:id_item, :season_number, :episode_number, :title, :air_date, :image_url, :description, :runtime_minutes, :rating)
-                ON CONFLICT (id_item, season_number, episode_number) DO UPDATE SET
-                    title = EXCLUDED.title,
-                    air_date = EXCLUDED.air_date,
-                    image_url = EXCLUDED.image_url,
-                    description = EXCLUDED.description,
-                    runtime_minutes = EXCLUDED.runtime_minutes,
-                    rating = EXCLUDED.rating
+                INSERT INTO episodio (id_item, numero_temporada, numero_episodio, titulo, data_exibicao, url_imagem, descricao, duracao_minutos, nota)
+                VALUES (:id_item, :numero_temporada, :numero_episodio, :titulo, :data_exibicao, :url_imagem, :descricao, :duracao_minutos, :nota)
+                ON CONFLICT (id_item, numero_temporada, numero_episodio) DO UPDATE SET
+                    titulo = EXCLUDED.titulo,
+                    data_exibicao = EXCLUDED.data_exibicao,
+                    url_imagem = EXCLUDED.url_imagem,
+                    descricao = EXCLUDED.descricao,
+                    duracao_minutos = EXCLUDED.duracao_minutos,
+                    nota = EXCLUDED.nota
             ");
 
             foreach ($episodes as $ep) {
@@ -525,14 +643,14 @@ class TmdbHelper {
                 }
                 $stmtEpisode->execute([
                     ':id_item' => $itemId,
-                    ':season_number' => (int)$ep['season_number'],
-                    ':episode_number' => (int)$ep['episode_number'],
-                    ':title' => $ep['name'] ?? ('Episodio ' . (int)$ep['episode_number']),
-                    ':air_date' => !empty($ep['air_date']) ? $ep['air_date'] : null,
-                    ':image_url' => !empty($ep['still_path']) ? self::IMG . 'w500' . $ep['still_path'] : null,
-                    ':description' => trim($ep['overview'] ?? ''),
-                    ':runtime_minutes' => (int)($ep['runtime'] ?? $runtime),
-                    ':rating' => isset($ep['vote_average']) ? (float)$ep['vote_average'] : null,
+                    ':numero_temporada' => (int)$ep['season_number'],
+                    ':numero_episodio' => (int)$ep['episode_number'],
+                    ':titulo' => $ep['name'] ?? ('Episodio ' . (int)$ep['episode_number']),
+                    ':data_exibicao' => !empty($ep['air_date']) ? $ep['air_date'] : null,
+                    ':url_imagem' => !empty($ep['still_path']) ? self::IMG . 'w500' . $ep['still_path'] : null,
+                    ':descricao' => trim($ep['overview'] ?? ''),
+                    ':duracao_minutos' => (int)($ep['runtime'] ?? $runtime),
+                    ':nota' => isset($ep['vote_average']) ? (float)$ep['vote_average'] : null,
                 ]);
             }
 

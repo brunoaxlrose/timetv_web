@@ -24,6 +24,7 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   row: {
+    alignSelf: 'center',
     flexDirection: 'row',
     gap: 12,
     marginTop: 14,

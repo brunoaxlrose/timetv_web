@@ -1,4 +1,4 @@
-# Time View Mobile
+# CineFio Mobile
 
 Aplicativo React Native/Expo que consumira a API REST do backend Laminas.
 

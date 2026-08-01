@@ -1,6 +1,6 @@
-# Time View
+# CineFio
 
-Time View e um app para acompanhar filmes, series, animes e novelas em um visual dark premium, com foco em catalogo, progresso, favoritos, listas, episodios e avaliacoes.
+CineFio e um app para acompanhar filmes, series, animes e novelas em um visual dark premium, com foco em catalogo, progresso, favoritos, listas, episodios e avaliacoes.
 
 ## Visao Geral
 

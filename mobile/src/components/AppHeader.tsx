@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { logout, User } from '../api/auth';
 import { sendFeedback } from '../api/feedback';
 import { getNotifications, markNotificationsRead, NotificationItem } from '../api/notifications';
-import { colors } from '../theme/colors';
+import { alpha, colors } from '../theme/colors';
 import { useToast } from './Toast';
 
 export function AppHeader({
   user,
   onProfile,
   onLogout,
+  onCalendar,
 }: {
   user: User;
   onProfile: () => void;
   onLogout: () => void;
+  onCalendar: () => void;
 }) {
   const { showToast } = useToast();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -35,7 +37,7 @@ export function AppHeader({
       setNotifications(response.notifications || []);
       setCount(response.count || 0);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Erro ao carregar notificacoes.', 'error');
+      showToast(error instanceof Error ? error.message : 'Erro ao carregar notificações.', 'error');
     } finally {
       setLoadingNotifications(false);
     }
@@ -57,9 +59,9 @@ export function AppHeader({
       await markNotificationsRead();
       setNotifications([]);
       setCount(0);
-      showToast('Notificacoes marcadas como lidas.', 'success');
+      showToast('Notificações marcadas como lidas.', 'success');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Erro ao atualizar notificacoes.', 'error');
+      showToast(error instanceof Error ? error.message : 'Erro ao atualizar notificações.', 'error');
     }
   }
 
@@ -70,7 +72,7 @@ export function AppHeader({
       await sendFeedback(feedbackType, feedback.trim());
       setFeedback('');
       setFeedbackOpen(false);
-      showToast('Feedback enviado. Valeu!', 'success');
+      showToast('Feedback enviado.', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao enviar feedback.', 'error');
     } finally {
@@ -92,9 +94,12 @@ export function AppHeader({
     <View style={styles.header}>
       <View style={styles.brandRow}>
         <View style={styles.mark} />
-        <Text style={styles.brand}>Time View</Text>
+        <Text style={styles.brand}>CineFio</Text>
       </View>
       <View style={styles.actions}>
+        <Pressable onPress={onCalendar} style={styles.iconButton} accessibilityLabel="Calendário de lançamentos">
+          <CalendarIcon />
+        </Pressable>
         <Pressable onPress={() => setFeedbackOpen(true)} style={styles.iconButton}>
           <FeedbackIcon />
         </Pressable>
@@ -102,40 +107,52 @@ export function AppHeader({
           <BellIcon />
           {count > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{count}</Text></View> : null}
         </Pressable>
-        <Pressable onPress={() => setUserOpen((value) => !value)} style={styles.avatarButton}>
-          <Text style={styles.avatarText}>{user.nome?.[0] || 'U'}</Text>
+        <Pressable accessibilityLabel="Abrir menu do perfil" hitSlop={8} onPress={() => setUserOpen(true)} style={styles.avatarButton}>
+          {user.url_avatar ? <Image source={{ uri: user.url_avatar }} style={styles.avatarImage} /> : <Text style={styles.avatarText}>{user.nome?.[0] || 'U'}</Text>}
         </Pressable>
       </View>
 
-      {userOpen ? (
-        <View style={styles.userMenu}>
-          <View style={styles.userMenuHeader}>
-            <View style={styles.userMenuAvatar}>
-              <Text style={styles.userMenuAvatarText}>{user.nome?.[0] || 'U'}</Text>
+      <Modal visible={userOpen} transparent animationType="fade" onRequestClose={() => setUserOpen(false)}>
+        <View style={styles.userMenuModal}>
+          <Pressable accessibilityLabel="Fechar menu do perfil" onPress={() => setUserOpen(false)} style={StyleSheet.absoluteFill} />
+          <SafeAreaView pointerEvents="box-none" style={styles.userMenuSafeArea}>
+            <View style={styles.userMenu}>
+              <View style={styles.userMenuHeader}>
+                <View style={styles.userMenuAvatar}>
+                  {user.url_avatar ? <Image source={{ uri: user.url_avatar }} style={styles.userMenuAvatarImage} /> : <Text style={styles.userMenuAvatarText}>{user.nome?.[0] || 'U'}</Text>}
+                </View>
+                <View style={styles.userMenuIdentity}>
+                  <Text numberOfLines={1} style={styles.userName}>{user.nome} {user.sobrenome}</Text>
+                  <Text numberOfLines={1} style={styles.userEmail}>@{user.nome_usuario}</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => { setUserOpen(false); onProfile(); }} style={styles.profileMenuItem}>
+                <Text style={styles.profileMenuIcon}>P</Text>
+                <View>
+                  <Text style={styles.profileMenuTitle}>Perfil</Text>
+                  {/* <Text style={styles.profileMenuSubtitle}>Coleção</Text> */}
+                </View>
+              </Pressable>
+              <Pressable onPress={() => { setUserOpen(false); setLogoutConfirmOpen(true); }} style={styles.logoutMenuItem}>
+                <View style={styles.logoutMenuIcon}>
+                  <View style={styles.logoutDoor} />
+                  <View style={styles.logoutArrow} />
+                </View>
+                <View>
+                  <Text style={styles.logoutMenuTitle}>Sair</Text>
+                  {/* <Text style={styles.logoutMenuSubtitle}>Encerrar sessão neste dispositivo</Text> */}
+                </View>
+              </Pressable>
             </View>
-            <View style={styles.userMenuIdentity}>
-              <Text numberOfLines={1} style={styles.userName}>{user.nome} {user.sobrenome}</Text>
-              <Text numberOfLines={1} style={styles.userEmail}>@{user.username}</Text>
-            </View>
-          </View>
-          <Pressable onPress={() => { setUserOpen(false); setLogoutConfirmOpen(true); }} style={styles.logoutMenuItem}>
-            <View style={styles.logoutMenuIcon}>
-              <View style={styles.logoutDoor} />
-              <View style={styles.logoutArrow} />
-            </View>
-            <View>
-              <Text style={styles.logoutMenuTitle}>Sair da conta</Text>
-              <Text style={styles.logoutMenuSubtitle}>Encerrar sessao neste aparelho</Text>
-            </View>
-          </Pressable>
+          </SafeAreaView>
         </View>
-      ) : null}
+      </Modal>
 
       <Modal visible={notificationsOpen} transparent animationType="fade" onRequestClose={() => setNotificationsOpen(false)}>
         <View style={styles.overlay}>
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Notificacoes</Text>
+              <Text style={styles.sheetTitle}>Notificações</Text>
               <Pressable onPress={() => setNotificationsOpen(false)} style={styles.closeButton}>
                 <Text style={styles.close}>Fechar</Text>
               </Pressable>
@@ -152,7 +169,7 @@ export function AppHeader({
 
             {!loadingNotifications && notifications.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateTitle}>Sem notificacoes no momento</Text>
+                <Text style={styles.emptyStateTitle}>Sem notificações no momento</Text>
                 <Text style={styles.emptyStateText}>Quando houver novos episodios, estreias ou alertas do sistema, eles aparecem aqui.</Text>
               </View>
             ) : null}
@@ -165,7 +182,7 @@ export function AppHeader({
                 <View style={styles.notificationBody}>
                   <Text style={styles.notificationTitle}>{formatNotificationTitle(item.titulo || item.title)}</Text>
                   <Text style={styles.notificationText}>{formatNotificationMessage(item.mensagem || item.message || item.content)}</Text>
-                  <Text style={styles.notificationTime}>{formatNotificationTime(item.mensagem || item.message || item.content, item.ts_criacao || item.created_at)}</Text>
+                  <Text style={styles.notificationTime}>{formatNotificationTime(item.mensagem || item.message || item.content, item.ts_criacao || item.ts_inclusao || item.created_at)}</Text>
                 </View>
               </View>
             ))}
@@ -231,7 +248,6 @@ function ConfirmLogoutModal({
       <View style={styles.logoutOverlay}>
         <View style={styles.logoutBox}>
           <Text style={styles.logoutTitle}>Deslogar do app?</Text>
-          <Text style={styles.logoutMessage}>{loading ? 'Deslogando...' : 'Tem certeza que deseja deslogar do app?'}</Text>
           <View style={styles.logoutActions}>
             <Pressable disabled={loading} onPress={onCancel} style={[styles.logoutCancel, loading && styles.logoutDisabled]}><Text style={styles.logoutCancelText}>Cancelar</Text></Pressable>
             <Pressable disabled={loading} onPress={onConfirm} style={[styles.logoutConfirm, loading && styles.logoutDisabled]}>
@@ -258,6 +274,10 @@ function BellIcon() {
   );
 }
 
+function CalendarIcon() {
+  return <View style={styles.calendarIcon}><View style={styles.calendarTop} /><View style={styles.calendarGrid}><View style={styles.calendarDot} /><View style={styles.calendarDot} /><View style={styles.calendarDot} /><View style={styles.calendarDot} /></View></View>;
+}
+
 function FeedbackIcon() {
   return (
     <View style={styles.drawIcon}>
@@ -269,7 +289,7 @@ function FeedbackIcon() {
 }
 
 function formatNotificationTitle(title?: string) {
-  if (!title) return 'Time View';
+  if (!title) return 'CineFio';
   return title
     .replace(/^Novo episódio:\s*/i, 'Novo episódio: ')
     .replace(/^Nova estreia:\s*/i, 'Nova estreia: ')
@@ -349,7 +369,7 @@ function capitalize(value: string) {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: '#08080d',
+    backgroundColor: colors.background,
     borderBottomColor: colors.surfaceRaised,
     borderBottomWidth: 1,
     flexDirection: 'row',
@@ -361,7 +381,7 @@ const styles = StyleSheet.create({
   },
   brandRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   mark: {
-    borderBottomColor: '#f7b4c7',
+    borderBottomColor: colors.accent,
     borderBottomWidth: 18,
     borderLeftColor: 'transparent',
     borderLeftWidth: 10,
@@ -370,7 +390,7 @@ const styles = StyleSheet.create({
     height: 0,
     width: 0,
   },
-  brand: { color: '#f0a6d8', fontSize: 18, fontWeight: '900' },
+  brand: { color: colors.text, fontSize: 18, fontWeight: '900' },
   actions: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   iconButton: { alignItems: 'center', height: 34, justifyContent: 'center', width: 34 },
   drawIcon: { height: 24, position: 'relative', width: 24 },
@@ -379,19 +399,23 @@ const styles = StyleSheet.create({
   feedbackBubble: { borderColor: colors.muted, borderRadius: 6, borderWidth: 2, height: 16, left: 3, position: 'absolute', top: 4, width: 18 },
   feedbackTail: { backgroundColor: colors.muted, bottom: 3, height: 6, left: 8, position: 'absolute', transform: [{ rotate: '45deg' }], width: 6 },
   feedbackDot: { backgroundColor: colors.muted, borderRadius: 2, height: 4, left: 10, position: 'absolute', top: 10, width: 4 },
+  calendarIcon: { borderColor: colors.accent, borderRadius: 5, borderWidth: 2, height: 21, overflow: 'hidden', width: 22 },
+  calendarTop: { backgroundColor: colors.accent, height: 4, width: '100%' },
+  calendarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, padding: 4 },
+  calendarDot: { backgroundColor: colors.accent, borderRadius: 1, height: 3, width: 4 },
   badge: { alignItems: 'center', backgroundColor: colors.danger, borderRadius: 999, minWidth: 16, paddingHorizontal: 4, position: 'absolute', right: 1, top: 1 },
   badgeText: { color: colors.text, fontSize: 9, fontWeight: '900' },
   avatarButton: { alignItems: 'center', borderColor: colors.muted, borderRadius: 18, borderWidth: 1, height: 34, justifyContent: 'center', width: 34 },
+  avatarImage: { borderRadius: 17, height: 32, width: 32 },
   avatarText: { color: colors.text, fontSize: 13, fontWeight: '900' },
+  userMenuModal: { flex: 1 },
+  userMenuSafeArea: { alignItems: 'flex-end', flex: 1, paddingRight: 12, paddingTop: 54 },
   userMenu: {
     backgroundColor: colors.surface,
     borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: 20,
     borderWidth: 1,
     padding: 14,
-    position: 'absolute',
-    right: 12,
-    top: 62,
     width: 252,
     zIndex: 30,
     shadowColor: '#000',
@@ -400,11 +424,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   userMenuHeader: { alignItems: 'center', flexDirection: 'row', gap: 10 },
-  userMenuAvatar: { alignItems: 'center', backgroundColor: 'rgba(139,92,246,0.18)', borderColor: 'rgba(139,92,246,0.48)', borderRadius: 18, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
+  userMenuAvatar: { alignItems: 'center', backgroundColor: alpha(colors.accent, 0.18), borderColor: alpha(colors.accent, 0.48), borderRadius: 18, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
+  userMenuAvatarImage: { borderRadius: 17, height: 34, width: 34 },
   userMenuAvatarText: { color: colors.text, fontSize: 13, fontWeight: '900' },
   userMenuIdentity: { flex: 1 },
   userName: { color: colors.text, fontWeight: '900' },
   userEmail: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  profileMenuItem: { alignItems: 'center', backgroundColor: colors.background, borderColor: colors.surfaceRaised, borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 12, marginTop: 14, padding: 12 },
+  profileMenuIcon: { color: colors.accent, fontSize: 15, fontWeight: '900', textAlign: 'center', width: 34 },
+  profileMenuTitle: { color: colors.text, fontSize: 13, fontWeight: '900' },
+  profileMenuSubtitle: { color: colors.muted, fontSize: 10, fontWeight: '700', marginTop: 3 },
   logoutMenuItem: { alignItems: 'center', backgroundColor: '#09090f', borderColor: 'rgba(255,95,135,0.22)', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 12, marginTop: 14, padding: 12 },
   logoutMenuIcon: { alignItems: 'center', backgroundColor: 'rgba(255,95,135,0.12)', borderRadius: 12, height: 34, justifyContent: 'center', position: 'relative', width: 34 },
   logoutDoor: { borderColor: colors.danger, borderRadius: 3, borderWidth: 2, height: 16, width: 12 },
@@ -450,7 +479,7 @@ const styles = StyleSheet.create({
   notificationCard: {
     alignItems: 'flex-start',
     backgroundColor: '#0d0d14',
-    borderColor: 'rgba(139,92,246,0.12)',
+    borderColor: alpha(colors.accent, 0.12),
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
@@ -460,8 +489,8 @@ const styles = StyleSheet.create({
   },
   notificationIcon: {
     alignItems: 'center',
-    backgroundColor: 'rgba(139,92,246,0.20)',
-    borderColor: 'rgba(139,92,246,0.45)',
+    backgroundColor: alpha(colors.accent, 0.20),
+    borderColor: alpha(colors.accent, 0.45),
     borderRadius: 13,
     borderWidth: 1,
     height: 34,

@@ -28,7 +28,7 @@
     font-weight: 800;
     font-size: 1.2rem;
     letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #a88beb 0%, #f8a5c2 60%, #f7d794 100%);
+    background: linear-gradient(135deg, #D99951 0%, #D0CCC3 60%, #f7d794 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -59,7 +59,7 @@
 .app-top-bar__icon-btn:hover,
 .app-top-bar__icon-btn.active {
     background: rgba(168, 139, 235, 0.12);
-    color: #a88beb;
+    color: #D99951;
 }
 
 .app-top-bar__badge {
@@ -99,7 +99,7 @@
     top: calc(100% + 8px);
     right: 0;
     width: 220px;
-    background: #151520;
+    background: #394452;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
@@ -188,7 +188,7 @@
     max-width: 480px;
     width: 100%;
     height: calc(100vh - 56px);
-    background: #0f0f15;
+    background: #303C4B;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     z-index: 800;
     transform: translateX(100%);
@@ -220,7 +220,7 @@
 .notif-panel__mark-read {
     background: none;
     border: none;
-    color: #a88beb;
+    color: #D99951;
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
@@ -285,12 +285,12 @@
 
 .notif-card__icon--new_episode {
     background: rgba(168, 139, 235, 0.15);
-    color: #a88beb;
+    color: #D99951;
 }
 
 .notif-card__icon--release_date {
     background: rgba(255, 210, 0, 0.12);
-    color: #ffd200;
+    color: #D99951;
 }
 
 .notif-card__icon--info {
@@ -330,7 +330,7 @@
 .notif-card__dot {
     width: 8px;
     height: 8px;
-    background: #a88beb;
+    background: #D99951;
     border-radius: 50%;
     flex-shrink: 0;
     margin-top: 5px;
@@ -341,7 +341,7 @@
     font-weight: 800;
     font-size: 1.3rem;
     letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #a88beb 0%, #f8a5c2 100%);
+    background: linear-gradient(135deg, #D99951 0%, #D0CCC3 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -385,7 +385,7 @@
 .settings-tab.active,
 .settings-tab:hover {
     background: rgba(168, 139, 235, 0.12);
-    color: #a88beb;
+    color: #D99951;
 }
 
 .settings-data-divider {
@@ -439,9 +439,9 @@
 
 .settings-upload-label:hover,
 .settings-upload-label.has-file {
-    border-color: #a88beb;
+    border-color: #D99951;
     background: rgba(168, 139, 235, 0.05);
-    color: #a88beb;
+    color: #D99951;
 }
 
 /* =============================================
@@ -463,8 +463,8 @@
     width: 48px;
     height: 48px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #a88beb, #7c4dff);
-    box-shadow: 0 8px 24px rgba(124, 77, 255, 0.4);
+    background: linear-gradient(135deg, #D99951, #D99951);
+    box-shadow: 0 8px 24px rgba(217, 153, 81, 0.4);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -546,7 +546,7 @@
 }
 
 .bottom-navbar .nav-item.active {
-    color: #a88beb;
+    color: #D99951;
     background-color: rgba(168, 139, 235, 0.12);
     transform: translateY(-2px);
 }
@@ -586,21 +586,21 @@
 }
 
 .refract-dashboard-tabs .tvtime-tab.active {
-    color: #a88beb;
-    border-bottom-color: #a88beb;
+    color: #D99951;
+    border-bottom-color: #D99951;
 }
 
 /* Refract Goal Banner */
 .refract-goal-banner {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.15) 0%, rgba(240, 147, 43, 0.05) 100%);
-    border: 1px solid rgba(124, 77, 255, 0.25);
+    background: linear-gradient(135deg, rgba(217, 153, 81, 0.15) 0%, rgba(240, 147, 43, 0.05) 100%);
+    border: 1px solid rgba(217, 153, 81, 0.25);
     border-radius: 14px;
     cursor: pointer;
     transition: background 0.2s;
 }
 
 .refract-goal-banner:hover {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.2) 0%, rgba(240, 147, 43, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(217, 153, 81, 0.2) 0%, rgba(240, 147, 43, 0.1) 100%);
 }
 
 /* Continue Watching Section */
@@ -612,7 +612,7 @@
 }
 
 .refract-purple-text {
-    color: #a88beb !important;
+    color: #D99951 !important;
 }
 
 .refract-continue-scroll {
@@ -685,8 +685,8 @@
 }
 
 .refract-continue-check:hover {
-    border-color: #a88beb;
-    color: #a88beb;
+    border-color: #D99951;
+    color: #D99951;
     transform: scale(1.08);
 }
 
@@ -702,7 +702,7 @@
 }
 
 .refract-btn-purple {
-    background-color: #7c4dff !important;
+    background-color: #D99951 !important;
     color: white !important;
     border: none;
     transition: background-color 0.2s;
@@ -854,9 +854,9 @@
 }
 
 .refract-action-btn {
-    background-color: #7c4dff !important;
+    background-color: #D99951 !important;
     color: white !important;
-    box-shadow: 0 4px 20px rgba(124, 77, 255, 0.4);
+    box-shadow: 0 4px 20px rgba(217, 153, 81, 0.4);
     border-radius: 14px;
     font-weight: 700;
 }
@@ -902,13 +902,13 @@
 }
 
 .refract-profile-tab.active {
-    color: #7c4dff;
-    border-bottom: 2px solid #7c4dff;
+    color: #D99951;
+    border-bottom: 2px solid #D99951;
 }
 
 .refract-time-panel {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.15) 0%, rgba(56, 239, 125, 0.03) 100%);
-    border: 1px solid rgba(124, 77, 255, 0.2);
+    background: linear-gradient(135deg, rgba(217, 153, 81, 0.15) 0%, rgba(56, 239, 125, 0.03) 100%);
+    border: 1px solid rgba(217, 153, 81, 0.2);
     border-radius: 16px;
 }
 
@@ -978,9 +978,9 @@
 }
 
 .refract-year-badge {
-    background-color: rgba(124, 77, 255, 0.15) !important;
-    color: #a88beb !important;
-    border: 1px solid rgba(124, 77, 255, 0.3);
+    background-color: rgba(217, 153, 81, 0.15) !important;
+    color: #D99951 !important;
+    border: 1px solid rgba(217, 153, 81, 0.3);
 }
 
 .refract-activity-block {
@@ -991,8 +991,8 @@
 }
 
 .refract-activity-block.active {
-    background-color: #7c4dff;
-    box-shadow: 0 0 8px rgba(124, 77, 255, 0.6);
+    background-color: #D99951;
+    box-shadow: 0 0 8px rgba(217, 153, 81, 0.6);
 }
 
 /* Horizontal Scrolling Carousel generic styling */
@@ -1273,10 +1273,10 @@
 
 .refract-feedback-tab.active,
 .refract-feedback-tab:hover {
-    background-color: #7c4dff !important;
-    border-color: #7c4dff !important;
+    background-color: #D99951 !important;
+    border-color: #D99951 !important;
     color: #ffffff !important;
-    box-shadow: 0 4px 12px rgba(124, 77, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(217, 153, 81, 0.3);
 }
 
 /* Google Chooser email legibility */
@@ -1308,10 +1308,10 @@
 
 .pill-btn.active,
 .pill-btn:hover {
-    background-color: #7c4dff;
+    background-color: #D99951;
     color: #ffffff;
-    border-color: #7c4dff;
-    box-shadow: 0 4px 12px rgba(124, 77, 255, 0.3);
+    border-color: #D99951;
+    box-shadow: 0 4px 12px rgba(217, 153, 81, 0.3);
 }
 
 /* Feedback Modal Content Readability */
@@ -1366,7 +1366,7 @@
 }
 
 .refract-dot.purple {
-    background-color: #a88beb;
+    background-color: #D99951;
     box-shadow: 0 0 6px rgba(168, 139, 235, 0.6);
 }
 

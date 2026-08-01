@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { getCollection } from '../api/mobile';
-import { PosterSkeletonRow } from '../components/Skeleton';
-import { colors } from '../theme/colors';
+import { Skeleton } from '../components/Skeleton';
+import { alpha, colors } from '../theme/colors';
 import { Item } from '../types';
 
 type StatusFilter = '' | 'watching' | 'em_dia' | 'visto' | 'para_ver' | 'em_pausa' | 'abandonado' | 'reassistindo';
@@ -11,13 +11,13 @@ type SortFilter = 'last_watched' | 'last_added' | 'last_premiered' | 'progress' 
 type ViewMode = 'grid' | 'list';
 
 type Groups = {
-  watching: Item[];
+  assistindo: Item[];
   up_to_date: Item[];
-  completed: Item[];
-  plan_to_watch: Item[];
-  paused: Item[];
-  abandoned: Item[];
-  rewatching: Item[];
+  concluido: Item[];
+  quero_ver: Item[];
+  em_pausa: Item[];
+  abandonado: Item[];
+  reassistindo: Item[];
 };
 
 type CollectionSectionData = {
@@ -55,13 +55,13 @@ const sortFilters: Array<{ key: SortFilter; label: string; hint?: string }> = [
 ];
 
 const groupLabels: Array<{ key: keyof Groups; status: StatusFilter; label: string; color: string }> = [
-  { key: 'watching', status: 'watching', label: 'A ver', color: '#f6c45f' },
+  { key: 'assistindo', status: 'watching', label: 'A ver', color: '#f6c45f' },
   { key: 'up_to_date', status: 'em_dia', label: 'Em dia', color: '#38ef7d' },
-  { key: 'completed', status: 'visto', label: 'Visto', color: colors.accent },
-  { key: 'plan_to_watch', status: 'para_ver', label: 'Para ver', color: '#8fb8ff' },
-  { key: 'paused', status: 'em_pausa', label: 'Em pausa', color: '#f59e0b' },
-  { key: 'abandoned', status: 'abandonado', label: 'Abandonado', color: '#ff5f87' },
-  { key: 'rewatching', status: 'reassistindo', label: 'Reassistindo', color: colors.info },
+  { key: 'concluido', status: 'visto', label: 'Visto', color: colors.accent },
+  { key: 'quero_ver', status: 'para_ver', label: 'Para ver', color: '#8fb8ff' },
+  { key: 'em_pausa', status: 'em_pausa', label: 'Em pausa', color: '#f59e0b' },
+  { key: 'abandonado', status: 'abandonado', label: 'Abandonado', color: '#ff5f87' },
+  { key: 'reassistindo', status: 'reassistindo', label: 'Reassistindo', color: colors.info },
 ];
 
 export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item: Item) => void; refreshKey?: number }) {
@@ -82,7 +82,7 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
 
   async function load(nextStatus = status, nextMedia = media, nextSort = sort, refresh = false) {
     if (refresh) setRefreshing(true);
-    else setLoading(true);
+    else if (!items.length) setLoading(true);
 
     const types = nextMedia === 'all' ? 'movie,series,anime' : nextMedia;
     try {
@@ -92,7 +92,7 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
         nextItems = [...nextItems].sort((a, b) => Number(b.progress_percent || 0) - Number(a.progress_percent || 0));
       }
       if (nextSort === 'my_rating') {
-        nextItems = [...nextItems].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+        nextItems = [...nextItems].sort((a, b) => Number(b.nota || 0) - Number(a.nota || 0));
       }
       setItems(nextItems);
       setGroups(response.data?.groups || null);
@@ -130,12 +130,6 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
     setDraftGrouped(true);
   }
 
-  function quickStatus(next: StatusFilter) {
-    const value = status === next ? '' : next;
-    setStatus(value);
-    load(value, media, sort);
-  }
-
   const totalCount = grouped && groups ? Object.values(groups).reduce((sum: number, rows: Item[]) => sum + rows.length, 0) : items.length;
   const hasActiveFilters = !!status || media !== 'all' || sort !== 'last_watched' || !grouped;
   const visibleSections: CollectionSectionData[] = grouped && groups && !status
@@ -156,19 +150,8 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusRail} contentContainerStyle={styles.statusRailContent}>
-        {statusFilters.map((item) => (
-          <Pressable key={item.key} onPress={() => quickStatus(item.key)} style={[styles.statusIconButton, status === item.key && styles.statusIconActive]}>
-            <StatusGlyph color={status === item.key ? item.color : colors.muted} kind={item.key} />
-          </Pressable>
-        ))}
-      </ScrollView>
-
       {loading ? (
-        <View>
-          <PosterSkeletonRow />
-          <PosterSkeletonRow />
-        </View>
+        <CollectionSkeleton />
       ) : (
         <FlatList
           data={visibleSections}
@@ -206,6 +189,39 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
   );
 }
 
+function CollectionSkeleton() {
+  const { width } = useWindowDimensions();
+  const posterWidth = Math.floor((width - 36) * 0.31);
+  const sections = [3, 6];
+
+  return (
+    <ScrollView contentContainerStyle={styles.collectionSkeletonContent} scrollEnabled={false}>
+      {sections.map((itemCount, sectionIndex) => (
+        <View key={sectionIndex} style={styles.collectionSkeletonSection}>
+          <View style={styles.collectionSkeletonHeader}>
+            <View style={styles.collectionSkeletonHeading}>
+              <Skeleton height={11} width={11} radius={6} />
+              <Skeleton height={20} width={sectionIndex ? 74 : 58} radius={7} />
+            </View>
+            <Skeleton height={14} width={18} radius={6} />
+          </View>
+          <View style={styles.collectionSkeletonGrid}>
+            {Array.from({ length: itemCount }, (_, index) => (
+              <View key={index} style={{ width: posterWidth }}>
+                <Skeleton height={Math.round(posterWidth * 1.5)} width={posterWidth} radius={12} />
+                <View style={styles.collectionSkeletonText}>
+                  <Skeleton height={13} width={index % 2 ? '72%' : '90%'} radius={5} />
+                  <Skeleton height={11} width="42%" radius={5} />
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
 function CollectionSection({ label, color, items, viewMode, onOpenItem }: { label: string; color: string; items: Item[]; viewMode: ViewMode; onOpenItem: (item: Item) => void }) {
   if (!items.length) return null;
 
@@ -239,11 +255,11 @@ function CollectionPoster({ item, onPress }: { item: Item; onPress: () => void }
   return (
     <Pressable onPress={onPress} style={styles.posterCard}>
       <View style={styles.posterWrap}>
-        <Image source={{ uri: item.poster_url }} style={styles.poster} />
+        <Image source={{ uri: item.url_poster }} style={styles.poster} />
         <View style={styles.posterProgress}><View style={[styles.posterProgressFill, { width: `${item.progress_percent || 0}%` }]} /></View>
       </View>
-      <Text numberOfLines={1} style={styles.posterTitle}>{item.title}</Text>
-      <Text style={styles.posterYear}>{item.release_year || ''}</Text>
+      <Text numberOfLines={1} style={styles.posterTitle}>{item.titulo}</Text>
+      <Text style={styles.posterYear}>{item.ano_lancamento || ''}</Text>
     </Pressable>
   );
 }
@@ -251,14 +267,14 @@ function CollectionPoster({ item, onPress }: { item: Item; onPress: () => void }
 function CollectionRow({ item, onPress }: { item: Item; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={styles.row}>
-      <Image source={{ uri: item.poster_url }} style={styles.posterMini} />
+      <Image source={{ uri: item.url_poster }} style={styles.posterMini} />
       <View style={styles.rowCopy}>
-        <Text numberOfLines={1} style={styles.rowTitle}>{item.title}</Text>
-        <Text style={styles.rowMeta}>{labelType(item.type)} - {item.progress_percent || 0}%</Text>
+        <Text numberOfLines={1} style={styles.rowTitle}>{item.titulo}</Text>
+        <Text style={styles.rowMeta}>{labelType(item.tipo)} - {item.progress_percent || 0}%</Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${item.progress_percent || 0}%` }]} />
         </View>
-        {item.next_episode ? <Text style={styles.nextText}>Proximo: T{item.next_episode.season_number}E{item.next_episode.episode_number}</Text> : null}
+        {item.next_episode ? <Text style={styles.nextText}>Proximo: T{item.next_episode.numero_temporada}E{item.next_episode.numero_episodio}</Text> : null}
       </View>
     </Pressable>
   );
@@ -291,7 +307,8 @@ function FilterSheet(props: {
             </View>
           </View>
 
-          <Text style={styles.sheetGroupTitle}>Visualizacao</Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
+          <Text style={styles.sheetGroupTitle}>Visualização</Text>
           <View style={styles.groupedRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.groupedTitle}>Agrupado por estado</Text>
@@ -302,28 +319,29 @@ function FilterSheet(props: {
             </Pressable>
           </View>
 
-          <Text style={styles.sheetGroupTitle}>Filtrar por estado</Text>
+          <Text style={styles.sheetGroupTitle}>Status</Text>
           <View style={styles.chips}>
             <FilterChip active={props.status === ''} label="Tudo" onPress={() => props.onSetStatus('')} />
             {statusFilters.map((item) => <FilterChip key={item.key} active={props.status === item.key} label={item.label} onPress={() => props.onSetStatus(item.key)} />)}
           </View>
 
-          <Text style={styles.sheetGroupTitle}>Filtrar por tipo</Text>
+          <Text style={styles.sheetGroupTitle}>Tipo de conteúdo</Text>
           <View style={styles.chips}>
             {mediaFilters.map((item) => <FilterChip key={item.key} active={props.media === item.key} label={item.label} onPress={() => props.onSetMedia(item.key)} />)}
           </View>
 
-          <Text style={styles.sheetGroupTitle}>Ordenar por</Text>
-          {sortFilters.map((item) => (
-            <Pressable key={item.key} onPress={() => props.onSetSort(item.key)} style={styles.sortRow}>
-              <Text style={[styles.sortText, props.sort === item.key && styles.sortTextActive]}>{item.label}</Text>
-              {item.hint ? <Text style={styles.sortHint}>{item.hint}</Text> : null}
+          <Text style={styles.sheetGroupTitle}>Ordenação</Text>
+          <View style={styles.sortGrid}>{sortFilters.map((item) => (
+            <Pressable key={item.key} onPress={() => props.onSetSort(item.key)} style={[styles.sortRow, props.sort === item.key && styles.sortRowActive]}>
+              <View style={[styles.radio, props.sort === item.key && styles.radioActive]}>{props.sort === item.key ? <View style={styles.radioDot} /> : null}</View>
+              <View style={{ flex: 1 }}><Text style={[styles.sortText, props.sort === item.key && styles.sortTextActive]}>{item.label}</Text>{item.hint ? <Text style={styles.sortHint}>{item.hint}</Text> : null}</View>
             </Pressable>
-          ))}
+          ))}</View>
 
           <Pressable onPress={props.onApply} style={styles.applyButton}>
             <Text style={styles.applyText}>Aplicar filtros</Text>
           </Pressable>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -387,12 +405,18 @@ const styles = StyleSheet.create({
   count: { color: colors.muted, fontSize: 18, fontWeight: '900' },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 16 },
   iconButton: { alignItems: 'center', borderColor: 'transparent', borderRadius: 12, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 },
-  iconButtonActive: { backgroundColor: 'rgba(139,92,246,0.18)', borderColor: 'rgba(139,92,246,0.55)' },
+  iconButtonActive: { backgroundColor: alpha(colors.accent, 0.18), borderColor: alpha(colors.accent, 0.55) },
   statusRail: { backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 20, borderWidth: 1, marginHorizontal: 18, marginTop: 14, maxHeight: 56 },
   statusRailContent: { alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 8 },
   statusIconButton: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'transparent', borderRadius: 14, borderWidth: 1, height: 38, justifyContent: 'center', opacity: 1, width: 38 },
-  statusIconActive: { backgroundColor: 'rgba(139,92,246,0.18)', borderColor: colors.accent },
+  statusIconActive: { backgroundColor: alpha(colors.accent, 0.18), borderColor: colors.accent },
   empty: { color: colors.muted, marginTop: 24, paddingHorizontal: 18 },
+  collectionSkeletonContent: { paddingBottom: 120 },
+  collectionSkeletonSection: { marginTop: 20, paddingHorizontal: 18 },
+  collectionSkeletonHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  collectionSkeletonHeading: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  collectionSkeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  collectionSkeletonText: { gap: 5, paddingTop: 7 },
   section: { marginTop: 20, paddingHorizontal: 18 },
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   sectionTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 9 },
@@ -408,7 +432,7 @@ const styles = StyleSheet.create({
   posterProgressFill: { backgroundColor: colors.accent, height: 5 },
   posterTitle: { color: colors.text, fontSize: 13, fontWeight: '800', marginTop: 7 },
   posterYear: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  row: { alignItems: 'center', backgroundColor: 'rgba(17,17,24,0.7)', borderColor: 'rgba(255,255,255,0.08)', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 12 },
+  row: { alignItems: 'center', backgroundColor: 'rgba(57,68,82,0.9)', borderColor: 'rgba(208,204,195,0.16)', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 12 },
   posterMini: { backgroundColor: colors.surfaceRaised, borderRadius: 10, height: 82, width: 56 },
   rowCopy: { flex: 1 },
   rowTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
@@ -416,32 +440,38 @@ const styles = StyleSheet.create({
   progressTrack: { backgroundColor: colors.surfaceRaised, borderRadius: 999, height: 5, marginTop: 10, overflow: 'hidden' },
   progressFill: { backgroundColor: colors.success, height: 5 },
   nextText: { color: colors.info, fontSize: 12, fontWeight: '800', marginTop: 8 },
-  sheetOverlay: { backgroundColor: 'rgba(0,0,0,0.58)', flex: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#38414f', borderTopLeftRadius: 26, borderTopRightRadius: 26, maxHeight: '86%', padding: 22 },
-  dragHandle: { alignSelf: 'center', backgroundColor: '#9aa4b5', borderRadius: 999, height: 5, marginBottom: 22, opacity: 0.7, width: 54 },
+  sheetOverlay: { backgroundColor: 'rgba(0,0,0,0.72)', flex: 1, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colors.surface, borderColor: 'rgba(208,204,195,0.16)', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, maxHeight: '90%', paddingHorizontal: 20, paddingTop: 12 },
+  sheetContent: { paddingBottom: 28 },
+  dragHandle: { alignSelf: 'center', backgroundColor: '#73758a', borderRadius: 999, height: 4, marginBottom: 16, width: 48 },
   sheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   sheetHeaderActions: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   sheetTitle: { color: colors.text, fontSize: 23, fontWeight: '900' },
   sheetCloseButton: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   sheetCloseText: { color: colors.text, fontSize: 12, fontWeight: '900' },
-  resetText: { color: '#c7cbd5', fontSize: 15, fontWeight: '800' },
-  sheetGroupTitle: { color: '#aeb5c1', fontSize: 13, fontWeight: '900', letterSpacing: 0.8, marginTop: 24, textTransform: 'uppercase' },
-  groupedRow: { alignItems: 'center', borderBottomColor: 'rgba(255,255,255,0.08)', borderBottomWidth: 1, flexDirection: 'row', gap: 14, marginTop: 14, paddingBottom: 20 },
+  resetText: { color: colors.accent, fontSize: 13, fontWeight: '900' },
+  sheetGroupTitle: { color: '#8f91a8', fontSize: 12, fontWeight: '900', letterSpacing: 1.1, marginTop: 24, textTransform: 'uppercase' },
+  groupedRow: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderColor: 'rgba(208,204,195,0.14)', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 14, marginTop: 12, padding: 16 },
   groupedTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
   groupedSubtitle: { color: '#c0c5ce', fontSize: 13, marginTop: 4 },
   switchTrack: { backgroundColor: '#272f3b', borderRadius: 999, height: 38, justifyContent: 'center', padding: 3, width: 78 },
   switchTrackActive: { backgroundColor: colors.accent },
   switchThumb: { backgroundColor: '#d9dde7', borderRadius: 16, height: 32, width: 32 },
   switchThumbActive: { alignSelf: 'flex-end', backgroundColor: colors.text },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
-  chip: { borderColor: 'rgba(255,255,255,0.12)', borderRadius: 999, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
-  chipActive: { backgroundColor: 'rgba(139,92,246,0.26)', borderColor: colors.accent },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 12 },
+  chip: { backgroundColor: colors.surfaceRaised, borderColor: 'rgba(208,204,195,0.18)', borderRadius: 13, borderWidth: 1, paddingHorizontal: 15, paddingVertical: 11 },
+  chipActive: { backgroundColor: alpha(colors.accent, 0.22), borderColor: colors.accent },
   chipText: { color: '#c3c8d1', fontSize: 14, fontWeight: '800' },
   chipTextActive: { color: colors.text },
-  sortRow: { alignItems: 'center', flexDirection: 'row', gap: 10, paddingVertical: 13 },
-  sortText: { color: '#d7dbe3', fontSize: 17, fontWeight: '800' },
+  sortGrid: { gap: 8, marginTop: 12 },
+  sortRow: { alignItems: 'center', backgroundColor: colors.surfaceRaised, borderColor: 'transparent', borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 13 },
+  sortRowActive: { backgroundColor: alpha(colors.accent, 0.14), borderColor: alpha(colors.accent, 0.65) },
+  radio: { alignItems: 'center', borderColor: '#686a7d', borderRadius: 9, borderWidth: 2, height: 18, justifyContent: 'center', width: 18 },
+  radioActive: { borderColor: colors.accent },
+  radioDot: { backgroundColor: colors.accent, borderRadius: 4, height: 8, width: 8 },
+  sortText: { color: '#d7dbe3', fontSize: 15, fontWeight: '800' },
   sortTextActive: { color: colors.text },
-  sortHint: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 8, color: '#c6cbd4', fontSize: 11, overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 4 },
+  sortHint: { color: '#8f91a8', fontSize: 11, marginTop: 3 },
   applyButton: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 16, marginTop: 18, padding: 16 },
   applyText: { color: colors.text, fontSize: 17, fontWeight: '900' },
   gridIcon: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, height: 25, width: 25 },

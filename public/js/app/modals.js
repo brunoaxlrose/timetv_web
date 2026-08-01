@@ -95,7 +95,7 @@
         if (event) event.preventDefault();
         window.customConfirm({
             title: 'Sair do Sistema',
-            message: 'Tem certeza que deseja sair do aplicativo Time View?',
+            message: 'Tem certeza que deseja sair do aplicativo CineFio?',
             isDanger: false,
             onConfirm: function() {
                 showToast('Efetuando logout...', true);

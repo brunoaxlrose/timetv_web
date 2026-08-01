@@ -1,0 +1,9 @@
+.git
+.idea
+.vscode
+vendor
+mobile
+config/autoload/local.php
+cookie.txt
+scratch/cache
+*.log

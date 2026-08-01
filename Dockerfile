@@ -26,4 +26,12 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 # Set working directory
 WORKDIR /var/www/html
 
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+COPY . .
+
+RUN mkdir -p scratch/cache \
+    && chown -R www-data:www-data scratch
+
 EXPOSE 80

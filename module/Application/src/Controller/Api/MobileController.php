@@ -21,13 +21,42 @@ class MobileController extends AbstractActionController {
 
     public function dashboardAction(): JsonModel {
         $userId = $this->userId();
+        $page = max(1, (int)$this->params()->fromQuery('pagina', 1));
+        $month = $this->params()->fromQuery('mes', date('Y-m'));
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $month = date('Y-m');
+        }
+        $startDate = $month . '-01';
+        $endDate = date('Y-m-t', strtotime($startDate));
+
+        $calendar = $this->catalogModel->getReleaseCalendar($userId, $startDate, $endDate);
+        if ($this->params()->fromQuery('mes', '') !== '') {
+            $calendar = array_merge(
+                $calendar,
+                TmdbHelper::getCalendarReleases($startDate, $endDate, 120),
+                TvmazeHelper::getFutureSchedule($startDate, $endDate)
+            );
+            $seenCalendar = [];
+            $calendar = array_values(array_filter($calendar, static function(array $event) use (&$seenCalendar): bool {
+                $key = strtolower((string)($event['titulo'] ?? '')) . '|' . ($event['data_evento'] ?? '') . '|' . ($event['numero_temporada'] ?? '') . '|' . ($event['numero_episodio'] ?? '');
+                if (isset($seenCalendar[$key])) return false;
+                $seenCalendar[$key] = true;
+                return true;
+            }));
+            usort($calendar, static fn(array $a, array $b): int => strcmp((string)$a['data_evento'], (string)$b['data_evento']));
+        }
 
         return $this->ok([
-            'continue_watching' => $this->trackingModel->getContinueWatching($userId),
-            'lists' => $this->trackingModel->getUserListsSummary($userId),
-            'plan_to_watch' => $this->trackingModel->getPlanToWatch($userId),
-            'popular' => TmdbHelper::getPopular(12),
-            'upcoming' => TmdbHelper::getUpcoming(12),
+            'continuar_assistindo' => $this->trackingModel->getContinueWatching($userId),
+            'listas' => $this->trackingModel->getUserListsSummary($userId),
+            'quero_ver' => $this->trackingModel->getPlanToWatch($userId),
+            'proximos' => $this->catalogModel->getReleaseCalendar($userId, date('Y-m-d'), date('Y-m-d', strtotime('+90 days'))),
+            'calendario' => $calendar,
+            'populares' => TmdbHelper::getPopular(20, $page),
+            'em_breve' => TmdbHelper::getUpcoming(20, $page),
+            'pagina' => $page,
+            'tem_mais_populares' => true,
+            'tem_mais_em_breve' => true,
         ]);
     }
 
@@ -45,18 +74,18 @@ class MobileController extends AbstractActionController {
         );
 
         $groups = [
-            'watching' => [],
+            'assistindo' => [],
             'up_to_date' => [],
-            'completed' => [],
-            'plan_to_watch' => [],
-            'paused' => [],
-            'abandoned' => [],
-            'rewatching' => [],
+            'concluido' => [],
+            'quero_ver' => [],
+            'em_pausa' => [],
+            'abandonado' => [],
+            'reassistindo' => [],
         ];
 
         foreach ($items as &$item) {
             $item['next_episode'] = null;
-            if (($item['type'] ?? '') !== 'movie') {
+            if (($item['tipo'] ?? '') !== 'movie') {
                 try {
                     $progress = $this->trackingModel->getProgress($userId, (string)$item['id_item']);
                     $remaining = $this->trackingModel->countReleasedUnwatchedEpisodes($userId, (string)$item['id_item']);
@@ -72,53 +101,53 @@ class MobileController extends AbstractActionController {
                 $item['progress'] = $progress;
                 $item['progress_percent'] = $progress['total_count'] > 0 ? round(($progress['watched_count'] / $progress['total_count']) * 100) : 0;
 
-                if (($item['track_status'] ?? '') === 'plan_to_watch') {
-                    $groups['plan_to_watch'][] = $item;
-                } elseif (($item['track_status'] ?? '') === 'dropped') {
-                    $groups['paused'][] = $item;
-                } elseif (($item['track_status'] ?? '') === 'abandoned') {
-                    $groups['abandoned'][] = $item;
-                } elseif (($item['track_status'] ?? '') === 'rewatching') {
-                    $groups['rewatching'][] = $item;
-                } elseif (($item['track_status'] ?? '') === 'completed') {
-                    $groups['completed'][] = $item;
+                if (($item['status_acompanhamento'] ?? '') === 'quero_ver') {
+                    $groups['quero_ver'][] = $item;
+                } elseif (($item['status_acompanhamento'] ?? '') === 'em_pausa') {
+                    $groups['em_pausa'][] = $item;
+                } elseif (($item['status_acompanhamento'] ?? '') === 'abandonado') {
+                    $groups['abandonado'][] = $item;
+                } elseif (($item['status_acompanhamento'] ?? '') === 'reassistindo') {
+                    $groups['reassistindo'][] = $item;
+                } elseif (($item['status_acompanhamento'] ?? '') === 'concluido') {
+                    $groups['concluido'][] = $item;
                 } elseif ($remaining === 0 && $futureEpisodes === 0) {
-                    $item['track_status'] = 'completed';
-                    $this->trackingModel->updateWatchlistStatus($userId, (string)$item['id_item'], 'completed');
-                    $groups['completed'][] = $item;
+                    $item['status_acompanhamento'] = 'concluido';
+                    $this->trackingModel->updateWatchlistStatus($userId, (string)$item['id_item'], 'concluido');
+                    $groups['concluido'][] = $item;
                 } elseif ($remaining === 0) {
                     $groups['up_to_date'][] = $item;
                 } else {
-                    $groups['watching'][] = $item;
+                    $groups['assistindo'][] = $item;
                 }
             } else {
-                $item['progress'] = ['total_count' => 1, 'watched_count' => ($item['track_status'] ?? '') === 'completed' ? 1 : 0];
-                $item['progress_percent'] = ($item['track_status'] ?? '') === 'completed' ? 100 : 0;
-                if (($item['track_status'] ?? '') === 'plan_to_watch') {
-                    $groups['plan_to_watch'][] = $item;
-                } elseif (($item['track_status'] ?? '') === 'dropped') {
-                    $groups['paused'][] = $item;
-                } elseif (($item['track_status'] ?? '') === 'abandoned') {
-                    $groups['abandoned'][] = $item;
-                } elseif (($item['track_status'] ?? '') === 'rewatching') {
-                    $groups['rewatching'][] = $item;
-                } elseif (($item['track_status'] ?? '') === 'completed') {
-                    $groups['completed'][] = $item;
+                $item['progress'] = ['total_count' => 1, 'watched_count' => ($item['status_acompanhamento'] ?? '') === 'concluido' ? 1 : 0];
+                $item['progress_percent'] = ($item['status_acompanhamento'] ?? '') === 'concluido' ? 100 : 0;
+                if (($item['status_acompanhamento'] ?? '') === 'quero_ver') {
+                    $groups['quero_ver'][] = $item;
+                } elseif (($item['status_acompanhamento'] ?? '') === 'em_pausa') {
+                    $groups['em_pausa'][] = $item;
+                } elseif (($item['status_acompanhamento'] ?? '') === 'abandonado') {
+                    $groups['abandonado'][] = $item;
+                } elseif (($item['status_acompanhamento'] ?? '') === 'reassistindo') {
+                    $groups['reassistindo'][] = $item;
+                } elseif (($item['status_acompanhamento'] ?? '') === 'concluido') {
+                    $groups['concluido'][] = $item;
                 } else {
-                    $groups['watching'][] = $item;
+                    $groups['assistindo'][] = $item;
                 }
             }
         }
         unset($item);
 
         $filtered = match ($statusFilter) {
-            'watching' => $groups['watching'],
+            'watching' => $groups['assistindo'],
             'em_dia' => $groups['up_to_date'],
-            'visto' => $groups['completed'],
-            'para_ver' => $groups['plan_to_watch'],
-            'em_pausa' => $groups['paused'],
-            'abandonado' => $groups['abandoned'],
-            'reassistindo' => $groups['rewatching'],
+            'visto' => $groups['concluido'],
+            'para_ver' => $groups['quero_ver'],
+            'em_pausa' => $groups['em_pausa'],
+            'abandonado' => $groups['abandonado'],
+            'reassistindo' => $groups['reassistindo'],
             default => $items,
         };
 
@@ -231,13 +260,13 @@ class MobileController extends AbstractActionController {
             return $this->error($this->itemResolveErrorMessage(), 422);
         }
 
-        $isFavorite = array_key_exists('is_favorite', $payload)
-            ? $this->trackingModel->setFavorite($this->userId(), $itemId, filter_var($payload['is_favorite'], FILTER_VALIDATE_BOOLEAN))
+        $isFavorite = array_key_exists('eh_favorito', $payload)
+            ? $this->trackingModel->setFavorite($this->userId(), $itemId, filter_var($payload['eh_favorito'], FILTER_VALIDATE_BOOLEAN))
             : $this->trackingModel->toggleFavorite($this->userId(), $itemId);
 
         return $this->ok([
             'item_id' => $itemId,
-            'is_favorite' => $isFavorite,
+            'eh_favorito' => $isFavorite,
         ]);
     }
 
@@ -249,9 +278,9 @@ class MobileController extends AbstractActionController {
         }
 
         $action = (string)($payload['action'] ?? 'add');
-        $status = (string)($payload['status'] ?? 'watching');
+        $status = (string)($payload['status'] ?? 'assistindo');
 
-        if ($action === 'add' && $status === 'completed' && !$this->trackingModel->isItemReleased((string)$itemId)) {
+        if ($action === 'add' && $status === 'concluido' && !$this->trackingModel->isItemReleased((string)$itemId)) {
             return $this->error('Este titulo ainda nao foi lancado.', 409);
         }
 
@@ -268,7 +297,7 @@ class MobileController extends AbstractActionController {
 
         return $this->ok([
             'item_id' => $itemId,
-            'status' => $action === 'rewatch' ? 'rewatching' : $status,
+            'status' => $action === 'rewatch' ? 'reassistindo' : $status,
         ]);
     }
 
@@ -284,7 +313,7 @@ class MobileController extends AbstractActionController {
 
         return $this->ok([
             'episode_id' => $episodeId,
-            'rewatch_count' => $this->trackingModel->rewatchEpisode($this->userId(), $episodeId),
+            'quantidade_reassistida' => $this->trackingModel->rewatchEpisode($this->userId(), $episodeId),
         ]);
     }
 
@@ -292,7 +321,7 @@ class MobileController extends AbstractActionController {
         $payload = $this->payload();
         $itemId = (int)($payload['item_id'] ?? 0);
         $episodeId = (int)($payload['episode_id'] ?? 0);
-        $seasonNumber = (int)($payload['season_number'] ?? 0);
+        $seasonNumber = (int)($payload['numero_temporada'] ?? 0);
         $mode = (string)($payload['mode'] ?? 'single');
 
         if ($itemId <= 0) {
@@ -340,8 +369,8 @@ class MobileController extends AbstractActionController {
             return $this->error('Voce so pode avaliar apos o lancamento.', 409);
         }
 
-        $rating = $payload['rating'] ?? null;
-        $comment = trim((string)($payload['comment'] ?? ''));
+        $rating = $payload['nota'] ?? null;
+        $comment = trim((string)($payload['comentario'] ?? ''));
         $rating = ($rating === null || $rating === '') ? null : (float)$rating;
         $comment = $comment === '' ? null : $comment;
 
@@ -353,13 +382,13 @@ class MobileController extends AbstractActionController {
         $stmtCheck = $pdo->prepare("SELECT id_usuario_item FROM usuario_item WHERE id_usuario = :uid AND id_item = :iid LIMIT 1");
         $stmtCheck->execute([':uid' => $this->userId(), ':iid' => $itemId]);
         if (!$stmtCheck->fetch()) {
-            $stmtInsert = $pdo->prepare("INSERT INTO usuario_item (id_usuario, id_item, status) VALUES (:uid, :iid, 'plan_to_watch')");
+            $stmtInsert = $pdo->prepare("INSERT INTO usuario_item (id_usuario, id_item, status) VALUES (:uid, :iid, 'avaliado')");
             $stmtInsert->execute([':uid' => $this->userId(), ':iid' => $itemId]);
         }
 
         $stmt = $pdo->prepare("
             UPDATE usuario_item
-            SET rating = :rating, comment = :comment, ts_atualizacao = CURRENT_TIMESTAMP
+            SET nota = :rating, comentario = :comment, ts_atualizacao = CURRENT_TIMESTAMP
             WHERE id_usuario = :uid AND id_item = :iid
         ");
         $stmt->execute([
@@ -369,10 +398,21 @@ class MobileController extends AbstractActionController {
             ':iid' => $itemId,
         ]);
 
+        $reviews = $this->catalogModel->getItemComments((int)$itemId);
+        $currentReview = null;
+        foreach ($reviews as $review) {
+            if ((int)$review['id_usuario'] === $this->userId()) {
+                $currentReview = $review;
+                break;
+            }
+        }
+
         return $this->ok([
             'item_id' => $itemId,
-            'rating' => $rating,
-            'comment' => $comment,
+            'nota' => $rating,
+            'comentario' => $comment,
+            'avaliacao' => $currentReview,
+            'total_avaliacoes' => count($reviews),
         ]);
     }
 
@@ -403,12 +443,13 @@ class MobileController extends AbstractActionController {
             'tvmaze_id' => (int)$this->params()->fromQuery('tvmaze_id', 0),
             'tmdb_id' => (int)$this->params()->fromQuery('tmdb_id', 0),
             'mal_id' => (int)$this->params()->fromQuery('mal_id', 0),
-            'type' => $this->params()->fromQuery('type', ''),
-            'title' => $this->params()->fromQuery('title', ''),
-            'release_year' => (int)$this->params()->fromQuery('release_year', 0),
-            'release_date' => $this->params()->fromQuery('release_date', ''),
-            'poster_url' => $this->params()->fromQuery('poster_url', ''),
-            'banner_url' => $this->params()->fromQuery('banner_url', ''),
+            'tipo' => $this->params()->fromQuery('tipo', ''),
+            'titulo' => $this->params()->fromQuery('titulo', ''),
+            'ano_lancamento' => (int)$this->params()->fromQuery('ano_lancamento', 0),
+            'data_lancamento' => $this->params()->fromQuery('data_lancamento', ''),
+            'url_poster' => $this->params()->fromQuery('url_poster', ''),
+            'url_banner' => $this->params()->fromQuery('url_banner', ''),
+            'rapido' => $this->params()->fromQuery('rapido', '0') === '1',
         ]);
         if ($itemId <= 0) {
             return $this->error($this->itemResolveErrorMessage(), 422);
@@ -421,36 +462,51 @@ class MobileController extends AbstractActionController {
 
         $pdo = $this->catalogModel->getPdo();
 
+        if ($this->params()->fromQuery('rapido', '0') === '1') {
+            return $this->ok([
+                'item' => $item,
+                'episodes' => $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId),
+                'progress' => $this->catalogModel->getProgress($userId, (string)$itemId),
+                'next_unwatched' => $this->catalogModel->getNextUnwatched($userId, (string)$itemId),
+                'released' => $this->trackingModel->isItemReleased((string)$itemId),
+                'lists' => $this->trackingModel->getItemLists($userId, (int)$itemId),
+                'cast' => [],
+                'reviews' => $this->catalogModel->getItemComments((int)$itemId),
+                'recommendations' => [],
+            ]);
+        }
+
         try {
-            if (($item['type'] ?? '') === 'movie' && !empty($item['tmdb_id'])) {
+            if (($item['tipo'] ?? '') === 'movie' && !empty($item['tmdb_id']) && (empty($item['ts_ultima_sincronizacao']) || time() - strtotime($item['ts_ultima_sincronizacao']) > 86400)) {
                 \Application\Helper\TmdbHelper::syncMovieMetadata($pdo, (int)$item['id_item'], (int)$item['tmdb_id']);
                 $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
             }
 
-            if (($item['type'] ?? '') !== 'movie' && !empty($item['tvmaze_id'])) {
-                $lastSync = $item['last_sync'] ?? null;
-                if (empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
+            if (($item['tipo'] ?? '') !== 'movie' && !empty($item['tvmaze_id'])) {
+                $lastSync = $item['ts_ultima_sincronizacao'] ?? null;
+                $existingEpisodes = $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId);
+                if (empty($existingEpisodes) || empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
                     \Application\Helper\TvmazeHelper::syncEpisodes($pdo, (int)$itemId, (int)$item['tvmaze_id']);
                     $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
                 }
 
                 if (empty($this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId)) && !empty($item['tmdb_id'])) {
-                    \Application\Helper\TmdbHelper::syncTvMetadataAndEpisodes($pdo, (int)$itemId, (int)$item['tmdb_id'], $item['type']);
+                    \Application\Helper\TmdbHelper::syncTvMetadataAndEpisodes($pdo, (int)$itemId, (int)$item['tmdb_id'], $item['tipo']);
                     $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
                 }
-            } elseif (($item['type'] ?? '') !== 'movie' && !empty($item['tmdb_id'])) {
-                $lastSync = $item['last_sync'] ?? null;
+            } elseif (($item['tipo'] ?? '') !== 'movie' && !empty($item['tmdb_id'])) {
+                $lastSync = $item['ts_ultima_sincronizacao'] ?? null;
                 if (empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
-                    \Application\Helper\TmdbHelper::syncTvMetadataAndEpisodes($pdo, (int)$itemId, (int)$item['tmdb_id'], $item['type']);
+                    \Application\Helper\TmdbHelper::syncTvMetadataAndEpisodes($pdo, (int)$itemId, (int)$item['tmdb_id'], $item['tipo']);
                     $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
                 }
             }
 
-            if (($item['type'] ?? '') === 'anime' && !empty($item['mal_id'])) {
+            if (($item['tipo'] ?? '') === 'anime' && !empty($item['mal_id'])) {
                 $episodes = $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId);
-                $lastSync = $item['last_sync'] ?? null;
+                $lastSync = $item['ts_ultima_sincronizacao'] ?? null;
                 if (empty($episodes) || empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
-                    \Application\Helper\JikanHelper::syncEpisodes($pdo, (int)$itemId, (int)$item['mal_id'], (int)($item['total_episodes'] ?? 0));
+                    \Application\Helper\JikanHelper::syncEpisodes($pdo, (int)$itemId, (int)$item['mal_id'], (int)($item['total_episodios'] ?? 0));
                     $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
                 }
             }
@@ -460,27 +516,27 @@ class MobileController extends AbstractActionController {
 
         // Fetch/populate watch providers if null
         try {
-            if (($item['watch_providers'] ?? null) === null) {
-                $watchProviders = $this->fetchWatchProviders($item['title'], $item['type'], (int)($item['release_year'] ?? 0), (int)($item['tmdb_id'] ?? 0), (int)($item['tvmaze_id'] ?? 0));
+            if (($item['provedores_streaming'] ?? null) === null) {
+                $watchProviders = $this->fetchWatchProviders($item['titulo'], $item['tipo'], (int)($item['ano_lancamento'] ?? 0), (int)($item['tmdb_id'] ?? 0), (int)($item['tvmaze_id'] ?? 0));
                 if ($watchProviders !== null) {
-                    $stmt = $pdo->prepare("UPDATE item SET watch_providers = :wp WHERE id_item = :id");
+                    $stmt = $pdo->prepare("UPDATE item SET provedores_streaming = :wp WHERE id_item = :id");
                     $stmt->execute([':wp' => $watchProviders, ':id' => $itemId]);
-                    $item['watch_providers'] = $watchProviders;
+                    $item['provedores_streaming'] = $watchProviders;
                 } else {
-                    $stmt = $pdo->prepare("UPDATE item SET watch_providers = '' WHERE id_item = :id");
+                    $stmt = $pdo->prepare("UPDATE item SET provedores_streaming = '' WHERE id_item = :id");
                     $stmt->execute([':id' => $itemId]);
-                    $item['watch_providers'] = '';
+                    $item['provedores_streaming'] = '';
                 }
             }
         } catch (\Throwable $e) {
-            $item['watch_providers'] = $item['watch_providers'] ?? '';
+            $item['provedores_streaming'] = $item['provedores_streaming'] ?? '';
         }
 
         // Fetch/populate genres if null/empty
         try {
-            if (empty($item['genres'])) {
+            if (empty($item['generos'])) {
                 $genresStr = null;
-                if (($item['type'] ?? '') === 'anime' && !empty($item['mal_id'])) {
+                if (($item['tipo'] ?? '') === 'anime' && !empty($item['mal_id'])) {
                     $animeData = \Application\Helper\JikanHelper::getAnimeDetail((int)$item['mal_id']);
                     if ($animeData) {
                         $genres = [];
@@ -496,7 +552,7 @@ class MobileController extends AbstractActionController {
                         }
                         $genresStr = !empty($genres) ? implode(', ', $genres) : null;
                     }
-                } elseif (($item['type'] ?? '') !== 'movie' && !empty($item['tvmaze_id'])) {
+                } elseif (($item['tipo'] ?? '') !== 'movie' && !empty($item['tvmaze_id'])) {
                     $url = "https://api.tvmaze.com/shows/" . (int)$item['tvmaze_id'];
                     $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: TVTimeClone/1.0\r\n"]]));
                     if ($json) {
@@ -521,31 +577,31 @@ class MobileController extends AbstractActionController {
 
                 if ($genresStr !== null) {
                     $genresStr = $this->translateGenres($genresStr);
-                    $stmt = $pdo->prepare("UPDATE item SET genres = :genres WHERE id_item = :id");
+                    $stmt = $pdo->prepare("UPDATE item SET generos = :genres WHERE id_item = :id");
                     $stmt->execute([':genres' => $genresStr, ':id' => $itemId]);
-                    $item['genres'] = $genresStr;
+                    $item['generos'] = $genresStr;
                 }
             } else {
-                $item['genres'] = $this->translateGenres($item['genres']);
+                $item['generos'] = $this->translateGenres($item['generos']);
             }
         } catch (\Throwable $e) {
-            $item['genres'] = $item['genres'] ?? '';
+            $item['generos'] = $item['generos'] ?? '';
         }
 
         // Recommendations
         $recommendations = [];
         try {
-            if (($item['type'] ?? '') === 'anime' && !empty($item['mal_id'])) {
+            if (($item['tipo'] ?? '') === 'anime' && !empty($item['mal_id'])) {
                 $recommendations = \Application\Helper\JikanHelper::getRecommendations((int)$item['mal_id'], 8);
             } else {
                 $tmdbIdForRecs = $item['tmdb_id'] ?? null;
                 if (empty($tmdbIdForRecs)) {
-                    $searchType = (($item['type'] ?? '') === 'movie') ? 'movie' : 'tv';
-                    $url = "https://api.themoviedb.org/3/search/" . $searchType . "?api_key=1f54bd990f1cdfb230adb312546d765d&query=" . urlencode($item['title']) . "&language=pt-BR";
-                    if (!empty($item['release_year'])) {
-                        $url .= (($item['type'] ?? '') === 'movie') ? "&primary_release_year=" . $item['release_year'] : "&first_air_date_year=" . $item['release_year'];
+                    $searchType = (($item['tipo'] ?? '') === 'movie') ? 'movie' : 'tv';
+                    $url = "https://api.themoviedb.org/3/search/" . $searchType . "?api_key=1f54bd990f1cdfb230adb312546d765d&query=" . urlencode($item['titulo']) . "&language=pt-BR";
+                    if (!empty($item['ano_lancamento'])) {
+                        $url .= (($item['tipo'] ?? '') === 'movie') ? "&primary_release_year=" . $item['ano_lancamento'] : "&first_air_date_year=" . $item['ano_lancamento'];
                     }
-                    $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: TimeView/1.0\r\n", 'timeout' => 5]]));
+                    $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: CineFio/1.0\r\n", 'timeout' => 5]]));
                     if ($json) {
                         $results = json_decode($json, true)['results'] ?? [];
                         if (!empty($results[0]['id'])) {
@@ -561,15 +617,15 @@ class MobileController extends AbstractActionController {
                     }
                 }
                 if (!empty($tmdbIdForRecs)) {
-                    $recommendations = \Application\Helper\TmdbHelper::getRecommendations($item['type'], (int)$tmdbIdForRecs, 8);
+                    $recommendations = \Application\Helper\TmdbHelper::getRecommendations($item['tipo'], (int)$tmdbIdForRecs, 8);
                 }
             }
         } catch (\Throwable $e) {
             $recommendations = [];
         }
 
-        if (!empty($item['watch_providers'])) {
-            $providers = json_decode($item['watch_providers'], true);
+        if (!empty($item['provedores_streaming'])) {
+            $providers = json_decode($item['provedores_streaming'], true);
             if (is_array($providers)) {
                 $cleaned = [];
                 foreach ($providers as $prov) {
@@ -599,7 +655,7 @@ class MobileController extends AbstractActionController {
                         'logo' => $prov['logo'] ?? ''
                     ];
                 }
-                $item['watch_providers'] = json_encode(array_values($cleaned), JSON_UNESCAPED_UNICODE);
+                $item['provedores_streaming'] = json_encode(array_values($cleaned), JSON_UNESCAPED_UNICODE);
             }
         }
 
@@ -614,6 +670,20 @@ class MobileController extends AbstractActionController {
             'reviews' => $this->catalogModel->getItemComments((int)$itemId),
             'recommendations' => $recommendations
         ]);
+    }
+
+    public function personAction(): JsonModel {
+        $source = strtolower(trim((string)$this->params()->fromQuery('source', 'tmdb')));
+        $personId = (int)$this->params()->fromQuery('person_id', 0);
+        if ($personId <= 0) return $this->error('Pessoa invalida.', 422);
+
+        $result = match ($source) {
+            'jikan' => JikanHelper::getCharacterCredits($personId),
+            'tvmaze' => $this->getTvmazePersonCredits($personId),
+            default => TmdbHelper::getPersonCredits($personId),
+        };
+        if (!$result) return $this->error('Filmografia nao encontrada.', 404);
+        return $this->ok($result);
     }
 
     private function userId(): int {
@@ -688,12 +758,19 @@ class MobileController extends AbstractActionController {
         $tvmazeId = (int)($payload['tvmaze_id'] ?? 0);
         $tmdbId = (int)($payload['tmdb_id'] ?? 0);
         $malId = (int)($payload['mal_id'] ?? 0);
-        $type = $this->normalizeItemType((string)($payload['type'] ?? 'series'));
-        $payload['type'] = $type;
+        $type = $this->normalizeItemType((string)($payload['tipo'] ?? 'series'));
+        $payload['tipo'] = $type;
 
         $existingExternalId = $this->findLocalItemIdByExternalIds($pdo, $tvmazeId, $tmdbId, $malId);
         if ($existingExternalId > 0) {
             return $existingExternalId;
+        }
+
+        if (!empty($payload['rapido']) && trim((string)($payload['titulo'] ?? '')) !== '') {
+            $quickItemId = $this->createLocalItemFromPayload($payload);
+            if ($quickItemId > 0) {
+                return $quickItemId;
+            }
         }
 
         if ($tvmazeId > 0) {
@@ -719,13 +796,13 @@ class MobileController extends AbstractActionController {
                 if ($movie) {
                     $fallbackPayload = array_merge($payload, [
                         'tmdb_id' => $tmdbId,
-                        'type' => 'movie',
-                        'title' => $payload['title'] ?? ($movie['title'] ?? $movie['original_title'] ?? ''),
-                        'description' => $payload['description'] ?? ($movie['overview'] ?? ''),
-                        'release_date' => $payload['release_date'] ?? ($movie['release_date'] ?? ''),
-                        'poster_url' => $payload['poster_url'] ?? (!empty($movie['poster_path']) ? 'https://image.tmdb.org/t/p/w500' . $movie['poster_path'] : ''),
-                        'banner_url' => $payload['banner_url'] ?? (!empty($movie['backdrop_path']) ? 'https://image.tmdb.org/t/p/original' . $movie['backdrop_path'] : ''),
-                        'runtime_minutes' => (int)($movie['runtime'] ?? 120),
+                        'tipo' => 'movie',
+                        'titulo' => $payload['titulo'] ?? ($movie['title'] ?? $movie['original_title'] ?? ''),
+                        'descricao' => $payload['descricao'] ?? ($movie['overview'] ?? ''),
+                        'data_lancamento' => $payload['data_lancamento'] ?? ($movie['release_date'] ?? ''),
+                        'url_poster' => $payload['url_poster'] ?? (!empty($movie['poster_path']) ? 'https://image.tmdb.org/t/p/w500' . $movie['poster_path'] : ''),
+                        'url_banner' => $payload['url_banner'] ?? (!empty($movie['backdrop_path']) ? 'https://image.tmdb.org/t/p/original' . $movie['backdrop_path'] : ''),
+                        'duracao_minutos' => (int)($movie['runtime'] ?? 120),
                     ]);
                     $resolvedId = $this->createLocalItemFromPayload($fallbackPayload);
                     if ($resolvedId > 0) {
@@ -753,15 +830,15 @@ class MobileController extends AbstractActionController {
                 if ($tvShow) {
                     $fallbackPayload = array_merge($payload, [
                         'tmdb_id' => $tmdbId,
-                        'type' => $type,
-                        'title' => $payload['title'] ?? ($tvShow['name'] ?? $tvShow['original_name'] ?? ''),
-                        'description' => $payload['description'] ?? ($tvShow['overview'] ?? ''),
-                        'release_date' => $payload['release_date'] ?? ($tvShow['first_air_date'] ?? ''),
-                        'release_year' => $payload['release_year'] ?? (!empty($tvShow['first_air_date']) ? (int)substr($tvShow['first_air_date'], 0, 4) : 0),
-                        'poster_url' => $payload['poster_url'] ?? (!empty($tvShow['poster_path']) ? 'https://image.tmdb.org/t/p/w500' . $tvShow['poster_path'] : ''),
-                        'banner_url' => $payload['banner_url'] ?? (!empty($tvShow['backdrop_path']) ? 'https://image.tmdb.org/t/p/original' . $tvShow['backdrop_path'] : ''),
-                        'total_episodes' => (int)($tvShow['number_of_episodes'] ?? 0),
-                        'runtime_minutes' => (int)($tvShow['episode_run_time'][0] ?? 45),
+                        'tipo' => $type,
+                        'titulo' => $payload['titulo'] ?? ($tvShow['name'] ?? $tvShow['original_name'] ?? ''),
+                        'descricao' => $payload['descricao'] ?? ($tvShow['overview'] ?? ''),
+                        'data_lancamento' => $payload['data_lancamento'] ?? ($tvShow['first_air_date'] ?? ''),
+                        'ano_lancamento' => $payload['ano_lancamento'] ?? (!empty($tvShow['first_air_date']) ? (int)substr($tvShow['first_air_date'], 0, 4) : 0),
+                        'url_poster' => $payload['url_poster'] ?? (!empty($tvShow['poster_path']) ? 'https://image.tmdb.org/t/p/w500' . $tvShow['poster_path'] : ''),
+                        'url_banner' => $payload['url_banner'] ?? (!empty($tvShow['backdrop_path']) ? 'https://image.tmdb.org/t/p/original' . $tvShow['backdrop_path'] : ''),
+                        'total_episodios' => (int)($tvShow['number_of_episodes'] ?? 0),
+                        'duracao_minutos' => (int)($tvShow['episode_run_time'][0] ?? 45),
                     ]);
                     $resolvedId = $this->createLocalItemFromPayload($fallbackPayload);
                     if ($resolvedId > 0) {
@@ -771,9 +848,9 @@ class MobileController extends AbstractActionController {
             }
         }
 
-        $title = trim((string)($payload['title'] ?? ''));
+        $title = trim((string)($payload['titulo'] ?? ''));
         if ($title !== '') {
-            $releaseYear = (int)($payload['release_year'] ?? 0);
+            $releaseYear = (int)($payload['ano_lancamento'] ?? 0);
 
             if ($type !== 'movie') {
                 $resolvedTvmazeId = TvmazeHelper::getTvmazeIdByTitle($title);
@@ -787,11 +864,11 @@ class MobileController extends AbstractActionController {
 
             $results = TmdbHelper::searchMulti($title, 8);
             foreach ($results as $result) {
-                if (($result['type'] ?? '') !== $type || empty($result['tmdb_id'])) {
+                if (($result['tipo'] ?? '') !== $type || empty($result['tmdb_id'])) {
                     continue;
                 }
 
-                if ($releaseYear > 0 && !empty($result['release_year']) && abs((int)$result['release_year'] - $releaseYear) > 1) {
+                if ($releaseYear > 0 && !empty($result['ano_lancamento']) && abs((int)$result['ano_lancamento'] - $releaseYear) > 1) {
                     continue;
                 }
 
@@ -810,13 +887,13 @@ class MobileController extends AbstractActionController {
     }
 
     private function createLocalItemFromPayload(array $payload): int {
-        $title = trim((string)($payload['title'] ?? ''));
+        $title = trim((string)($payload['titulo'] ?? ''));
         if ($title === '') {
             return 0;
         }
 
         $pdo = $this->catalogModel->getPdo();
-        $type = $this->normalizeItemType((string)($payload['type'] ?? 'series'));
+        $type = $this->normalizeItemType((string)($payload['tipo'] ?? 'series'));
         $tvmazeId = (int)($payload['tvmaze_id'] ?? 0);
         $tmdbId = (int)($payload['tmdb_id'] ?? 0);
         $malId = (int)($payload['mal_id'] ?? 0);
@@ -826,8 +903,8 @@ class MobileController extends AbstractActionController {
             return $existingExternalId;
         }
 
-        $releaseDate = trim((string)($payload['release_date'] ?? '')) ?: null;
-        $releaseYear = (int)($payload['release_year'] ?? 0);
+        $releaseDate = trim((string)($payload['data_lancamento'] ?? '')) ?: null;
+        $releaseYear = (int)($payload['ano_lancamento'] ?? 0);
         if ($releaseYear <= 0 && $releaseDate) {
             $releaseYear = (int)substr($releaseDate, 0, 4);
         }
@@ -838,15 +915,15 @@ class MobileController extends AbstractActionController {
         $stmt = $pdo->prepare("
             SELECT id_item
             FROM item
-            WHERE LOWER(title) = LOWER(:title)
-              AND type = :type
-              AND release_year = :release_year
+            WHERE LOWER(titulo) = LOWER(:titulo)
+              AND tipo = :tipo
+              AND ano_lancamento = :ano_lancamento
             LIMIT 1
         ");
         $stmt->execute([
-            ':title' => $title,
-            ':type' => $type,
-            ':release_year' => $releaseYear,
+            ':titulo' => $title,
+            ':tipo' => $type,
+            ':ano_lancamento' => $releaseYear,
         ]);
         $existing = $stmt->fetchColumn();
         if ($existing) {
@@ -860,12 +937,12 @@ class MobileController extends AbstractActionController {
         try {
             $stmt = $pdo->prepare("
                 INSERT INTO item (
-                    tvmaze_id, tmdb_id, mal_id, title, type, poster_url, banner_url, description,
-                    release_year, release_date, total_episodes, runtime_minutes, status, ts_inclusao
+                    tvmaze_id, tmdb_id, mal_id, titulo, tipo, url_poster, url_banner, descricao,
+                    ano_lancamento, data_lancamento, total_episodios, duracao_minutos, status, ts_inclusao
                 )
                 VALUES (
-                    :tvmaze_id, :tmdb_id, :mal_id, :title, :type, :poster_url, :banner_url, :description,
-                    :release_year, :release_date, :total_episodes, :runtime_minutes, :status, CURRENT_TIMESTAMP
+                    :tvmaze_id, :tmdb_id, :mal_id, :titulo, :tipo, :url_poster, :url_banner, :descricao,
+                    :ano_lancamento, :data_lancamento, :total_episodios, :duracao_minutos, :status, CURRENT_TIMESTAMP
                 )
                 RETURNING id_item
             ");
@@ -873,15 +950,15 @@ class MobileController extends AbstractActionController {
                 ':tvmaze_id' => $tvmazeId > 0 ? $tvmazeId : null,
                 ':tmdb_id' => $tmdbId > 0 ? $tmdbId : null,
                 ':mal_id' => $malId > 0 ? $malId : null,
-                ':title' => $title,
-                ':type' => $type,
-                ':poster_url' => $payload['poster_url'] ?? '',
-                ':banner_url' => $payload['banner_url'] ?? ($payload['poster_url'] ?? ''),
-                ':description' => $payload['description'] ?? 'Nenhuma sinopse disponivel.',
-                ':release_year' => $releaseYear,
-                ':release_date' => $releaseDate,
-                ':total_episodes' => (int)($payload['total_episodes'] ?? ($type === 'movie' ? 1 : 0)),
-                ':runtime_minutes' => (int)($payload['runtime_minutes'] ?? ($type === 'movie' ? 120 : 45)),
+                ':titulo' => $title,
+                ':tipo' => $type,
+                ':url_poster' => $payload['url_poster'] ?? '',
+                ':url_banner' => $payload['url_banner'] ?? ($payload['url_poster'] ?? ''),
+                ':descricao' => $payload['descricao'] ?? 'Nenhuma sinopse disponivel.',
+                ':ano_lancamento' => $releaseYear,
+                ':data_lancamento' => $releaseDate,
+                ':total_episodios' => (int)($payload['total_episodios'] ?? ($type === 'movie' ? 1 : 0)),
+                ':duracao_minutos' => (int)($payload['duracao_minutos'] ?? ($type === 'movie' ? 120 : 45)),
                 ':status' => $status,
             ]);
 
@@ -945,7 +1022,7 @@ class MobileController extends AbstractActionController {
 
     private function getCast(array $item): array {
         if (!empty($item['tmdb_id'])) {
-            $cast = TmdbHelper::getCredits((string)$item['type'], (int)$item['tmdb_id'], 12);
+            $cast = TmdbHelper::getCredits((string)$item['tipo'], (int)$item['tmdb_id'], 12);
             if (!empty($cast)) {
                 return $cast;
             }
@@ -964,7 +1041,7 @@ class MobileController extends AbstractActionController {
 
         $context = stream_context_create([
             'http' => [
-                'header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n",
+                'header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n",
                 'timeout' => 4,
             ],
         ]);
@@ -979,6 +1056,8 @@ class MobileController extends AbstractActionController {
             $person = $row['person'] ?? [];
             $character = $row['character'] ?? [];
             $cast[] = [
+                'person_id' => (int)($person['id'] ?? 0),
+                'source' => 'tvmaze',
                 'name' => $person['name'] ?? 'Sem nome',
                 'character' => $character['name'] ?? '',
                 'image_url' => $person['image']['medium'] ?? $person['image']['original'] ?? null,
@@ -986,6 +1065,51 @@ class MobileController extends AbstractActionController {
         }
 
         return $cast;
+    }
+
+    private function getTvmazePersonCredits(int $personId): ?array {
+        $context = stream_context_create(['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]]);
+        $personJson = @file_get_contents('https://api.tvmaze.com/people/' . $personId, false, $context);
+        $creditsJson = @file_get_contents('https://api.tvmaze.com/people/' . $personId . '/castcredits?embed=show', false, $context);
+        $person = $personJson ? json_decode($personJson, true) : null;
+        $rows = $creditsJson ? json_decode($creditsJson, true) : [];
+        if (!$person || !is_array($rows)) return null;
+
+        $credits = [];
+        foreach ($rows as $row) {
+            $show = $row['_embedded']['show'] ?? [];
+            if (empty($show['id'])) continue;
+            $premiered = $show['premiered'] ?? '';
+            $credits[] = [
+                'id_item' => null,
+                'tmdb_id' => null,
+                'tvmaze_id' => (int)$show['id'],
+                'mal_id' => null,
+                'titulo' => $show['name'] ?? 'Sem título',
+                'tipo' => 'series',
+                'url_poster' => $show['image']['medium'] ?? '',
+                'url_banner' => $show['image']['original'] ?? '',
+                'descricao' => trim(strip_tags($show['summary'] ?? '')),
+                'ano_lancamento' => $premiered ? (int)substr($premiered, 0, 4) : null,
+                'data_lancamento' => $premiered ?: null,
+                'personagem' => '',
+                'popularidade' => (float)($show['weight'] ?? 0),
+            ];
+        }
+        usort($credits, static fn(array $a, array $b): int => ($b['popularidade'] <=> $a['popularidade']));
+        return [
+            'person' => [
+                'person_id' => (int)$person['id'],
+                'source' => 'tvmaze',
+                'name' => $person['name'] ?? 'Sem nome',
+                'image_url' => $person['image']['original'] ?? $person['image']['medium'] ?? null,
+                'biography' => '',
+                'birthday' => $person['birthday'] ?? null,
+                'place_of_birth' => $person['country']['name'] ?? null,
+                'department' => 'Atuação',
+            ],
+            'credits' => array_slice($credits, 0, 60),
+        ];
     }
 
     private function ok(array $data): JsonModel {

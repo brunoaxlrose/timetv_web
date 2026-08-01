@@ -8,7 +8,7 @@ $userLists = $this->userLists ?? [];
         color: #f2f2f7;
     }
     .list-summary-card {
-        background: linear-gradient(180deg, #1d1d2a 0%, #171720 100%);
+        background: linear-gradient(180deg, #1d1d2a 0%, #394452 100%);
         border: 1px solid rgba(255,255,255,0.05);
         border-radius: 16px;
         padding: 16px;
@@ -37,7 +37,7 @@ $userLists = $this->userLists ?? [];
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #a88beb;
+        color: #D99951;
         font-size: 1.25rem;
     }
     .list-summary-body {
@@ -83,7 +83,7 @@ $userLists = $this->userLists ?? [];
 <div class="px-3 refract-lists-container pb-5">
     <div class="d-flex justify-content-between align-items-center mt-3 mb-4">
         <h4 class="text-white fw-bold mb-0" style="font-size: 1.5rem; letter-spacing: -0.5px;">As tuas listas</h4>
-        <button class="btn btn-sm text-white rounded-pill px-3 py-1.5 fw-bold d-flex align-items-center gap-1" style="background-color: #7c4dff;" onclick="promptCreateList()">
+        <button class="btn btn-sm text-white rounded-pill px-3 py-1.5 fw-bold d-flex align-items-center gap-1" style="background-color: #D99951;" onclick="promptCreateList()">
             <i class="bi bi-plus-lg"></i> Criar lista
         </button>
     </div>
@@ -133,7 +133,7 @@ $userLists = $this->userLists ?? [];
     <div class="modal-dialog modal-dialog-centered" style="max-width: 360px; margin: auto 15px;">
         <div class="modal-content text-white p-4" style="border-radius: 20px; background-color: #1a1a24; border: 1px solid #2d2d3e; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
             <div class="d-flex align-items-center gap-2 mb-3">
-                <i class="bi bi-folder-plus text-accent fs-4" style="color: #a88beb;"></i>
+                <i class="bi bi-folder-plus text-accent fs-4" style="color: #D99951;"></i>
                 <h5 class="fw-bold mb-0 text-white">Criar Nova Lista</h5>
             </div>
             <p class="small mb-4" style="font-size: 0.78rem; color: #d6d6ea !important;">Exemplo: "Para Assistir no Fim de Semana", "Favoritos de Ação".</p>
@@ -142,7 +142,7 @@ $userLists = $this->userLists ?? [];
             </div>
             <div class="d-flex gap-2">
                 <button type="button" class="btn btn-secondary rounded-pill w-50 small fw-bold py-2" data-bs-dismiss="modal" style="background-color: #2c2c3e; border: none; font-size: 0.78rem;">Cancelar</button>
-                <button type="button" class="btn rounded-pill w-50 small fw-bold py-2 text-white" onclick="submitCreateList()" style="background-color: #7c4dff; border: none; font-size: 0.78rem;">Criar</button>
+                <button type="button" class="btn rounded-pill w-50 small fw-bold py-2 text-white" onclick="submitCreateList()" style="background-color: #D99951; border: none; font-size: 0.78rem;">Criar</button>
             </div>
         </div>
     </div>
@@ -150,7 +150,7 @@ $userLists = $this->userLists ?? [];
 
 <div class="modal fade" id="listItemsModal" tabindex="-1" aria-hidden="true" style="z-index: 5000;">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 420px; margin: auto 12px;">
-        <div class="modal-content text-white p-3" style="border-radius: 22px; background-color: #171720; border: 1px solid #2d2d3e; box-shadow: 0 18px 40px rgba(0,0,0,0.45);">
+        <div class="modal-content text-white p-3" style="border-radius: 22px; background-color: #394452; border: 1px solid #2d2d3e; box-shadow: 0 18px 40px rgba(0,0,0,0.45);">
             <div class="d-flex align-items-center justify-content-between px-2 pt-2 pb-3">
                 <div>
                     <h5 id="listItemsModalTitle" class="fw-bold mb-1 text-white">Lista</h5>

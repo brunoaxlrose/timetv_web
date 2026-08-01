@@ -1,23 +1,9 @@
-<?php
-if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSION['sobrenome']))) {
-    try {
-        $pdo = new \PDO('pgsql:host=db;port=5432;dbname=tvtime_db', 'tvtime', 'tvtime_pass');
-        $stmt = $pdo->prepare("SELECT nome, sobrenome, user_name FROM usuario WHERE id_usuario = :id LIMIT 1");
-        $stmt->execute([':id' => $_SESSION['user_id']]);
-        $u = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if ($u) {
-            $_SESSION['nome'] = $u['nome'];
-            $_SESSION['sobrenome'] = $u['sobrenome'];
-            $_SESSION['username'] = $u['user_name'];
-        }
-    } catch (\Exception $e) {}
-}
-?><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $this->layout()->title ?? 'Time View' ?></title>
+    <title><?= $this->layout()->title ?? 'CineFio' ?></title>
     <!-- Google Fonts: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,13 +33,13 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
                     <polygon points="50,12 92,88 8,88" fill="url(#tbPrism)"/>
                     <defs>
                         <linearGradient id="tbPrism" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#a88beb"/>
-                            <stop offset="50%" stop-color="#f8a5c2"/>
+                            <stop offset="0%" stop-color="#D99951"/>
+                            <stop offset="50%" stop-color="#D0CCC3"/>
                             <stop offset="100%" stop-color="#f7d794"/>
                         </linearGradient>
                     </defs>
                 </svg>
-                <span class="app-top-bar__logo-text">Time View</span>
+                <span class="app-top-bar__logo-text">CineFio</span>
             </a>
 
             <!-- Right controls -->
@@ -68,8 +54,8 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
                 <!-- 👤 User Menu -->
                 <div class="app-top-bar__user-wrap" id="userMenuWrap">
                     <button class="app-top-bar__icon-btn app-top-bar__user-btn" id="userMenuBtn" title="Minha conta" aria-label="Minha conta">
-                        <?php if (!empty($_SESSION['avatar_url'])): ?>
-                            <img src="<?= htmlspecialchars($_SESSION['avatar_url']) ?>" alt="Avatar" class="app-top-bar__avatar-img">
+                        <?php if (!empty($_SESSION['url_avatar'])): ?>
+                            <img src="<?= htmlspecialchars($_SESSION['url_avatar']) ?>" alt="Avatar" class="app-top-bar__avatar-img">
                         <?php else: ?>
                             <i class="bi bi-person-circle"></i>
                         <?php endif; ?>
@@ -77,8 +63,8 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
                     <!-- Dropdown -->
                     <div class="app-top-bar__user-dropdown" id="userDropdown">
                         <div class="app-top-bar__user-info">
-                            <span class="app-top-bar__user-name"><?= htmlspecialchars((!empty($_SESSION['nome']) || !empty($_SESSION['sobrenome'])) ? (($_SESSION['nome'] ?? '') . ' ' . ($_SESSION['sobrenome'] ?? '')) : ($_SESSION['username'] ?? '')) ?></span>
-                            <span class="app-top-bar__user-handle">@<?= htmlspecialchars($_SESSION['username'] ?? '') ?></span>
+                            <span class="app-top-bar__user-name"><?= htmlspecialchars((!empty($_SESSION['nome']) || !empty($_SESSION['sobrenome'])) ? (($_SESSION['nome'] ?? '') . ' ' . ($_SESSION['sobrenome'] ?? '')) : ($_SESSION['nome_usuario'] ?? '')) ?></span>
+                            <span class="app-top-bar__user-handle">@<?= htmlspecialchars($_SESSION['nome_usuario'] ?? '') ?></span>
                         </div>
                         <div class="app-top-bar__dropdown-divider"></div>
                         <!-- <a href="/stats" class="app-top-bar__dropdown-item">
@@ -174,7 +160,7 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
                 </div>
                 <div class="small text-gray mb-1" id="widgetFileName" style="font-size: 0.72rem; word-break: break-all;">arquivo.csv</div>
                 <div class="progress" style="height: 6px; background-color: #2c2c3e; border-radius: 3px;">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-purple" role="progressbar" style="width: 100%; background-color: #a88beb !important;"></div>
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-purple" role="progressbar" style="width: 100%; background-color: #D99951 !important;"></div>
                 </div>
                 <div class="small text-muted mt-1" style="font-size: 0.68rem;">Processando em segundo plano...</div>
             </div>
@@ -238,10 +224,10 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
 
                             <div class="mb-4">
                                 <label for="profileUsername" class="form-label text-gray small" style="color: #a5a5c0 !important;">Nome de Usuário</label>
-                                <input type="text" class="form-control text-white rounded-pill px-3" id="profileUsername" name="username" value="<?= htmlspecialchars($_SESSION['username'] ?? '') ?>" style="background-color: #0c0c12 !important; border: 1px solid #2d2d3e !important;" required>
+                                <input type="text" class="form-control text-white rounded-pill px-3" id="profileUsername" name="nome_usuario" value="<?= htmlspecialchars($_SESSION['nome_usuario'] ?? '') ?>" style="background-color: #0c0c12 !important; border: 1px solid #2d2d3e !important;" required>
                             </div>
                             <div class="mb-3 text-start">
-                                <button type="button" class="btn btn-sm rounded-pill px-3" id="btnTogglePasswordChange" onclick="togglePasswordChangeFields()" style="border: 1px solid #7c4dff; color: #a88beb; font-size: 0.75rem; font-weight: 600; background: transparent;">
+                                <button type="button" class="btn btn-sm rounded-pill px-3" id="btnTogglePasswordChange" onclick="togglePasswordChangeFields()" style="border: 1px solid #D99951; color: #D99951; font-size: 0.75rem; font-weight: 600; background: transparent;">
                                     <i class="bi bi-key me-1"></i> Trocar Senha
                                 </button>
                             </div>
@@ -276,7 +262,7 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
                         </div>
                         <div class="modal-footer border-0 pt-0">
                             <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Fechar</button>
-                            <button type="button" id="btnSaveProfileSettings" class="btn rounded-pill px-4 text-white fw-bold" onclick="submitProfileSettings()" style="background-color: #7c4dff !important; border: none;">Salvar</button>
+                            <button type="button" id="btnSaveProfileSettings" class="btn rounded-pill px-4 text-white fw-bold" onclick="submitProfileSettings()" style="background-color: #D99951 !important; border: none;">Salvar</button>
                         </div>
                     </form>
                 </div>
@@ -288,17 +274,17 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
                         <!-- Import Section -->
                         <div class="settings-data-section mb-4">
                             <div class="d-flex align-items-center gap-2 mb-3">
-                                <i class="bi bi-upload text-accent" style="color: #a88beb;"></i>
+                                <i class="bi bi-upload text-accent" style="color: #D99951;"></i>
                                 <h6 class="text-white mb-0 fw-bold">Importação de Dados</h6>
                             </div>
                             
                             <div class="d-flex flex-column gap-2">
                                 <a href="/import/tvtime" class="btn btn-outline-light btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between text-white" style="border: 1px solid #2d2d3e; background-color: #0c0c12; text-decoration: none;">
-                                    <span><i class="bi bi-tv-fill me-2" style="color: #a88beb;"></i> Importar do TV Time</span>
+                                    <span><i class="bi bi-tv-fill me-2" style="color: #D99951;"></i> Importar do TV Time</span>
                                     <i class="bi bi-chevron-right small text-muted"></i>
                                 </a>
                                 <a href="/import/imdb" class="btn btn-outline-light btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between text-white" style="border: 1px solid #2d2d3e; background-color: #0c0c12; text-decoration: none;">
-                                    <span><i class="bi bi-film me-2" style="color: #ffd200;"></i> Importar do IMDb</span>
+                                    <span><i class="bi bi-film me-2" style="color: #D99951;"></i> Importar do IMDb</span>
                                     <i class="bi bi-chevron-right small text-muted"></i>
                                 </a>
                                 <a href="/import/trakt" class="btn btn-outline-light btn-sm rounded-pill py-2 text-start px-3 d-flex align-items-center justify-content-between text-white" style="border: 1px solid #2d2d3e; background-color: #0c0c12; text-decoration: none;">
@@ -354,14 +340,14 @@ if (isset($_SESSION['user_id']) && (!isset($_SESSION['nome']) || !isset($_SESSIO
                     <img id="screenshotPreviewImg" src="" style="max-height: 120px; max-width: 100%; border-radius: 6px;" alt="Preview">
                     <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2 rounded-circle" style="width: 24px; height: 24px; font-size: 0.75rem;" onclick="removeScreenshotPreview()">&times;</button>
                 </div>
-                <button type="button" id="btnAttachScreenshot" onclick="triggerScreenshotUpload()" class="btn w-100 mb-4 d-flex align-items-center justify-content-center gap-2 text-white small" style="background-color: #12121a; border: 1px dashed #7c4dff; border-radius: 10px; font-size: 0.78rem; padding: 10px;">
+                <button type="button" id="btnAttachScreenshot" onclick="triggerScreenshotUpload()" class="btn w-100 mb-4 d-flex align-items-center justify-content-center gap-2 text-white small" style="background-color: #12121a; border: 1px dashed #D99951; border-radius: 10px; font-size: 0.78rem; padding: 10px;">
                     <span id="screenshotSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
-                    <i id="screenshotIcon" class="bi bi-image" style="color: #a88beb;"></i>
+                    <i id="screenshotIcon" class="bi bi-image" style="color: #D99951;"></i>
                     <span id="screenshotBtnText">Anexar screenshot</span>
                 </button>
                 <div class="d-flex align-items-center justify-content-end gap-2">
                     <button type="button" class="btn text-muted small fw-bold px-3" onclick="closeFeedbackModal()">Cancelar</button>
-                    <button type="submit" class="btn py-2 px-4 text-white small fw-bold d-flex align-items-center gap-2" style="background-color: #7c4dff; border-radius: 10px; border: none; font-size: 0.78rem;"><i class="bi bi-send-fill"></i> Enviar</button>
+                    <button type="submit" class="btn py-2 px-4 text-white small fw-bold d-flex align-items-center gap-2" style="background-color: #D99951; border-radius: 10px; border: none; font-size: 0.78rem;"><i class="bi bi-send-fill"></i> Enviar</button>
                 </div>
             </form>
         </div>

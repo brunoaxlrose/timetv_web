@@ -6,6 +6,7 @@ mobile/.env
 mobile/.gradle-apk-cache/
 mobile/.gradle-build-cache/
 mobile/.gradle-cache/
+mobile/.gradle-user/
 mobile/.expo/
 mobile/node_modules/
 mobile/android/.gradle/

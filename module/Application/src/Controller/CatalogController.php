@@ -174,7 +174,7 @@ class CatalogController extends AbstractActionController {
         if ($this->getRequest()->isXmlHttpRequest()) {
             $view->setTerminal(true);
         } else {
-            $this->layout()->title = "Coleção - Time View";
+            $this->layout()->title = "Coleção - CineFio";
         }
 
         return $view;
@@ -229,7 +229,7 @@ class CatalogController extends AbstractActionController {
         if ($this->getRequest()->isXmlHttpRequest()) {
             $view->setTerminal(true);
         } else {
-            $this->layout()->title = "Pesquisar - Time View";
+            $this->layout()->title = "Pesquisar - CineFio";
         }
 
         return $view;
@@ -434,7 +434,7 @@ class CatalogController extends AbstractActionController {
                 if ($item['release_year']) {
                     $url .= ($item['type'] === 'movie') ? "&primary_release_year=" . $item['release_year'] : "&first_air_date_year=" . $item['release_year'];
                 }
-                $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: TimeView/1.0\r\n", 'timeout' => 5]]));
+                $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: CineFio/1.0\r\n", 'timeout' => 5]]));
                 if ($json) {
                     $results = json_decode($json, true)['results'] ?? [];
                     if (!empty($results[0]['id'])) {
@@ -448,6 +448,7 @@ class CatalogController extends AbstractActionController {
             if (!empty($tmdbIdForRecs)) {
                 $recommendations = \Application\Helper\TmdbHelper::getRecommendations($item['type'], (int)$tmdbIdForRecs, 8);
             }
+        }
         if (!empty($item['watch_providers'])) {
             $providers = json_decode($item['watch_providers'], true);
             if (is_array($providers)) {
@@ -494,7 +495,7 @@ class CatalogController extends AbstractActionController {
             'comments' => $comments,
             'recommendations' => $recommendations
         ]);
-        $this->layout()->title = $item['title'] . " - Time View";
+        $this->layout()->title = $item['title'] . " - CineFio";
         return $view;
     }
 

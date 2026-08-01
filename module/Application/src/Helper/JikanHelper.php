@@ -7,7 +7,7 @@ class JikanHelper {
 
     public static function searchAnime(string $query, int $limit = 10): array {
         $url = self::BASE_URL . '/anime?q=' . urlencode($query) . '&limit=' . $limit . '&sfw=true';
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
         $json = @file_get_contents($url, false, stream_context_create($opts));
         if (!$json) return [];
 
@@ -35,7 +35,7 @@ class JikanHelper {
                 'poster_url'    => $poster,
                 'banner_url'    => $banner,
                 'description'   => $overview,
-                'release_year'  => $releaseYear,
+                'ano_lancamento'  => $releaseYear,
                 'track_status'  => null,
                 'source'        => 'mal'
             ];
@@ -45,7 +45,7 @@ class JikanHelper {
 
     public static function getAnimeDetail(int $malId): ?array {
         $url = self::BASE_URL . '/anime/' . $malId;
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\n", 'timeout' => 8]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\n", 'timeout' => 8]];
         $json = @file_get_contents($url, false, stream_context_create($opts));
         if (!$json) return null;
         $res = json_decode($json, true);
@@ -54,7 +54,7 @@ class JikanHelper {
 
     public static function getCharacters(int $malId, int $limit = 12): array {
         $url = self::BASE_URL . '/anime/' . $malId . '/characters';
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 6]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 6]];
         $json = @file_get_contents($url, false, stream_context_create($opts));
         if (!$json) return [];
 
@@ -67,6 +67,8 @@ class JikanHelper {
             $character = $row['character'] ?? [];
             $images = $character['images']['jpg'] ?? [];
             $cast[] = [
+                'person_id' => (int)($character['mal_id'] ?? 0),
+                'source' => 'jikan',
                 'name' => $character['name'] ?? 'Sem nome',
                 'character' => $row['role'] ?? '',
                 'image_url' => $images['image_url'] ?? null,
@@ -76,11 +78,45 @@ class JikanHelper {
         return $cast;
     }
 
+    public static function getCharacterCredits(int $characterId, int $limit = 60): ?array {
+        $url = self::BASE_URL . '/characters/' . $characterId . '/full';
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $json = @file_get_contents($url, false, stream_context_create($opts));
+        $data = $json ? (json_decode($json, true)['data'] ?? null) : null;
+        if (!$data) return null;
+        $credits = [];
+        foreach (array_slice($data['anime'] ?? [], 0, $limit) as $row) {
+            $anime = $row['anime'] ?? [];
+            if (empty($anime['mal_id'])) continue;
+            $credits[] = [
+                'id_item' => null,
+                'tmdb_id' => null,
+                'tvmaze_id' => null,
+                'mal_id' => (int)$anime['mal_id'],
+                'titulo' => $anime['title'] ?? 'Sem título',
+                'tipo' => 'anime',
+                'url_poster' => $anime['images']['jpg']['large_image_url'] ?? $anime['images']['jpg']['image_url'] ?? '',
+                'personagem' => $row['role'] ?? '',
+            ];
+        }
+        return [
+            'person' => [
+                'person_id' => (int)($data['mal_id'] ?? $characterId),
+                'source' => 'jikan',
+                'name' => $data['name'] ?? 'Sem nome',
+                'image_url' => $data['images']['jpg']['image_url'] ?? null,
+                'biography' => trim($data['about'] ?? ''),
+                'department' => 'Personagem',
+            ],
+            'credits' => $credits,
+        ];
+    }
+
     public static function getEpisodes(int $malId, int $maxPages = 8): array {
         $episodes = [];
         $page = 1;
         $hasNextPage = true;
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
 
         while ($hasNextPage && $page <= $maxPages) {
             $url = self::BASE_URL . '/anime/' . $malId . '/episodes?page=' . $page;
@@ -175,7 +211,7 @@ class JikanHelper {
                 ]);
             }
 
-            $update = $pdo->prepare("UPDATE item SET total_episodes = :total, last_sync = CURRENT_TIMESTAMP WHERE id_item = :item_id");
+            $update = $pdo->prepare("UPDATE item SET total_episodes = :total, ts_ultima_sincronizacao = CURRENT_TIMESTAMP WHERE id_item = :item_id");
             $update->execute([':total' => max($totalEpisodes, count($episodes)), ':item_id' => $itemId]);
 
             $pdo->commit();
@@ -227,17 +263,17 @@ class JikanHelper {
 
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO item (mal_id, title, type, poster_url, banner_url, description, release_year, total_episodes, runtime_minutes, genres)
-                VALUES (:mal_id, :title, 'anime', :poster, :banner, :description, :release_year, :episodes, 24, :genres)
+                INSERT INTO item (mal_id, titulo, tipo, poster_url, banner_url, descricao, ano_lancamento, total_episodes, runtime_minutes, genres)
+                VALUES (:mal_id, :titulo, 'anime', :poster, :banner, :descricao, :ano_lancamento, :episodes, 24, :genres)
                 RETURNING id_item
             ");
             $stmt->execute([
                 ':mal_id' => $malId,
-                ':title' => $title,
+                ':titulo' => $title,
                 ':poster' => $poster,
                 ':banner' => $banner,
-                ':description' => $description,
-                ':release_year' => $releaseYear,
+                ':descricao' => $description,
+                ':ano_lancamento' => $releaseYear,
                 ':episodes' => $episodes,
                 ':genres' => $genresStr
             ]);
@@ -265,7 +301,7 @@ class JikanHelper {
 
     public static function getRecommendations(int $malId, int $limit = 8): array {
         $url = self::BASE_URL . '/anime/' . $malId . '/recommendations';
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
         $json = @file_get_contents($url, false, stream_context_create($opts));
         if (!$json) return [];
 
@@ -291,7 +327,7 @@ class JikanHelper {
                 'poster_url'    => $poster,
                 'banner_url'    => $banner,
                 'description'   => '',
-                'release_year'  => (int)date('Y'),
+                'ano_lancamento'  => (int)date('Y'),
                 'track_status'  => null,
                 'source'        => 'mal'
             ];

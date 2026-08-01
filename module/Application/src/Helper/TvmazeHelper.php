@@ -74,29 +74,30 @@ class TvmazeHelper {
 
             // Insert primary item record
             $insertItem = $pdo->prepare("
-                INSERT INTO item (tvmaze_id, title, type, poster_url, banner_url, description, release_year, total_episodes, runtime_minutes, last_sync, genres)
-                VALUES (:tvmaze_id, :title, :type, :poster, :banner, :description, :release_year, :total_episodes, :runtime, CURRENT_TIMESTAMP, :genres)
+                INSERT INTO item (tvmaze_id, titulo, tipo, url_poster, url_banner, descricao, ano_lancamento, data_lancamento, total_episodios, duracao_minutos, ts_ultima_sincronizacao, generos)
+                VALUES (:tvmaze_id, :titulo, :tipo, :poster, :banner, :descricao, :ano_lancamento, :data_lancamento, :total_episodios, :duracao_minutos, CURRENT_TIMESTAMP, :generos)
                 RETURNING id_item
             ");
             $insertItem->execute([
                 ':tvmaze_id' => $tvmazeId,
-                ':title' => $title,
-                ':type' => $type,
+                ':titulo' => $title,
+                ':tipo' => $type,
                 ':poster' => $poster,
                 ':banner' => $banner,
-                ':description' => $description,
-                ':release_year' => $releaseYear,
-                ':total_episodes' => $totalEpisodes,
-                ':runtime' => $runtime,
-                ':genres' => $genresStr
+                ':descricao' => $description,
+                ':ano_lancamento' => $releaseYear,
+                ':data_lancamento' => $show['premiered'] ?? null,
+                ':total_episodios' => $totalEpisodes,
+                ':duracao_minutos' => $runtime,
+                ':generos' => $genresStr
             ]);
 
             $itemId = $insertItem->fetchColumn();
 
             // Insert all episodes
             $insertEp = $pdo->prepare("
-                INSERT INTO episodio (id_item, season_number, episode_number, title, air_date, image_url, description, runtime_minutes, rating)
-                VALUES (:id_item, :season_number, :episode_number, :title, :air_date, :image_url, :description, :runtime_minutes, :rating)
+                INSERT INTO episodio (id_item, numero_temporada, numero_episodio, titulo, data_exibicao, url_imagem, descricao, duracao_minutos, nota)
+                VALUES (:id_item, :numero_temporada, :numero_episodio, :titulo, :data_exibicao, :url_imagem, :descricao, :duracao_minutos, :nota)
             ");
 
             foreach ($filteredEpisodes as $ep) {
@@ -111,14 +112,14 @@ class TvmazeHelper {
 
                 $insertEp->execute([
                     ':id_item' => $itemId,
-                    ':season_number' => $ep['season'],
-                    ':episode_number' => $ep['number'],
-                    ':title' => $ep['name'] ?? ('Episódio ' . $ep['number']),
-                    ':air_date' => $airDate,
-                    ':image_url' => $epImage,
-                    ':description' => $epDesc,
-                    ':runtime_minutes' => $epRuntime,
-                    ':rating' => $epRating
+                    ':numero_temporada' => $ep['season'],
+                    ':numero_episodio' => $ep['number'],
+                    ':titulo' => $ep['name'] ?? ('Episódio ' . $ep['number']),
+                    ':data_exibicao' => $airDate,
+                    ':url_imagem' => $epImage,
+                    ':descricao' => $epDesc,
+                    ':duracao_minutos' => $epRuntime,
+                    ':nota' => $epRating
                 ]);
             }
 
@@ -141,12 +142,12 @@ class TvmazeHelper {
         $context = stream_context_create($options);
 
         // Fetch show's title, type, and current tmdb_id from local DB
-        $stmtLocal = $pdo->prepare("SELECT title, type, tmdb_id FROM item WHERE id_item = :id_item LIMIT 1");
+        $stmtLocal = $pdo->prepare("SELECT titulo, tipo, tmdb_id FROM item WHERE id_item = :id_item LIMIT 1");
         $stmtLocal->execute([':id_item' => $itemId]);
         $localItem = $stmtLocal->fetch(\PDO::FETCH_ASSOC);
 
-        $title = $localItem['title'] ?? '';
-        $type = $localItem['type'] ?? 'series';
+        $title = $localItem['titulo'] ?? '';
+        $type = $localItem['tipo'] ?? 'series';
         $tmdbId = $localItem['tmdb_id'] ?? null;
 
         // Fetch episodes list from TVMaze
@@ -163,7 +164,7 @@ class TvmazeHelper {
         if ($type !== 'movie') {
             if (empty($tmdbId)) {
                 $searchUrl = "https://api.themoviedb.org/3/search/tv?api_key=1f54bd990f1cdfb230adb312546d765d&query=" . urlencode($title) . "&language=pt-BR";
-                $searchJson = @file_get_contents($searchUrl, false, stream_context_create(['http' => ['header' => "User-Agent: TimeView/1.0\r\n"]]));
+                $searchJson = @file_get_contents($searchUrl, false, stream_context_create(['http' => ['header' => "User-Agent: CineFio/1.0\r\n"]]));
                 if ($searchJson) {
                     $searchResults = json_decode($searchJson, true)['results'] ?? [];
                     if (!empty($searchResults)) {
@@ -257,41 +258,41 @@ class TvmazeHelper {
 
             $updateItem = $pdo->prepare("
                 UPDATE item 
-                SET total_episodes = :total_episodes, 
+                SET total_episodios = :total_episodios,
                     status = :status,
-                    last_sync = CURRENT_TIMESTAMP
+                    ts_ultima_sincronizacao = CURRENT_TIMESTAMP
                 WHERE id_item = :id_item
             ");
             $updateItem->execute([
-                ':total_episodes' => $totalEpisodes,
+                ':total_episodios' => $totalEpisodes,
                 ':status' => $status,
                 ':id_item' => $itemId
             ]);
 
             // Insert or update all episodes
             $insertEp = $pdo->prepare("
-                INSERT INTO episodio (id_item, season_number, episode_number, title, air_date, image_url, description, runtime_minutes, rating)
-                VALUES (:id_item, :season_number, :episode_number, :title, :air_date, :image_url, :description, :runtime_minutes, :rating)
-                ON CONFLICT (id_item, season_number, episode_number) DO UPDATE SET
-                    title = EXCLUDED.title,
-                    air_date = EXCLUDED.air_date,
-                    image_url = CASE WHEN EXCLUDED.image_url <> '' THEN EXCLUDED.image_url ELSE episodio.image_url END,
-                    description = CASE WHEN EXCLUDED.description <> 'Nenhuma sinopse disponível.' AND EXCLUDED.description <> '' THEN EXCLUDED.description ELSE episodio.description END,
-                    runtime_minutes = EXCLUDED.runtime_minutes,
-                    rating = EXCLUDED.rating
+                INSERT INTO episodio (id_item, numero_temporada, numero_episodio, titulo, data_exibicao, url_imagem, descricao, duracao_minutos, nota)
+                VALUES (:id_item, :numero_temporada, :numero_episodio, :titulo, :data_exibicao, :url_imagem, :descricao, :duracao_minutos, :nota)
+                ON CONFLICT (id_item, numero_temporada, numero_episodio) DO UPDATE SET
+                    titulo = EXCLUDED.titulo,
+                    data_exibicao = EXCLUDED.data_exibicao,
+                    url_imagem = CASE WHEN EXCLUDED.url_imagem <> '' THEN EXCLUDED.url_imagem ELSE episodio.url_imagem END,
+                    descricao = CASE WHEN EXCLUDED.descricao <> 'Nenhuma sinopse disponível.' AND EXCLUDED.descricao <> '' THEN EXCLUDED.descricao ELSE episodio.descricao END,
+                    duracao_minutos = EXCLUDED.duracao_minutos,
+                    nota = EXCLUDED.nota
             ");
 
             foreach ($mergedEpisodes as $ep) {
                 $insertEp->execute([
                     ':id_item' => $itemId,
-                    ':season_number' => $ep['season'],
-                    ':episode_number' => $ep['number'],
-                    ':title' => $ep['title'],
-                    ':air_date' => $ep['air_date'] ?? null,
-                    ':image_url' => $ep['image_url'],
-                    ':description' => $ep['description'],
-                    ':runtime_minutes' => $ep['runtime'],
-                    ':rating' => $ep['rating']
+                    ':numero_temporada' => $ep['season'],
+                    ':numero_episodio' => $ep['number'],
+                    ':titulo' => $ep['title'],
+                    ':data_exibicao' => $ep['air_date'] ?? null,
+                    ':url_imagem' => $ep['image_url'],
+                    ':descricao' => $ep['description'],
+                    ':duracao_minutos' => $ep['runtime'],
+                    ':nota' => $ep['rating']
                 ]);
             }
 
@@ -336,10 +337,54 @@ class TvmazeHelper {
 
     public static function getTvmazeIdByTitle(string $title): ?int {
         $url = 'https://api.tvmaze.com/singlesearch/shows?q=' . urlencode($title);
-        $opts = ['http' => ['header' => "User-Agent: TimeView/1.0\r\n", 'timeout' => 8]];
+        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\n", 'timeout' => 8]];
         $json = @file_get_contents($url, false, stream_context_create($opts));
         if (!$json) return null;
         $show = json_decode($json, true);
         return $show['id'] ?? null;
+    }
+
+    public static function getFutureSchedule(string $startDate, string $endDate, int $limit = 160): array {
+        $cacheFile = sys_get_temp_dir() . '/cinefio-tvmaze-full-schedule.json';
+        $json = is_file($cacheFile) && time() - filemtime($cacheFile) < 21600 ? @file_get_contents($cacheFile) : false;
+        if (!$json) {
+            $context = stream_context_create(['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 15]]);
+            $json = @file_get_contents('https://api.tvmaze.com/schedule/full', false, $context);
+            if ($json) @file_put_contents($cacheFile, $json);
+        }
+        $rows = $json ? json_decode($json, true) : [];
+        if (!is_array($rows)) return [];
+
+        $events = [];
+        foreach ($rows as $episode) {
+            $date = substr((string)($episode['airdate'] ?? $episode['airstamp'] ?? ''), 0, 10);
+            if ($date < $startDate || $date > $endDate) continue;
+            $show = $episode['_embedded']['show'] ?? $episode['show'] ?? [];
+            if (empty($show['id'])) continue;
+            $genres = $show['genres'] ?? [];
+            $country = $show['network']['country']['code'] ?? $show['webChannel']['country']['code'] ?? '';
+            $type = ($country === 'JP' || in_array('Anime', $genres, true)) ? 'anime' : 'series';
+            $events[] = [
+                'id_item' => null,
+                'tvmaze_id' => (int)$show['id'],
+                'tmdb_id' => null,
+                'mal_id' => null,
+                'titulo' => $show['name'] ?? 'Sem título',
+                'tipo' => $type,
+                'url_poster' => $show['image']['medium'] ?? '',
+                'url_banner' => $show['image']['original'] ?? '',
+                'ano_lancamento' => !empty($show['premiered']) ? (int)substr($show['premiered'], 0, 4) : (int)substr($date, 0, 4),
+                'data_evento' => $date,
+                'id_episodio' => null,
+                'numero_temporada' => isset($episode['season']) ? (int)$episode['season'] : null,
+                'numero_episodio' => isset($episode['number']) ? (int)$episode['number'] : null,
+                'titulo_episodio' => $episode['name'] ?? null,
+                'status_acompanhamento' => null,
+                'assistido' => false,
+                'origem' => 'tvmaze',
+            ];
+            if (count($events) >= $limit) break;
+        }
+        return $events;
     }
 }

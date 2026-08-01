@@ -31,12 +31,12 @@
     cursor: pointer;
 }
 .refract-profile-tab.active {
-    color: #7c4dff;
-    border-bottom: 2px solid #7c4dff;
+    color: #D99951;
+    border-bottom: 2px solid #D99951;
 }
 .refract-time-panel {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.15) 0%, rgba(56, 239, 125, 0.03) 100%);
-    border: 1px solid rgba(124, 77, 255, 0.2);
+    background: linear-gradient(135deg, rgba(217, 153, 81, 0.15) 0%, rgba(56, 239, 125, 0.03) 100%);
+    border: 1px solid rgba(217, 153, 81, 0.2);
     border-radius: 16px;
 }
 .refract-stat-box {
@@ -80,7 +80,7 @@
 
 .refract-year-badge {
     background-color: rgba(124,77,255,0.15) !important;
-    color: #a88beb !important;
+    color: #D99951 !important;
     border: 1px solid rgba(124,77,255,0.3);
 }
 .refract-activity-block {
@@ -90,7 +90,7 @@
     border-radius: 3px;
 }
 .refract-activity-block.active {
-    background-color: #7c4dff;
+    background-color: #D99951;
     box-shadow: 0 0 8px rgba(124,77,255,0.6);
 }
 

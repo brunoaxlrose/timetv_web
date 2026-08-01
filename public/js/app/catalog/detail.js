@@ -101,10 +101,10 @@ $(function() {
     if (forceLocked) {
         $metaBlock.attr('data-released', '0');
         $('#ratingStarsContainer').attr('data-locked', '1').css({ pointerEvents: 'none', opacity: '0.35' });
-        $('#userComment').prop('disabled', true).attr('placeholder', 'Disponivel apos o lancamento.');
-        $('#btnSaveReview').prop('disabled', true).text('Disponivel apos lancamento').css('pointer-events', 'none');
+        $('#userComment').prop('disabled', true).attr('placeholder', 'Disponível após o lançamento.');
+        $('#btnSaveReview').prop('disabled', true).text('Disponível após o lançamento').css('pointer-events', 'none');
         $('.btn-track-toggle[data-status="completed"]').removeClass('btn-track-toggle').addClass('disabled').prop('disabled', true)
-            .html('<i class="bi bi-clock me-2"></i> CONTEUDO AINDA NAO LANCADO')
+            .html('<i class="bi bi-clock me-2"></i> CONTEUDO AINDA NÃO LANÇADO')
             .css({ backgroundColor: '#2c2c3e', color: '#a5a5c0', cursor: 'not-allowed', opacity: '0.7' });
     }
 

@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'Time View'
+rootProject.name = 'CineFio'
 
 dependencyResolutionManagement {
   versionCatalogs {

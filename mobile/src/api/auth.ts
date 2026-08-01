@@ -2,27 +2,28 @@ import { apiRequest } from './client';
 
 export type User = {
   id: number;
-  username: string;
+  nome_usuario: string;
   email: string;
   nome: string;
   sobrenome: string;
-  api_token?: string;
+  url_avatar?: string;
+  token_api?: string;
 };
 
-export function login(email: string, password: string) {
+export function login(email: string, senha: string) {
   return apiRequest<User>('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, senha }),
   });
 }
 
 export function register(payload: {
-  user_name: string;
+  nome_usuario: string;
   nome: string;
   sobrenome: string;
   email: string;
-  password: string;
-  password_confirm: string;
+  senha: string;
+  confirmacao_senha: string;
 }) {
   return apiRequest<User>('/api/v1/auth/register', {
     method: 'POST',
@@ -39,12 +40,13 @@ export function logout() {
 }
 
 export function updateProfile(payload: {
-  username: string;
+  nome_usuario: string;
   nome: string;
   sobrenome: string;
-  current_password?: string;
-  new_password?: string;
-  confirm_new_password?: string;
+  url_avatar?: string;
+  senha_atual?: string;
+  nova_senha?: string;
+  confirmacao_nova_senha?: string;
 }) {
   return apiRequest<User>('/api/v1/auth/profile', {
     method: 'POST',

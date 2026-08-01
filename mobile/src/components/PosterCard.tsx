@@ -9,16 +9,16 @@ type Props = {
 };
 
 export function PosterCard({ item, onPress, width = 104 }: Props) {
-  const showReleaseDate = item.release_date ? item.release_date.slice(0, 10) > new Date().toISOString().slice(0, 10) : false;
+  const showReleaseDate = item.data_lancamento ? item.data_lancamento.slice(0, 10) > new Date().toISOString().slice(0, 10) : false;
 
   return (
     <Pressable onPress={() => onPress?.(item)} disabled={!onPress} style={[styles.card, { width }]}>
       <View style={styles.posterWrap}>
-        {item.poster_url ? <Image source={{ uri: item.poster_url }} style={styles.poster} /> : <View style={styles.placeholder} />}
-        <Text style={styles.type}>{item.type === 'movie' ? 'FILM' : item.type === 'anime' ? 'ANIME' : 'TV'}</Text>
+        {item.url_poster ? <Image source={{ uri: item.url_poster }} style={styles.poster} /> : <View style={styles.placeholder} />}
+        <Text style={styles.type}>{item.tipo === 'movie' ? 'FILM' : item.tipo === 'anime' ? 'ANIME' : 'TV'}</Text>
       </View>
-      <Text numberOfLines={1} style={styles.title}>{item.title}</Text>
-      {showReleaseDate ? <Text numberOfLines={1} style={styles.date}>Lanca em {formatDate(item.release_date!)}</Text> : null}
+      <Text numberOfLines={1} style={styles.title}>{item.titulo}</Text>
+      {showReleaseDate ? <Text numberOfLines={1} style={styles.date}>Lanca em {formatDate(item.data_lancamento!)}</Text> : null}
     </Pressable>
   );
 }

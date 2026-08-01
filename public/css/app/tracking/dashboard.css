@@ -1,14 +1,14 @@
 /* Dashboard / Collection Page specific styles */
 
 .refract-goal-banner {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.15) 0%, rgba(240, 147, 43, 0.05) 100%);
-    border: 1px solid rgba(124, 77, 255, 0.25);
+    background: linear-gradient(135deg, rgba(217, 153, 81, 0.15) 0%, rgba(240, 147, 43, 0.05) 100%);
+    border: 1px solid rgba(217, 153, 81, 0.25);
     border-radius: 14px;
     cursor: pointer;
     transition: background 0.2s;
 }
 .refract-goal-banner:hover {
-    background: linear-gradient(135deg, rgba(124, 77, 255, 0.2) 0%, rgba(240, 147, 43, 0.1) 100%);
+    background: linear-gradient(135deg, rgba(217, 153, 81, 0.2) 0%, rgba(240, 147, 43, 0.1) 100%);
 }
 
 .refract-section-title {
@@ -18,7 +18,7 @@
     letter-spacing: -0.3px;
 }
 .refract-purple-text {
-    color: #a88beb !important;
+    color: #D99951 !important;
 }
 
 .refract-continue-scroll {
@@ -84,8 +84,8 @@
     transition: all 0.2s;
 }
 .refract-continue-check:hover {
-    border-color: #a88beb;
-    color: #a88beb;
+    border-color: #D99951;
+    color: #D99951;
     transform: scale(1.08);
 }
 .refract-continue-check.checked {
@@ -100,7 +100,7 @@
 }
 
 .refract-btn-purple {
-    background-color: #7c4dff !important;
+    background-color: #D99951 !important;
     color: white !important;
     border: none;
     transition: background-color 0.2s;
@@ -169,10 +169,10 @@
     transition: all 0.2s;
 }
 .pill-btn.active, .pill-btn:hover {
-    background-color: #7c4dff;
+    background-color: #D99951;
     color: #ffffff;
-    border-color: #7c4dff;
-    box-shadow: 0 4px 12px rgba(124, 77, 255, 0.3);
+    border-color: #D99951;
+    box-shadow: 0 4px 12px rgba(217, 153, 81, 0.3);
 }
 
 .catalog-item-card {
@@ -217,7 +217,7 @@
     box-shadow: 0 0 6px rgba(46, 213, 115, 0.6);
 }
 .refract-dot.purple {
-    background-color: #a88beb;
+    background-color: #D99951;
     box-shadow: 0 0 6px rgba(168, 139, 235, 0.6);
 }
 

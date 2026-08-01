@@ -1,48 +1,83 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { addItemToList, getDetailByItem, markEpisodes, saveReview, toggleFavorite, trackItem } from '../api/mobile';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { addItemToList, createList, getDetailByItem, markEpisodes, saveReview, toggleFavorite, trackItem } from '../api/mobile';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { Marquee } from '../components/Marquee';
 import { Skeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
-import { colors } from '../theme/colors';
+import { alpha, colors } from '../theme/colors';
 import { CastMember, Episode, Item, UserList } from '../types';
 
 type SelectableList = UserList & { has_item?: boolean };
 type DetailTab = 'about' | 'episodes';
+type DetailData = Awaited<ReturnType<typeof getDetailByItem>>['data'];
+const detailCache = new Map<string, DetailData>();
 
-export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBack: () => void; onSelectItem?: (item: Item) => void }) {
-  const [detail, setDetail] = useState<Awaited<ReturnType<typeof getDetailByItem>>['data'] | null>(null);
-  const [loading, setLoading] = useState(true);
+export function DetailScreen({ item, onBack, onSelectItem, onSelectPerson, onDataChanged }: { item: Item; onBack: () => void; onSelectItem?: (item: Item) => void; onSelectPerson?: (person: CastMember) => void; onDataChanged?: () => void }) {
+  const cacheKey = itemKey(item);
+  const [detail, setDetail] = useState<DetailData | null>(() => {
+    const cached = detailCache.get(cacheKey);
+    return cached ? { ...cached, item: preservePreviewItem(item, cached.item) } : null;
+  });
+  const [loading, setLoading] = useState(false);
+  const [enriching, setEnriching] = useState(() => !detailCache.has(cacheKey));
   const [activeTab, setActiveTab] = useState<DetailTab>('about');
-  const [favorite, setFavorite] = useState(!!item.is_favorite);
-  const [rating, setRating] = useState(Number(item.rating || 0));
-  const [comment, setComment] = useState(item.comment || '');
+  const [favorite, setFavorite] = useState(!!item.eh_favorito);
+  const [rating, setRating] = useState(Number(item.nota || 0));
+  const [comment, setComment] = useState(item.comentario || '');
   const [listOpen, setListOpen] = useState(false);
   const [confirmRemoveFavorite, setConfirmRemoveFavorite] = useState(false);
   const [saving, setSaving] = useState(false);
   const [favoriteSaving, setFavoriteSaving] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const requestId = useRef(0);
   const { showToast } = useToast();
 
   async function load() {
-    setLoading(true);
+    const currentRequest = ++requestId.current;
+    const cachedValue = detailCache.get(cacheKey);
+    const cached = cachedValue ? { ...cachedValue, item: preservePreviewItem(item, cachedValue.item) } : null;
+    if (cached) setDetail(cached);
+    setLoading(false);
+    setEnriching(true);
     setDetailError('');
+    let usableDetail = cached || null;
     try {
-      const response = await getDetailByItem(item);
-      setDetail(response.data);
-      setActiveTab(response.data?.item?.type !== 'movie' && response.data?.episodes?.length ? 'episodes' : 'about');
-      if (response.data?.item) {
-        setFavorite(!!response.data.item.is_favorite);
-        setRating(Number(response.data.item.rating || 0));
-        setComment(response.data.item.comment || '');
+      const response = cached ? null : await getDetailByItem(item, true);
+      if (currentRequest !== requestId.current) return;
+      if (response?.data) {
+        usableDetail = { ...response.data, item: preservePreviewItem(item, response.data.item) };
+        detailCache.set(cacheKey, usableDetail);
+        setDetail(usableDetail);
+        setActiveTab(usableDetail.item?.tipo !== 'movie' && usableDetail.episodes?.length ? 'episodes' : 'about');
+        if (usableDetail.item) {
+          setFavorite(!!usableDetail.item.eh_favorito);
+          setRating(Number(usableDetail.item.nota || 0));
+          setComment(usableDetail.item.comentario || '');
+        }
+      }
+      const enriched = await getDetailByItem(usableDetail?.item || item);
+      if (currentRequest !== requestId.current) return;
+      if (enriched.data) {
+        usableDetail = { ...enriched.data, item: preservePreviewItem(usableDetail?.item || item, enriched.data.item) };
+        detailCache.set(cacheKey, usableDetail);
+        setDetail(usableDetail);
+        setFavorite(!!usableDetail.item?.eh_favorito);
+        setRating(Number(usableDetail.item?.nota || 0));
+        setComment(usableDetail.item?.comentario || '');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Nao foi possivel carregar este titulo.';
-      setDetail(null);
-      setDetailError(message);
-      showToast(message, 'error');
+      if (!usableDetail) {
+        setDetail(null);
+        setDetailError(message);
+        showToast(message, 'error');
+      }
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+        setEnriching(false);
+      }
     }
   }
 
@@ -51,25 +86,29 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
     load();
   }, [item.id_item, item.tmdb_id, item.tvmaze_id, item.mal_id]);
 
+  useEffect(() => {
+    if (detail) detailCache.set(cacheKey, detail);
+  }, [cacheKey, detail]);
+
   const displayItem = detail?.item || item;
-  const released = detail?.released ?? isReleased(displayItem.release_date);
-  const isMovie = displayItem.type === 'movie';
+  const released = detail?.released ?? isReleased(displayItem.data_lancamento);
+  const isMovie = displayItem.tipo === 'movie';
   const nextEpisode = detail?.next_unwatched || null;
   const hasEpisodes = !!detail?.episodes?.length && !!displayItem.id_item && !isMovie;
   const canUseItemActions = !!(displayItem.id_item || displayItem.tmdb_id || displayItem.tvmaze_id || displayItem.mal_id);
   const watchedCount = Number(detail?.progress?.watched_count || 0);
   const totalCount = Number(detail?.progress?.total_count || 0);
-  const isWatched = isMovie ? displayItem.track_status === 'completed' : totalCount > 0 && watchedCount >= totalCount;
+  const isWatched = isMovie ? displayItem.status_acompanhamento === 'concluido' : totalCount > 0 && watchedCount >= totalCount;
   const canRewatch = isMovie && released && isWatched;
-  const hasExistingReview = !!Number(displayItem.rating || 0) && !!String(displayItem.comment || '').trim();
+  const hasExistingReview = !!Number(displayItem.nota || 0) && !!String(displayItem.comentario || '').trim();
   const mainButtonLabel = !released
-    ? availableLabel(displayItem.release_date)
+    ? availableLabel(displayItem.data_lancamento)
     : isMovie && isWatched
       ? 'Filme assistido'
       : isMovie
         ? 'Marcar filme como assistido'
         : nextEpisode
-          ? `Marcar T${nextEpisode.season_number}E${nextEpisode.episode_number} como visto`
+          ? `Marcar T${nextEpisode.numero_temporada}E${nextEpisode.numero_episodio} como visto`
           : 'Tudo assistido';
 
   async function doFavorite() {
@@ -82,14 +121,15 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
     setFavoriteSaving(true);
     try {
       const response = await toggleFavorite(displayItem, true);
-      const nextFavorite = !!response.data?.is_favorite;
+      const nextFavorite = !!response.data?.eh_favorito;
       const itemId = response.data?.item_id ?? displayItem.id_item;
       setFavorite(nextFavorite);
       setDetail((current) => current ? {
         ...current,
-        item: { ...current.item, id_item: itemId, is_favorite: nextFavorite },
+        item: { ...current.item, id_item: itemId, eh_favorito: nextFavorite },
       } : current);
       showToast(nextFavorite ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.', 'success');
+      onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao favoritar.', 'error');
     } finally {
@@ -102,14 +142,15 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
     setFavoriteSaving(true);
     try {
       const response = await toggleFavorite(displayItem, false);
-      const nextFavorite = !!response.data?.is_favorite;
+      const nextFavorite = !!response.data?.eh_favorito;
       const itemId = response.data?.item_id ?? displayItem.id_item;
       setFavorite(nextFavorite);
       setDetail((current) => current ? {
         ...current,
-        item: { ...current.item, id_item: itemId, is_favorite: nextFavorite },
+        item: { ...current.item, id_item: itemId, eh_favorito: nextFavorite },
       } : current);
       showToast('Removido dos favoritos.', 'success');
+      onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao remover favorito.', 'error');
     } finally {
@@ -122,11 +163,11 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
     setSaving(true);
     try {
       if (isMovie) {
-        const response = await trackItem(displayItem, 'completed');
+        const response = await trackItem(displayItem, 'concluido');
         const itemId = response.data?.item_id ?? displayItem.id_item;
         setDetail((current) => current ? {
           ...current,
-          item: { ...current.item, id_item: itemId, track_status: 'completed' },
+          item: { ...current.item, id_item: itemId, status_acompanhamento: 'concluido' },
           progress: { total_count: 1, watched_count: 1 },
         } : current);
       } else if (nextEpisode) {
@@ -138,6 +179,7 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
         applyEpisodePayload(response.data);
       }
       showToast('Marcado como assistido.', 'success');
+      onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao marcar como visto.', 'error');
     } finally {
@@ -149,13 +191,14 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
     if (!canRewatch || saving) return;
     setSaving(true);
     try {
-      const response = await trackItem(displayItem, 'rewatching', 'rewatch');
+      const response = await trackItem(displayItem, 'reassistindo', 'rewatch');
       const itemId = response.data?.item_id ?? displayItem.id_item;
       setDetail((current) => current ? {
         ...current,
-        item: { ...current.item, id_item: itemId, track_status: isMovie ? 'completed' : 'watching', rewatch_count: Number(current.item.rewatch_count || 0) + 1 },
+        item: { ...current.item, id_item: itemId, status_acompanhamento: isMovie ? 'concluido' : 'assistindo', quantidade_reassistida: Number(current.item.quantidade_reassistida || 0) + 1 },
       } : current);
       showToast('Reassistir iniciado.', 'success');
+      onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao iniciar reassistir.', 'error');
     } finally {
@@ -171,12 +214,16 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
     }
     setSaving(true);
     try {
-      await saveReview(displayItem, nextRating, comment.trim());
+      const response = await saveReview(displayItem, nextRating, comment.trim());
       setDetail((current) => current ? {
         ...current,
-        item: { ...current.item, rating: nextRating, comment: comment.trim() },
+        item: { ...current.item, nota: nextRating, comentario: comment.trim() },
+        reviews: response.data?.avaliacao
+          ? [response.data.avaliacao, ...current.reviews.filter((review) => review.id_usuario !== response.data?.avaliacao?.id_usuario)]
+          : current.reviews,
       } : current);
       showToast('Avaliacao salva.', 'success');
+      onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao salvar avaliacao.', 'error');
     } finally {
@@ -192,6 +239,7 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
       progress: payload.progress,
       next_unwatched: payload.next_unwatched,
     } : current);
+    onDataChanged?.();
   }
 
   return (
@@ -216,7 +264,7 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
         <>
           {/* Immersive Header Banner (Option 3) */}
           <View style={styles.bannerContainer}>
-            <Image source={{ uri: displayItem.banner_url || displayItem.poster_url }} style={styles.bannerImage} />
+            <Image source={{ uri: displayItem.url_banner || displayItem.url_poster }} style={styles.bannerImage} />
             <View style={styles.bannerOverlay} />
             
             {/* Navigation buttons absolutely positioned on top of the banner */}
@@ -232,17 +280,17 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
 
             {/* Poster and Title Info Floating over Banner Bottom */}
             <View style={styles.bannerContentRow}>
-              <Image source={{ uri: displayItem.poster_url }} style={styles.floatPoster} />
+              <Image source={{ uri: displayItem.url_poster }} style={styles.floatPoster} />
               <View style={styles.bannerMetaBlock}>
-                <Text style={styles.bannerTitle} numberOfLines={2}>{displayItem.title}</Text>
+                <Text style={styles.bannerTitle} numberOfLines={2}>{displayItem.titulo}</Text>
                 <View style={styles.bannerMetaInfo}>
-                  <Text style={styles.bannerYearText}>{displayItem.release_year || 'Sem ano'}</Text>
+                  <Text style={styles.bannerYearText}>{displayItem.ano_lancamento || 'Sem ano'}</Text>
                   <Text style={styles.bannerDot}>•</Text>
-                  <Text style={styles.bannerTypeText}>{labelType(displayItem.type)}</Text>
+                  <Text style={styles.bannerTypeText}>{labelType(displayItem.tipo)}</Text>
                 </View>
-                {displayItem.genres ? (
+                {displayItem.generos ? (
                   <View style={styles.bannerGenresRow}>
-                    {displayItem.genres.split(', ').slice(0, 3).map((genre, idx) => (
+                    {displayItem.generos.split(', ').slice(0, 3).map((genre, idx) => (
                       <View key={idx} style={styles.bannerGenreBadge}>
                         <Text style={styles.bannerGenreText}>{genre}</Text>
                       </View>
@@ -255,8 +303,8 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
 
           {/* Inner padded content container */}
           <View style={styles.contentContainer}>
-            {!released && displayItem.release_date ? (
-              <Text style={styles.release}>Lancamento: {formatDate(displayItem.release_date)}</Text>
+            {!released && displayItem.data_lancamento ? (
+              <Text style={styles.release}>Lancamento: {formatDate(displayItem.data_lancamento)}</Text>
             ) : null}
 
             {canRewatch ? (
@@ -282,7 +330,7 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
 
             {activeTab === 'about' || !hasEpisodes ? (
               <>
-                <Text style={styles.description}>{displayItem.description || 'Nenhuma sinopse disponivel.'}</Text>
+                <Text style={styles.description}>{displayItem.descricao || 'Nenhuma sinopse disponivel.'}</Text>
 
                 <View style={styles.inlineActionRow}>
                   <Pressable disabled={!canUseItemActions} onPress={() => setListOpen(true)} style={[styles.listFab, !canUseItemActions && styles.actionDisabled]}>
@@ -293,21 +341,22 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
                       {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.watchButtonText}>{canUseItemActions ? mainButtonLabel : 'Item indisponivel'}</Text>}
                     </Pressable>
                   ) : (
-                    <Pressable disabled={!hasEpisodes} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, !hasEpisodes && styles.watchButtonDisabled]}>
-                      <Text style={styles.watchButtonText}>{hasEpisodes ? 'Ver episodios' : 'Sem episodios'}</Text>
+                    <Pressable disabled={!hasEpisodes || enriching} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, (!hasEpisodes || enriching) && styles.watchButtonDisabled]}>
+                      <Text style={styles.watchButtonText}>{enriching ? 'Carregando episódios...' : hasEpisodes ? 'Ver episodios' : 'Sem episodios'}</Text>
                     </Pressable>
                   )}
                 </View>
 
-                <CastSection cast={detail?.cast || []} />
+                {enriching ? <DetailExtrasSkeleton /> : null}
+                {!enriching ? <CastSection cast={detail?.cast || []} onSelectPerson={onSelectPerson} /> : null}
 
-                {displayItem.watch_providers ? (
+                {!enriching && displayItem.provedores_streaming ? (
                   <View style={styles.providersBlock}>
                   <Text style={styles.providersTitle}>Onde assistir</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.providersList}>
                     {(() => {
                       try {
-                        const providers: Array<{ name: string; logo: string }> = JSON.parse(displayItem.watch_providers);
+                        const providers: Array<{ name: string; logo: string }> = JSON.parse(displayItem.provedores_streaming);
                         if (!providers || !providers.length) return null;
                         return providers.map((p, idx) => (
                           <View key={idx} style={styles.providerBadge}>
@@ -324,22 +373,22 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
                 </View>
               ) : null}
 
-              {detail?.recommendations && detail.recommendations.length > 0 ? (
+              {!enriching && detail?.recommendations && detail.recommendations.length > 0 ? (
                 <View style={styles.recsBlock}>
                   <Text style={styles.recsTitle}>Recomendações</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recsList}>
                     {detail.recommendations.map((recItem, idx) => (
                       <Pressable key={idx} onPress={() => onSelectItem && onSelectItem(recItem)} style={styles.recCard}>
-                        <Image source={{ uri: recItem.poster_url }} style={styles.recPhoto} />
-                        <Text numberOfLines={1} style={styles.recName}>{recItem.title}</Text>
-                        <Text numberOfLines={1} style={styles.recYear}>{recItem.release_year}</Text>
+                        <Image source={{ uri: recItem.url_poster }} style={styles.recPhoto} />
+                        <Text numberOfLines={1} style={styles.recName}>{recItem.titulo}</Text>
+                        <Text numberOfLines={1} style={styles.recYear}>{recItem.ano_lancamento}</Text>
                       </Pressable>
                     ))}
                   </ScrollView>
                 </View>
               ) : null}
 
-              <View style={styles.reviewBox}>
+              {!hasExistingReview ? <View style={styles.reviewBox}>
                 <Text style={styles.reviewTitle}>A minha avaliacao</Text>
                 <View style={styles.stars}>
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -356,7 +405,7 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
                   editable={released && !hasExistingReview}
                   multiline
                   onChangeText={setComment}
-                  placeholder={released ? 'Deixe um comentario sobre este titulo...' : 'Disponivel apos o lancamento.'}
+                  placeholder={released ? 'Deixe um comentario sobre este título...' : 'Disponível após o lançamento.'}
                   placeholderTextColor={colors.muted}
                   style={[styles.commentInput, (!released || hasExistingReview) && styles.commentDisabled]}
                   value={comment}
@@ -365,41 +414,33 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
                   <Pressable disabled={!rating || !comment.trim() || saving} onPress={() => doSaveReview()} style={[styles.saveReviewButton, (!rating || !comment.trim() || saving) && styles.saveReviewDisabled]}>
                     <Text style={styles.saveReviewText}>Salvar avaliacao</Text>
                   </Pressable>
-                ) : hasExistingReview ? (
-                  <View style={styles.reviewSavedBadge}>
-                    <Text style={styles.reviewSavedText}>Avaliação já salva</Text>
-                  </View>
                 ) : null}
-              </View>
+              </View> : null}
 
               <View style={styles.communityBox}>
                 <View style={styles.communityHeader}>
                   <Text style={styles.communityTitle}>Avaliações</Text>
                   <Text style={styles.communityCount}>{detail?.reviews?.length || 0}</Text>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.communityList}>
-                  {(detail?.reviews || []).map((review, index) => (
-                    <View key={`${review.user_name || 'user'}-${index}`} style={styles.communityCard}>
+                {(detail?.reviews || []).length ? <Marquee
+                  data={detail?.reviews || []}
+                  keyExtractor={(review, index) => `${review.id_usuario || 'user'}-${index}`}
+                  renderItem={(review) => (
+                    <View style={styles.communityCard}>
                       <View style={styles.communityTop}>
                         <View style={styles.communityAvatar}>
-                          <Text style={styles.communityAvatarText}>{initials(review.user_name || 'U')}</Text>
+                          <Text style={styles.communityAvatarText}>{initials(review.nome_usuario || 'U')}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.communityUser}>{review.user_name || 'Usuário'}</Text>
+                          <Text style={styles.communityUser}>{review.nome_usuario || 'Usuário'}</Text>
                           <Text style={styles.communityMeta}>{formatDateTime(review.reviewed_at)}</Text>
                         </View>
-                        <Text style={styles.communityRating}>★ {Number(review.rating || 0).toFixed(1)}</Text>
+                        <Text style={styles.communityRating}>★ {Number(review.nota || 0).toFixed(1)}</Text>
                       </View>
-                      <Text numberOfLines={4} style={styles.communityComment}>{review.comment}</Text>
+                      <Text numberOfLines={4} style={styles.communityComment}>{review.comentario}</Text>
                     </View>
-                  ))}
-                  {!(detail?.reviews || []).length ? (
-                    <View style={styles.communityEmpty}>
-                      <Text style={styles.communityEmptyTitle}>Sem avaliações ainda.</Text>
-                      <Text style={styles.communityEmptyText}>Quando alguém avaliar este título, elas aparecem aqui.</Text>
-                    </View>
-                  ) : null}
-                </ScrollView>
+                  )}
+                /> : <View style={styles.communityEmpty}><Text style={styles.communityEmptyTitle}>Sem avaliações ainda.</Text><Text style={styles.communityEmptyText}>Quando alguém avaliar este título, elas aparecem aqui.</Text></View>}
               </View>
             </>
           ) : null}
@@ -422,8 +463,8 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
                 {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.watchButtonText}>{mainButtonLabel}</Text>}
               </Pressable>
             ) : (
-              <Pressable disabled={!hasEpisodes} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, !hasEpisodes && styles.watchButtonDisabled]}>
-                <Text style={styles.watchButtonText}>Ver episódios</Text>
+              <Pressable disabled={!hasEpisodes || enriching} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, (!hasEpisodes || enriching) && styles.watchButtonDisabled]}>
+                <Text style={styles.watchButtonText}>{enriching ? 'Carregando episódios...' : hasEpisodes ? 'Ver episódios' : 'Sem episódios'}</Text>
               </Pressable>
             )}
           </View>
@@ -435,12 +476,15 @@ export function DetailScreen({ item, onBack, onSelectItem }: { item: Item; onBac
         lists={detail?.lists || []}
         item={displayItem}
         onClose={() => setListOpen(false)}
-        onAdded={(listId, itemId) => {
+        onAdded={(listId, itemId, listName) => {
           setDetail((current) => current ? {
             ...current,
             item: { ...current.item, id_item: itemId ?? current.item.id_item },
-            lists: current.lists.map((list) => list.id_lista === listId ? { ...list, has_item: true } : list),
+            lists: current.lists.some((list) => list.id_lista === listId)
+              ? current.lists.map((list) => list.id_lista === listId ? { ...list, has_item: true } : list)
+              : [...current.lists, { id_lista: listId, nome: listName || 'Nova lista', item_count: 1, has_item: true }],
           } : current);
+          onDataChanged?.();
         }}
       />
 
@@ -471,7 +515,7 @@ function EpisodeGroups({
   const { showToast } = useToast();
   const [savingSeason, setSavingSeason] = useState<number | null>(null);
   const seasons = episodes.reduce<Record<string, Episode[]>>((acc, episode) => {
-    const key = String(episode.season_number || 1);
+    const key = String(episode.numero_temporada || 1);
     acc[key] = acc[key] || [];
     acc[key].push(episode);
     return acc;
@@ -490,7 +534,7 @@ function EpisodeGroups({
     if (savingSeason) return;
     setSavingSeason(season);
     try {
-      const response = await markEpisodes({ item_id: itemId, season_number: season, mode: 'season' });
+      const response = await markEpisodes({ item_id: itemId, numero_temporada: season, mode: 'season' });
       onEpisodesChanged(response.data);
       showToast(`Temporada ${season} marcada como assistida.`, 'success');
     } catch (error) {
@@ -504,7 +548,7 @@ function EpisodeGroups({
     <>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.seasonPicker} contentContainerStyle={styles.seasonPickerContent}>
         {seasonNumbers.map((season) => {
-          const watched = seasons[String(season)].filter((episode) => episode.watched).length;
+          const watched = seasons[String(season)].filter((episode) => episode.assistido).length;
           const total = seasons[String(season)].length;
           return (
             <Pressable key={season} onPress={() => setActiveSeason(season)} style={[styles.seasonChip, activeSeason === season && styles.seasonChipActive]}>
@@ -519,7 +563,7 @@ function EpisodeGroups({
         <View style={styles.seasonHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.seasonTitle}>Temporada {activeSeason}</Text>
-            <Text style={styles.seasonMeta}>{activeRows.filter((episode) => episode.watched).length} de {activeRows.length} episódios vistos</Text>
+            <Text style={styles.seasonMeta}>{activeRows.filter((episode) => episode.assistido).length} de {activeRows.length} episódios vistos</Text>
           </View>
           <Pressable disabled={savingSeason === activeSeason} onPress={() => markSeason(activeSeason)} style={styles.seasonButton}>
             {savingSeason === activeSeason ? <ActivityIndicator color={colors.text} size="small" /> : <Text style={styles.seasonButtonText}>Marcar temporada completa</Text>}
@@ -538,7 +582,7 @@ function EpisodeGroups({
   );
 }
 
-function CastSection({ cast }: { cast: CastMember[] }) {
+function CastSection({ cast, onSelectPerson }: { cast: CastMember[]; onSelectPerson?: (person: CastMember) => void }) {
   if (!cast.length) return null;
 
   return (
@@ -546,7 +590,7 @@ function CastSection({ cast }: { cast: CastMember[] }) {
       <Text style={styles.castTitle}>Elenco</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.castList}>
         {cast.map((person, index) => (
-          <View key={`${person.name}-${index}`} style={styles.castCard}>
+          <Pressable disabled={!person.person_id || !onSelectPerson} onPress={() => onSelectPerson?.(person)} key={`${person.name}-${index}`} style={styles.castCard}>
             {person.image_url ? (
               <Image source={{ uri: person.image_url }} style={styles.castPhoto} />
             ) : (
@@ -556,9 +600,25 @@ function CastSection({ cast }: { cast: CastMember[] }) {
             )}
             <Text numberOfLines={1} style={styles.castName}>{person.name}</Text>
             {person.character ? <Text numberOfLines={1} style={styles.castCharacter}>{person.character}</Text> : null}
-          </View>
+          </Pressable>
         ))}
       </ScrollView>
+    </View>
+  );
+}
+
+function DetailExtrasSkeleton() {
+  return (
+    <View style={styles.extrasSkeleton}>
+      <Skeleton height={14} width={84} radius={6} />
+      <View style={styles.extrasSkeletonRow}>
+        {[0, 1, 2, 3].map((index) => <Skeleton key={index} height={64} width={64} radius={32} />)}
+      </View>
+      <Skeleton height={14} width={112} radius={6} />
+      <View style={styles.extrasSkeletonRow}>
+        {[0, 1, 2].map((index) => <Skeleton key={index} height={48} width={48} radius={12} />)}
+      </View>
+      <Text style={styles.enrichingText}>Carregando elenco e onde assistir...</Text>
     </View>
   );
 }
@@ -572,15 +632,15 @@ function EpisodeRow({
   itemId: number;
   onEpisodesChanged: (payload?: { episodes: Episode[]; progress: { total_count: number; watched_count: number }; next_unwatched: Episode | null } | null) => void;
 }) {
-  const [watched, setWatched] = useState(!!episode.watched);
+  const [watched, setWatched] = useState(!!episode.assistido);
   const [choiceOpen, setChoiceOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const upcoming = !isReleased(episode.air_date || undefined);
+  const upcoming = !isReleased(episode.data_exibicao || undefined);
   const { showToast } = useToast();
 
   useEffect(() => {
-    setWatched(!!episode.watched);
-  }, [episode.watched]);
+    setWatched(!!episode.assistido);
+  }, [episode.assistido]);
 
   async function mark() {
     if (loading || watched || upcoming) return;
@@ -615,8 +675,8 @@ function EpisodeRow({
   return (
     <View style={[styles.episodeRow, upcoming && styles.episodeLocked]}>
       <Pressable onPress={() => !watched && !upcoming && setChoiceOpen(true)} disabled={loading || watched || upcoming} style={styles.episodeContent}>
-        <Text style={styles.episodeTitle}>{episode.episode_number}. {episode.title}</Text>
-        <Text style={styles.meta}>{episode.air_date ? formatDate(episode.air_date) : 'Sem data'} - {episode.runtime_minutes || 45}m</Text>
+        <Text style={styles.episodeTitle}>{episode.numero_episodio}. {episode.titulo}</Text>
+        <Text style={styles.meta}>{episode.data_exibicao ? formatDate(episode.data_exibicao) : 'Sem data'} - {episode.duracao_minutos || 45}m</Text>
         {upcoming ? <Text style={styles.upcomingText}>Ainda nao lancado</Text> : null}
       </Pressable>
       <View style={styles.episodeActions}>
@@ -659,7 +719,7 @@ function EpisodeMarkModal({
   onMarkOnly: () => void;
   onCancel: () => void;
 }) {
-  const episodeLabel = `T${episode.season_number}E${episode.episode_number}`;
+  const episodeLabel = `T${episode.numero_temporada}E${episode.numero_episodio}`;
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onCancel}>
@@ -697,10 +757,15 @@ function ListModal({
   lists: SelectableList[];
   item: Item;
   onClose: () => void;
-  onAdded: (listId: number, itemId?: number | null) => void;
+  onAdded: (listId: number, itemId?: number | null, listName?: string) => void;
 }) {
   const [savingList, setSavingList] = useState<number | null>(null);
+  const [localLists, setLocalLists] = useState(lists);
+  const [newListName, setNewListName] = useState('');
+  const [creating, setCreating] = useState(false);
   const { showToast } = useToast();
+
+  useEffect(() => { setLocalLists(lists); }, [lists]);
 
   async function add(list: SelectableList) {
     if (savingList || list.has_item) return;
@@ -716,16 +781,42 @@ function ListModal({
     }
   }
 
+  async function createAndAdd() {
+    const name = newListName.trim();
+    if (!name || creating) return;
+    setCreating(true);
+    try {
+      const created = await createList(name);
+      const listId = Number(created.data?.list_id || 0);
+      if (!listId) throw new Error('Não foi possível criar a lista.');
+      const added = await addItemToList(listId, item);
+      const nextList: SelectableList = { id_lista: listId, nome: name, item_count: 1, has_item: true };
+      setLocalLists((current) => [...current, nextList]);
+      setNewListName('');
+      onAdded(listId, added.data?.item_id, name);
+      showToast(`Lista ${name} criada e título adicionado.`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Erro ao criar a lista.', 'error');
+    } finally { setCreating(false); }
+  }
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Adicionar a lista</Text>
             <Pressable onPress={onClose}><Text style={styles.close}>Fechar</Text></Pressable>
           </View>
+          <View style={styles.createListRow}>
+            <TextInput value={newListName} onChangeText={setNewListName} placeholder="Nome da nova lista" placeholderTextColor={colors.muted} style={styles.createListInput} />
+            <Pressable disabled={!newListName.trim() || creating} onPress={createAndAdd} style={[styles.createListButton, (!newListName.trim() || creating) && styles.saveReviewDisabled]}>
+              {creating ? <ActivityIndicator color={colors.text} size="small" /> : <Text style={styles.createListButtonText}>Criar</Text>}
+            </Pressable>
+          </View>
           <FlatList
-            data={lists}
+            keyboardShouldPersistTaps="handled"
+            data={localLists}
             keyExtractor={(list) => String(list.id_lista)}
             renderItem={({ item: list }) => (
               <Pressable disabled={!!list.has_item || savingList === list.id_lista} onPress={() => add(list)} style={styles.listRow}>
@@ -735,10 +826,10 @@ function ListModal({
                 </View>
               </Pressable>
             )}
-            ListEmptyComponent={<Text style={styles.emptyModal}>Crie uma lista na aba Listas primeiro.</Text>}
+            ListEmptyComponent={<Text style={styles.emptyModal}>Você ainda não tem listas. Crie uma acima.</Text>}
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -756,6 +847,21 @@ function ListPlusIcon() {
       <View style={styles.plusV} />
     </View>
   );
+}
+
+function itemKey(item: Item) {
+  return `${item.id_item || 0}:${item.tmdb_id || 0}:${item.tvmaze_id || 0}:${item.mal_id || 0}:${item.tipo}`;
+}
+
+function preservePreviewItem(preview: Item, incoming: Item): Item {
+  const merged = { ...preview, ...incoming };
+  const placeholders = ['Nenhuma sinopse disponivel.', 'Nenhuma sinopse disponível.'];
+  if (!incoming.descricao || placeholders.includes(incoming.descricao.trim())) merged.descricao = preview.descricao;
+  if (!incoming.url_poster) merged.url_poster = preview.url_poster;
+  if (!incoming.url_banner) merged.url_banner = preview.url_banner;
+  if (!incoming.generos) merged.generos = preview.generos;
+  if (!incoming.provedores_streaming) merged.provedores_streaming = preview.provedores_streaming;
+  return merged;
 }
 
 function isReleased(date?: string | null) {
@@ -819,7 +925,7 @@ const styles = StyleSheet.create({
   pillText: { color: colors.text, fontWeight: '900' },
   tabBar: { backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 6, marginTop: 26, padding: 5 },
   tabButton: { alignItems: 'center', borderRadius: 14, flex: 1, paddingVertical: 12 },
-  tabButtonActive: { backgroundColor: 'rgba(139,92,246,0.18)' },
+  tabButtonActive: { backgroundColor: alpha(colors.accent, 0.18) },
   tabText: { color: colors.muted, fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
   tabTextActive: { color: colors.accent },
   description: { color: colors.text, fontSize: 14, lineHeight: 22, marginTop: 14 },
@@ -829,6 +935,9 @@ const styles = StyleSheet.create({
   detailRetryButton: { alignItems: 'center', alignSelf: 'center', backgroundColor: colors.accent, borderRadius: 999, marginTop: 22, paddingHorizontal: 20, paddingVertical: 13 },
   detailRetryText: { color: colors.text, fontSize: 14, fontWeight: '900' },
   castBlock: { marginTop: 22 },
+  extrasSkeleton: { gap: 12, marginTop: 24 },
+  extrasSkeletonRow: { flexDirection: 'row', gap: 14 },
+  enrichingText: { color: colors.muted, fontSize: 11 },
   castTitle: { color: colors.text, fontSize: 14, fontWeight: '900', marginBottom: 12, textTransform: 'uppercase' },
   castList: { gap: 14, paddingRight: 8 },
   castCard: { width: 86 },
@@ -847,7 +956,7 @@ const styles = StyleSheet.create({
   communityList: { gap: 12, paddingRight: 12 },
   communityCard: { backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 16, borderWidth: 1, padding: 14, width: 280 },
   communityTop: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 10 },
-  communityAvatar: { alignItems: 'center', backgroundColor: 'rgba(139,92,246,0.18)', borderColor: 'rgba(139,92,246,0.35)', borderRadius: 18, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
+  communityAvatar: { alignItems: 'center', backgroundColor: alpha(colors.accent, 0.18), borderColor: alpha(colors.accent, 0.35), borderRadius: 18, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
   communityAvatarText: { color: colors.text, fontSize: 12, fontWeight: '900' },
   communityUser: { color: colors.text, fontSize: 13, fontWeight: '900' },
   communityMeta: { color: colors.muted, fontSize: 10, marginTop: 2 },
@@ -870,7 +979,7 @@ const styles = StyleSheet.create({
   seasonPicker: { marginTop: 16 },
   seasonPickerContent: { gap: 8, paddingRight: 8 },
   seasonChip: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 14, borderWidth: 1, minWidth: 62, paddingHorizontal: 12, paddingVertical: 10 },
-  seasonChipActive: { backgroundColor: 'rgba(139,92,246,0.2)', borderColor: colors.accent },
+  seasonChipActive: { backgroundColor: alpha(colors.accent, 0.2), borderColor: colors.accent },
   seasonChipTitle: { color: colors.muted, fontSize: 13, fontWeight: '900' },
   seasonChipTitleActive: { color: colors.text },
   seasonChipMeta: { color: colors.muted, fontSize: 10, fontWeight: '800', marginTop: 3 },
@@ -878,7 +987,7 @@ const styles = StyleSheet.create({
   seasonHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', padding: 14 },
   seasonTitle: { color: colors.text, flex: 1, fontSize: 16, fontWeight: '900' },
   seasonMeta: { color: colors.muted, fontSize: 11, fontWeight: '800', marginTop: 4 },
-  seasonButton: { backgroundColor: 'rgba(139,92,246,0.2)', borderColor: colors.accent, borderRadius: 999, borderWidth: 1, maxWidth: 142, paddingHorizontal: 10, paddingVertical: 7 },
+  seasonButton: { backgroundColor: alpha(colors.accent, 0.2), borderColor: colors.accent, borderRadius: 999, borderWidth: 1, maxWidth: 142, paddingHorizontal: 10, paddingVertical: 7 },
   seasonButtonText: { color: colors.text, fontSize: 10, fontWeight: '900' },
   episodeRow: {
     borderTopColor: colors.surfaceRaised,
@@ -944,6 +1053,10 @@ const styles = StyleSheet.create({
   checkboxChecked: { backgroundColor: colors.accent, borderColor: colors.accent },
   checkboxInner: { backgroundColor: colors.text, borderRadius: 4, height: 10, width: 10 },
   emptyModal: { color: colors.muted, padding: 16 },
+  createListRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  createListInput: { backgroundColor: colors.background, borderColor: colors.surfaceRaised, borderRadius: 14, borderWidth: 1, color: colors.text, flex: 1, paddingHorizontal: 14, paddingVertical: 12 },
+  createListButton: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 14, justifyContent: 'center', minWidth: 72, paddingHorizontal: 14 },
+  createListButtonText: { color: colors.text, fontWeight: '900' },
   genresRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 10 },
   genreBadge: { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
   genreText: { color: '#c8c8e3', fontSize: 11, fontWeight: '600' },

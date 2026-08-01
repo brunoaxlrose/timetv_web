@@ -40,12 +40,13 @@ class AuthController extends AbstractActionController {
             try {
                 $user = $this->authModel->getUserByEmail($email);
 
-                if ($user && password_verify($password, $user['password_hash'])) {
+                if ($user && password_verify($password, $user['hash_senha'])) {
                     $_SESSION['user_id'] = $user['id_usuario'];
-                    $_SESSION['username'] = $user['user_name'];
+                    $_SESSION['nome_usuario'] = $user['nome_usuario'];
                     $_SESSION['email'] = $user['email'];
                     $_SESSION['nome'] = $user['nome'];
                     $_SESSION['sobrenome'] = $user['sobrenome'];
+                    $_SESSION['url_avatar'] = $user['url_avatar'] ?? null;
                     session_write_close();
                     return new JsonModel(['success' => true, 'redirect' => '/dashboard']);
                 } else {
@@ -57,7 +58,7 @@ class AuthController extends AbstractActionController {
         }
 
         $view = new ViewModel();
-        $this->layout()->title = "Entrar - Time View";
+        $this->layout()->title = "Entrar - CineFio";
         return $view;
     }
 
@@ -94,7 +95,7 @@ class AuthController extends AbstractActionController {
                 $userId = $this->authModel->createUser($username, $email, $hash, $nome, $sobrenome);
 
                 $_SESSION['user_id'] = $userId;
-                $_SESSION['username'] = $username;
+                $_SESSION['nome_usuario'] = $username;
                 $_SESSION['email'] = $email;
                 $_SESSION['nome'] = $nome;
                 $_SESSION['sobrenome'] = $sobrenome;
@@ -107,7 +108,7 @@ class AuthController extends AbstractActionController {
         }
 
         $view = new ViewModel();
-        $this->layout()->title = "Criar Conta - Time View";
+        $this->layout()->title = "Criar Conta - CineFio";
         return $view;
     }
 
@@ -138,7 +139,7 @@ class AuthController extends AbstractActionController {
 
         $post = $request->getPost();
         $userId = $_SESSION['user_id'];
-        $newUsername = trim($post->get('username', ''));
+        $newUsername = trim($post->get('nome_usuario', ''));
         $nome = $this->capitalizeName(trim($post->get('nome', '')));
         $sobrenome = $this->capitalizeName(trim($post->get('sobrenome', '')));
         
@@ -174,7 +175,7 @@ class AuthController extends AbstractActionController {
                 }
 
                 $user = $this->authModel->getUserById($userId);
-                if (!$user || !password_verify($currentPassword, $user['password_hash'])) {
+                if (!$user || !password_verify($currentPassword, $user['hash_senha'])) {
                     return new JsonModel(['success' => false, 'message' => 'Senha atual incorreta.']);
                 }
 
@@ -182,8 +183,9 @@ class AuthController extends AbstractActionController {
                 $this->authModel->updatePassword($userId, $newHash);
             }
             
-            $this->authModel->updateProfile($userId, $newUsername, $nome, $sobrenome);
-            $_SESSION['username'] = $newUsername;
+            $currentUser = $this->authModel->getUserById($userId);
+            $this->authModel->updateProfile($userId, $newUsername, $nome, $sobrenome, $currentUser['url_avatar'] ?? null);
+            $_SESSION['nome_usuario'] = $newUsername;
             $_SESSION['nome'] = $nome;
             $_SESSION['sobrenome'] = $sobrenome;
             

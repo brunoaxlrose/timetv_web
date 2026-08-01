@@ -20,33 +20,33 @@ class AuthModel {
     public function issueApiToken(int $userId): string {
         $token = bin2hex(random_bytes(32));
         $hash = hash('sha256', $token);
-        $stmt = $this->pdo->prepare("UPDATE usuario SET api_token_hash = :hash WHERE id_usuario = :id");
+        $stmt = $this->pdo->prepare("UPDATE usuario SET hash_token_api = :hash WHERE id_usuario = :id");
         $stmt->execute([':hash' => $hash, ':id' => $userId]);
         return $token;
     }
 
     public function getUserByToken(string $token) {
         $hash = hash('sha256', $token);
-        $stmt = $this->pdo->prepare("SELECT * FROM usuario WHERE api_token_hash = :hash AND ts_cancelamento IS NULL LIMIT 1");
+        $stmt = $this->pdo->prepare("SELECT * FROM usuario WHERE hash_token_api = :hash AND ts_cancelamento IS NULL LIMIT 1");
         $stmt->execute([':hash' => $hash]);
         return $stmt->fetch();
     }
 
     public function clearApiToken(int $userId): void {
-        $stmt = $this->pdo->prepare("UPDATE usuario SET api_token_hash = NULL WHERE id_usuario = :id");
+        $stmt = $this->pdo->prepare("UPDATE usuario SET hash_token_api = NULL WHERE id_usuario = :id");
         $stmt->execute([':id' => $userId]);
     }
 
     public function isUsernameOrEmailTaken(string $userName, string $email): bool {
-        $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE email = :email OR user_name = :user_name LIMIT 1");
-        $stmt->execute([':email' => $email, ':user_name' => $userName]);
+        $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE email = :email OR nome_usuario = :nome_usuario LIMIT 1");
+        $stmt->execute([':email' => $email, ':nome_usuario' => $userName]);
         return (bool)$stmt->fetch();
     }
 
     public function createUser(string $userName, string $email, string $hash, string $nome, string $sobrenome): int {
-        $stmt = $this->pdo->prepare("INSERT INTO usuario (user_name, email, password_hash, nome, sobrenome) VALUES (:user_name, :email, :hash, :nome, :sobrenome) RETURNING id_usuario");
+        $stmt = $this->pdo->prepare("INSERT INTO usuario (nome_usuario, email, hash_senha, nome, sobrenome) VALUES (:nome_usuario, :email, :hash, :nome, :sobrenome) RETURNING id_usuario");
         $stmt->execute([
-            ':user_name' => $userName,
+            ':nome_usuario' => $userName,
             ':email' => $email,
             ':hash' => $hash,
             ':nome' => $nome,
@@ -56,17 +56,18 @@ class AuthModel {
     }
 
     public function isUsernameTaken(string $userName, int $excludeUserId): bool {
-        $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE user_name = :user_name AND id_usuario != :id LIMIT 1");
-        $stmt->execute([':user_name' => $userName, ':id' => $excludeUserId]);
+        $stmt = $this->pdo->prepare("SELECT id_usuario FROM usuario WHERE nome_usuario = :nome_usuario AND id_usuario != :id LIMIT 1");
+        $stmt->execute([':nome_usuario' => $userName, ':id' => $excludeUserId]);
         return (bool)$stmt->fetch();
     }
 
-    public function updateProfile(int $userId, string $userName, string $nome, string $sobrenome): bool {
-        $stmt = $this->pdo->prepare("UPDATE usuario SET user_name = :user_name, nome = :nome, sobrenome = :sobrenome WHERE id_usuario = :id");
+    public function updateProfile(int $userId, string $userName, string $nome, string $sobrenome, ?string $avatarUrl): bool {
+        $stmt = $this->pdo->prepare("UPDATE usuario SET nome_usuario = :nome_usuario, nome = :nome, sobrenome = :sobrenome, url_avatar = :url_avatar WHERE id_usuario = :id");
         return $stmt->execute([
-            ':user_name' => $userName,
+            ':nome_usuario' => $userName,
             ':nome' => $nome,
             ':sobrenome' => $sobrenome,
+            ':url_avatar' => $avatarUrl,
             ':id' => $userId
         ]);
     }
@@ -86,14 +87,14 @@ class AuthModel {
 
     public function saveFeedback(int $userId, string $type, string $content, ?string $screenshot): void {
         $stmt = $this->pdo->prepare("
-            INSERT INTO feedback (id_usuario, feedback_type, content, screenshot)
-            VALUES (:user_id, :type, :content, :screenshot)
+            INSERT INTO feedback (id_usuario, tipo_feedback, conteudo, captura_tela)
+            VALUES (:id_usuario, :tipo, :conteudo, :captura_tela)
         ");
         $stmt->execute([
-            ':user_id' => $userId,
-            ':type' => $type,
-            ':content' => $content,
-            ':screenshot' => $screenshot
+            ':id_usuario' => $userId,
+            ':tipo' => $type,
+            ':conteudo' => $content,
+            ':captura_tela' => $screenshot
         ]);
     }
 
@@ -104,7 +105,7 @@ class AuthModel {
     }
 
     public function updatePassword(int $userId, string $hash): bool {
-        $stmt = $this->pdo->prepare("UPDATE usuario SET password_hash = :hash WHERE id_usuario = :id");
+        $stmt = $this->pdo->prepare("UPDATE usuario SET hash_senha = :hash WHERE id_usuario = :id");
         return $stmt->execute([':hash' => $hash, ':id' => $userId]);
     }
 }

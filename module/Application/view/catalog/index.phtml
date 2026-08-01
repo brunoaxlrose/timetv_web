@@ -86,7 +86,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                             <a href="/detail?id=<?= $item['id_item'] ?? '' ?>" class="text-decoration-none text-white"><?= htmlspecialchars($item['title'] ?? '') ?></a>
                                         </h6>
                                         <div style="display: flex !important; align-items: center !important; flex-wrap: wrap !important; gap: 6px !important; font-size: 0.7rem; color: #b0b0cc !important; font-weight: 500; margin: 0 0 6px 0 !important; line-height: 1;">
-                                            <span class="badge bg-black text-uppercase" style="font-size: 0.52rem; color: #a88beb !important; border: 1px solid rgba(168,139,235,0.25);"><?= htmlspecialchars($item['type'] === 'series' ? 'Série' : ($item['type'] === 'anime' ? 'Anime' : 'Filme')) ?></span>
+                                            <span class="badge bg-black text-uppercase" style="font-size: 0.52rem; color: #D99951 !important; border: 1px solid rgba(168,139,235,0.25);"><?= htmlspecialchars($item['type'] === 'series' ? 'Série' : ($item['type'] === 'anime' ? 'Anime' : 'Filme')) ?></span>
                                             &bull; <span><?= $item['release_year'] ?></span>
                                             <?php if ($item['type'] !== 'movie' && !empty($item['next_episode'])): ?>
                                                 &bull; <span class="text-warning">Próximo: T<?= $item['next_episode']['season_number'] ?>E<?= $item['next_episode']['episode_number'] ?></span>
@@ -95,7 +95,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                         <?php if (isset($item['progress_percent'])): ?>
                                             <div style="display: flex !important; flex-direction: row !important; align-items: center !important; gap: 10px !important; width: 140px !important;">
                                                 <div style="flex-grow: 1 !important; height: 4px !important; background-color: rgba(255,255,255,0.1) !important; border-radius: 2px !important; margin: 0 !important; overflow: hidden !important; position: relative !important; display: block !important;">
-                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important; border-radius: 2px !important;"></div>
+                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#D99951' ?> !important; display: block !important; border-radius: 2px !important;"></div>
                                                 </div>
                                                 <span style="font-size: 0.65rem; color: #a5a5c0; font-weight: bold; flex-shrink: 0 !important;"><?= $item['progress_percent'] ?>%</span>
                                             </div>
@@ -121,7 +121,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                         $queryParams['page'] = $currentPage - 1; 
                                         $prevUrl = '/catalog?' . http_build_query($queryParams);
                                     ?>
-                                    <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center" href="<?= $currentPage <= 1 ? '#' : $prevUrl ?>" style="width: 32px; height: 32px; background-color: #121218; color: #a88beb;"><i class="bi bi-chevron-left"></i></a>
+                                    <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center" href="<?= $currentPage <= 1 ? '#' : $prevUrl ?>" style="width: 32px; height: 32px; background-color: #121218; color: #D99951;"><i class="bi bi-chevron-left"></i></a>
                                 </li>
 
                                 <!-- Page Numbers -->
@@ -132,7 +132,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                         $isActive = ($p === $currentPage);
                                     ?>
                                     <li class="page-item <?= $isActive ? 'active' : '' ?>">
-                                        <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold" href="<?= $pageUrl ?>" style="width: 32px; height: 32px; background-color: <?= $isActive ? '#7c4dff' : '#121218' ?>; color: <?= $isActive ? '#ffffff' : '#a88beb' ?>;"><?= $p ?></a>
+                                        <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold" href="<?= $pageUrl ?>" style="width: 32px; height: 32px; background-color: <?= $isActive ? '#D99951' : '#121218' ?>; color: <?= $isActive ? '#ffffff' : '#D99951' ?>;"><?= $p ?></a>
                                     </li>
                                 <?php endfor; ?>
 
@@ -142,7 +142,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                         $queryParams['page'] = $currentPage + 1; 
                                         $nextUrl = '/catalog?' . http_build_query($queryParams);
                                     ?>
-                                    <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center" href="<?= $currentPage >= $totalPages ? '#' : $nextUrl ?>" style="width: 32px; height: 32px; background-color: #121218; color: #a88beb;"><i class="bi bi-chevron-right"></i></a>
+                                    <a class="page-link border-0 rounded-circle d-flex align-items-center justify-content-center" href="<?= $currentPage >= $totalPages ? '#' : $nextUrl ?>" style="width: 32px; height: 32px; background-color: #121218; color: #D99951;"><i class="bi bi-chevron-right"></i></a>
                                 </li>
                             </ul>
                         </nav>
@@ -183,7 +183,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                             </a>
                                             <?php if (isset($item['progress_percent'])): ?>
                                                 <div class="position-absolute bottom-0 start-0 w-100" style="height: 3px !important; background-color: rgba(255,255,255,0.15) !important; border-radius: 0 !important; overflow: hidden !important; margin: 0 !important; z-index: 10 !important; display: block !important;">
-                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important;"></div>
+                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#D99951' ?> !important; display: block !important;"></div>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
@@ -220,7 +220,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                             </a>
                                             <?php if (isset($item['progress_percent'])): ?>
                                                 <div class="position-absolute bottom-0 start-0 w-100" style="height: 3px !important; background-color: rgba(255,255,255,0.15) !important; border-radius: 0 !important; overflow: hidden !important; margin: 0 !important; z-index: 10 !important; display: block !important;">
-                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important;"></div>
+                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#D99951' ?> !important; display: block !important;"></div>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
@@ -238,7 +238,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                         <!-- 3. Visto (Completed) -->
                         <?php if (!empty($items['completed'])): ?>
                             <div class="d-flex justify-content-between align-items-center mb-3 mt-2 px-1">
-                                <h6 class="text-accent small fw-bold text-uppercase mb-3 mt-2 d-flex align-items-center gap-2" style="color: #a88beb !important; font-size: 0.7rem; letter-spacing: 0.5px;">
+                                <h6 class="text-accent small fw-bold text-uppercase mb-3 mt-2 d-flex align-items-center gap-2" style="color: #D99951 !important; font-size: 0.7rem; letter-spacing: 0.5px;">
                                     <span class="refract-dot purple"></span> Visto
                                 </h6>
                                 <span class="text-muted small" style="font-size: 0.65rem;"><?= count($items['completed']) ?></span>
@@ -252,7 +252,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                             </a>
                                             <?php if (isset($item['progress_percent'])): ?>
                                                 <div class="position-absolute bottom-0 start-0 w-100" style="height: 3px !important; background-color: rgba(255,255,255,0.15) !important; border-radius: 0 !important; overflow: hidden !important; margin: 0 !important; z-index: 10 !important; display: block !important;">
-                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important;"></div>
+                                                    <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#D99951' ?> !important; display: block !important;"></div>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
@@ -287,7 +287,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                                         </a>
                                         <?php if (isset($item['progress_percent'])): ?>
                                             <div class="position-absolute bottom-0 start-0 w-100" style="height: 3px !important; background-color: rgba(255,255,255,0.15) !important; border-radius: 0 !important; overflow: hidden !important; margin: 0 !important; z-index: 10 !important; display: block !important;">
-                                                <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#ffd200' ?> !important; display: block !important;"></div>
+                                                <div style="width: <?= $item['progress_percent'] ?>% !important; height: 100% !important; background-color: <?= $item['progress_percent'] == 100 ? '#2ed573' : '#D99951' ?> !important; display: block !important;"></div>
                                             </div>
                                         <?php endif; ?>
                                     </div>
@@ -402,7 +402,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
             </div>
 
             <!-- Action Button -->
-            <button type="submit" class="btn w-100 py-3 rounded-pill fw-bold text-white mb-2" style="background-color: #7c4dff !important; border: none; font-size: 0.85rem;">Aplicar filtros</button>
+            <button type="submit" class="btn w-100 py-3 rounded-pill fw-bold text-white mb-2" style="background-color: #D99951 !important; border: none; font-size: 0.85rem;">Aplicar filtros</button>
         </form>
     </div>
 </div>
@@ -456,7 +456,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
                 <div class="d-flex align-items-center justify-content-between" style="border-top: 1px solid #2d2d3e; padding-top: 12px;">
                     <div class="d-flex align-items-center gap-3">
                         <div class="d-flex align-items-center justify-content-center rounded" style="width: 32px; height: 32px; background-color: rgba(168, 139, 235, 0.15);">
-                            <i class="bi bi-stars" style="color: #a88beb; font-size: 1.1rem;"></i>
+                            <i class="bi bi-stars" style="color: #D99951; font-size: 1.1rem;"></i>
                         </div>
                         <span class="text-white small fw-bold">Anime</span>
                     </div>
@@ -468,7 +468,7 @@ $this->partial('catalog/js.phtml', ['page' => 'catalog']);
             </div>
 
             <!-- Submit Button -->
-            <button type="submit" class="btn w-100 py-3 rounded-pill fw-bold text-white mb-2" style="background-color: #7c4dff !important; border: none; font-size: 0.85rem;">Aplicar filtros</button>
+            <button type="submit" class="btn w-100 py-3 rounded-pill fw-bold text-white mb-2" style="background-color: #D99951 !important; border: none; font-size: 0.85rem;">Aplicar filtros</button>
         </form>
     </div>
 </div>

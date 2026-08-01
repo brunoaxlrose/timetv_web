@@ -28,10 +28,10 @@
     transition: all 0.2s;
 }
 .pill-btn.active, .pill-btn:hover {
-    background-color: #7c4dff;
+    background-color: #D99951;
     color: #ffffff;
-    border-color: #7c4dff;
-    box-shadow: 0 4px 12px rgba(124, 77, 255, 0.3);
+    border-color: #D99951;
+    box-shadow: 0 4px 12px rgba(217, 153, 81, 0.3);
 }
 
 .refract-section-title {

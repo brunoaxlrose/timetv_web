@@ -33,7 +33,7 @@ export async function apiRequest<T>(
   try {
     const rawUser = await AsyncStorage.getItem(USER_KEY);
     if (rawUser) {
-      token = JSON.parse(rawUser)?.api_token;
+      token = JSON.parse(rawUser)?.token_api;
     }
   } catch {
     token = undefined;

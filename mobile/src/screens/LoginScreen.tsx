@@ -117,12 +117,12 @@ export function LoginScreen({ onAuthenticated }: Props) {
       const response = mode === 'login'
         ? await login(email.trim(), password)
         : await register({
-            user_name: username.trim(),
+            nome_usuario: username.trim(),
             nome,
             sobrenome,
             email: email.trim(),
-            password,
-            password_confirm: passwordConfirm,
+            senha: password,
+            confirmacao_senha: passwordConfirm,
           });
 
       if (response.data) {
@@ -151,7 +151,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
             <View style={styles.logoGlow}>
               <Text style={styles.logoText}>TV</Text>
             </View>
-            <Text style={styles.brand}>Time View</Text>
+            <Text style={styles.brand}>CineFio</Text>
             {/* <Text style={styles.subtitle}>Trackeia tudo o que voce ve</Text> */}
           </View>
 
@@ -222,7 +222,7 @@ export function LoginScreen({ onAuthenticated }: Props) {
           </View>
 
           {/* <Text style={styles.terms}>Ao continuar, aceitas os Termos de servico e Politica de privacidade.</Text> */}
-          <Text style={styles.footer}>Time View v0.1.0</Text>
+          <Text style={styles.footer}>CineFio v0.1.0</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -279,13 +279,13 @@ function EyeIcon({ open }: { open: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: '#263233', flex: 1 },
+  safeArea: { backgroundColor: colors.background, flex: 1 },
   keyboardView: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   logoWrap: { alignItems: 'center', marginBottom: 34 },
   logoGlow: {
     alignItems: 'center',
-    backgroundColor: '#111c22',
+    backgroundColor: colors.surface,
     borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: 24,
     borderWidth: 1,
@@ -298,18 +298,18 @@ const styles = StyleSheet.create({
   },
   logoText: { color: colors.text, fontSize: 24, fontWeight: '900', letterSpacing: 1 },
   brand: { color: colors.text, fontSize: 36, fontWeight: '900', marginTop: 22 },
-  subtitle: { color: '#b9c1c4', fontSize: 17, marginTop: 8 },
+  subtitle: { color: colors.muted, fontSize: 17, marginTop: 8 },
   modeRow: { backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 22, flexDirection: 'row', gap: 6, marginBottom: 22, padding: 5 },
   modeButton: { alignItems: 'center', borderRadius: 18, flex: 1, paddingVertical: 12 },
-  modeButtonActive: { backgroundColor: '#111618' },
+  modeButtonActive: { backgroundColor: colors.surfaceRaised },
   modeText: { color: '#9aa3a7', fontSize: 13, fontWeight: '900' },
   modeTextActive: { color: colors.text },
   form: { gap: 14 },
   twoColumns: { flexDirection: 'row', gap: 10 },
   inputShell: {
     alignItems: 'center',
-    backgroundColor: '#39414f',
-    borderColor: '#485164',
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.muted,
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
   },
   checkboxActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   rememberText: { color: '#c8ced6', fontSize: 13 },
-  primaryButton: { alignItems: 'center', backgroundColor: '#715cf0', borderRadius: 16, justifyContent: 'center', marginTop: 8, minHeight: 66 },
+  primaryButton: { alignItems: 'center', backgroundColor: colors.accent, borderRadius: 16, justifyContent: 'center', marginTop: 8, minHeight: 66 },
   primaryButtonDisabled: { opacity: 0.55 },
   primaryButtonText: { color: colors.text, fontSize: 18, fontWeight: '900' },
   switchCopy: { color: '#c2c7cc', fontSize: 15, marginTop: 8, textAlign: 'center' },

@@ -313,8 +313,8 @@ class ImportExportController extends AbstractActionController {
                 ui.status,
                 ui.rating,
                 ui.rewatch_count,
-                ui.ts_inclusao as added_at,
-                ui.ts_atualizacao as updated_at,
+                ui.ts_inclusao as ts_inclusao,
+                ui.ts_atualizacao as ts_atualizacao,
                 COALESCE(ep_count.watched, 0) AS episodes_watched,
                 i.total_episodes
             FROM usuario_item ui
@@ -334,7 +334,7 @@ class ImportExportController extends AbstractActionController {
 
         // Build CSV
         $output = fopen('php://temp', 'r+');
-        fputcsv($output, ['titulo', 'tipo', 'ano', 'status', 'nota', 'rewatches', 'episodios_assistidos', 'total_episodios', 'adicionado_em', 'atualizado_em']);
+        fputcsv($output, ['titulo', 'tipo', 'ano', 'status', 'nota', 'rewatches', 'episodios_assistidos', 'total_episodios', 'ts_inclusao', 'ts_atualizacao']);
         foreach ($items as $row) {
             fputcsv($output, [
                 $row['title'],
@@ -345,15 +345,15 @@ class ImportExportController extends AbstractActionController {
                 $row['rewatch_count'],
                 $row['episodes_watched'],
                 $row['total_episodes'],
-                $row['added_at'],
-                $row['updated_at'],
+                $row['ts_inclusao'],
+                $row['ts_atualizacao'],
             ]);
         }
         rewind($output);
         $csv = stream_get_contents($output);
         fclose($output);
 
-        $filename = 'timeview_export_' . $username . '_' . date('Y-m-d') . '.csv';
+        $filename = 'cinefio_export_' . $username . '_' . date('Y-m-d') . '.csv';
 
         $response = $this->getResponse();
         $response->getHeaders()

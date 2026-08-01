@@ -31,7 +31,7 @@ if (empty($initials)) {
 <div class="d-flex align-items-center justify-content-between px-3 mt-4 mb-4">
     <div class="d-flex align-items-center gap-3">
         <div class="position-relative">
-            <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" style="width: 68px; height: 68px; background: linear-gradient(135deg, #7c4dff, #a88beb); font-size: 1.5rem; letter-spacing: 0.5px; border: 2px solid #a88beb;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white shadow-sm" style="width: 68px; height: 68px; background: linear-gradient(135deg, #D99951, #D99951); font-size: 1.5rem; letter-spacing: 0.5px; border: 2px solid #D99951;">
                 <?= htmlspecialchars($initials) ?>
             </div>
         </div>
@@ -39,7 +39,7 @@ if (empty($initials)) {
             <h5 class="text-white fw-bold mb-0 d-flex align-items-center gap-1" style="font-size: 1.2rem;">
                 <?= htmlspecialchars(trim(($_SESSION['nome'] ?? '') . ' ' . ($_SESSION['sobrenome'] ?? ''))) ?>
             </h5>
-            <span class="small" style="font-size: 0.78rem; color: #a5a5c0 !important; font-weight: 500;">@<?= htmlspecialchars($_SESSION['username'] ?? 'usuario') ?></span>
+            <span class="small" style="font-size: 0.78rem; color: #a5a5c0 !important; font-weight: 500;">@<?= htmlspecialchars($_SESSION['nome_usuario'] ?? 'usuario') ?></span>
         </div>
     </div>
 </div>
@@ -155,7 +155,7 @@ if (empty($initials)) {
                 </div>
                 <?php if (count($groupedHistory) > 10): ?>
                     <div class="text-center mt-3">
-                        <button type="button" class="btn btn-sm btn-link text-accent text-decoration-none p-0 fw-bold" onclick="showMoreRecentHistory(this)" style="font-size: 0.75rem; color: #a88beb; background: transparent; border: none; letter-spacing: 0.5px;">VER MAIS</button>
+                        <button type="button" class="btn btn-sm btn-link text-accent text-decoration-none p-0 fw-bold" onclick="showMoreRecentHistory(this)" style="font-size: 0.75rem; color: #D99951; background: transparent; border: none; letter-spacing: 0.5px;">VER MAIS</button>
                     </div>
                 <?php endif; ?>
                 <div style="height: 110px;"></div>
@@ -213,7 +213,7 @@ if (empty($initials)) {
                 <span class="text-white small d-flex align-items-center gap-2"><span style="font-size: 1.1rem;">🇧🇷</span> Brazil</span>
                 <i class="bi bi-lock-fill text-muted" style="font-size: 0.8rem;"></i>
             </div>
-            <div class="d-flex align-items-center gap-2 text-primary" style="font-size: 0.78rem; cursor: pointer; color: #7c4dff !important; font-weight: 600;">
+            <div class="d-flex align-items-center gap-2 text-primary" style="font-size: 0.78rem; cursor: pointer; color: #D99951 !important; font-weight: 600;">
                 <i class="bi bi-plus-lg"></i> Adicionar um segundo país
             </div>
         </div>
@@ -223,7 +223,7 @@ if (empty($initials)) {
         <div class="refract-card-dark p-3 rounded-4 mb-4 d-flex flex-column gap-3">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <span class="text-white small fw-bold d-flex align-items-center gap-2"><i class="bi bi-play-circle-fill" style="color: #7c4dff;"></i> Streaming</span>
+                    <span class="text-white small fw-bold d-flex align-items-center gap-2"><i class="bi bi-play-circle-fill" style="color: #D99951;"></i> Streaming</span>
                     <div class="text-muted" style="font-size: 0.65rem; margin-top: 1px;">Netflix, Disney+...</div>
                 </div>
                 <div class="form-check form-switch p-0 m-0">
@@ -244,7 +244,7 @@ if (empty($initials)) {
         <!-- AS TUAS PLATAFORMAS -->
         <div class="d-flex align-items-center justify-content-between px-2 mb-3">
             <h6 class="text-gray small fw-bold text-uppercase m-0" style="font-size: 0.68rem; letter-spacing: 0.5px; color: #a5a5c0 !important;">As tuas plataformas</h6>
-            <span class="text-primary small" style="font-size: 0.72rem; cursor: pointer; color: #7c4dff !important; font-weight: 600;">Selecionar tudo</span>
+            <span class="text-primary small" style="font-size: 0.72rem; cursor: pointer; color: #D99951 !important; font-weight: 600;">Selecionar tudo</span>
         </div>
         
         <!-- Search platforms input -->

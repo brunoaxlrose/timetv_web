@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { createList, deleteList, getListItems, getLists, renameList } from '../api/mobile';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PosterCard } from '../components/PosterCard';
@@ -8,7 +8,7 @@ import { useToast } from '../components/Toast';
 import { colors } from '../theme/colors';
 import { Item, UserList } from '../types';
 
-export function ListsScreen({ onOpenItem }: { onOpenItem: (item: Item) => void }) {
+export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item: Item) => void; refreshKey?: number }) {
   const { showToast } = useToast();
   const [lists, setLists] = useState<UserList[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -29,6 +29,8 @@ export function ListsScreen({ onOpenItem }: { onOpenItem: (item: Item) => void }
       setLoading(false);
     }
   }
+
+  useEffect(() => { load(); }, [refreshKey]);
 
   async function openList(list: UserList) {
     setSelected(list);
@@ -78,10 +80,6 @@ export function ListsScreen({ onOpenItem }: { onOpenItem: (item: Item) => void }
     setDeleteTarget(null);
     showToast('Lista excluida.', 'success');
   }
-
-  useEffect(() => {
-    load();
-  }, []);
 
   return (
     <ScrollView style={styles.screen}>
@@ -145,7 +143,7 @@ export function ListsScreen({ onOpenItem }: { onOpenItem: (item: Item) => void }
       </Modal>
 
       <Modal visible={newListOpen} animationType="fade" transparent onRequestClose={() => setNewListOpen(false)}>
-        <View style={styles.modalOverlayCenter}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlayCenter}>
           <View style={styles.createSheet}>
             <Text style={styles.modalTitle}>Criar Nova Lista</Text>
             <Text style={styles.hint}>Exemplo: Para assistir no fim de semana</Text>
@@ -163,11 +161,11 @@ export function ListsScreen({ onOpenItem }: { onOpenItem: (item: Item) => void }
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={!!editingList} animationType="fade" transparent onRequestClose={() => setEditingList(null)}>
-        <View style={styles.modalOverlayCenter}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlayCenter}>
           <View style={styles.createSheet}>
             <Text style={styles.modalTitle}>Renomear lista</Text>
             <TextInput
@@ -184,7 +182,7 @@ export function ListsScreen({ onOpenItem }: { onOpenItem: (item: Item) => void }
               </Pressable>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <ConfirmModal

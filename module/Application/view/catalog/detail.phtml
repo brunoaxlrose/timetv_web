@@ -246,7 +246,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 </div>
                 
                 <div class="d-flex justify-content-end">
-                    <button type="button" id="btnSaveReview" class="btn btn-sm rounded-pill px-3 py-1 fw-bold text-white" onclick="savePersonalReview(<?= $item['id_item'] ?>)" <?= !empty($item['comment']) || $reviewLocked ? 'disabled' : '' ?> style="font-size: 0.7rem; background: linear-gradient(135deg, #a88beb 0%, #8a63e5 100%); border: none; pointer-events: <?= $reviewLocked ? 'none' : 'auto' ?>;"><?= $reviewLocked ? 'Disponível após lançamento' : 'Salvar Avaliação' ?></button>
+                    <button type="button" id="btnSaveReview" class="btn btn-sm rounded-pill px-3 py-1 fw-bold text-white" onclick="savePersonalReview(<?= $item['id_item'] ?>)" <?= !empty($item['comment']) || $reviewLocked ? 'disabled' : '' ?> style="font-size: 0.7rem; background: linear-gradient(135deg, #D99951 0%, #8a63e5 100%); border: none; pointer-events: <?= $reviewLocked ? 'none' : 'auto' ?>;"><?= $reviewLocked ? 'Disponível após lançamento' : 'Salvar Avaliação' ?></button>
                 </div>
                 <?php if ($reviewLocked): ?>
                     <div class="small mt-2" style="color: #c8c8e3; font-size: 0.72rem;">Avaliação liberada somente após a estreia.</div>
@@ -286,7 +286,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                 </div>
                 <?php if (count($this->comments) > 3): ?>
                     <div class="text-center mt-2.5">
-                        <button type="button" class="btn btn-sm btn-link text-accent text-decoration-none p-0 fw-bold" onclick="showMoreComments(this)" style="font-size: 0.72rem; color: #a88beb; background: transparent; border: none;">Ver mais comentários</button>
+                        <button type="button" class="btn btn-sm btn-link text-accent text-decoration-none p-0 fw-bold" onclick="showMoreComments(this)" style="font-size: 0.72rem; color: #D99951; background: transparent; border: none;">Ver mais comentários</button>
                     </div>
                 <?php endif; ?>
             </div>
@@ -358,7 +358,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
                                 <button class="btn btn-check-all-show <?= $allWatched ? 'checked' : '' ?>" 
                                         data-item-id="<?= $item['id_item'] ?>"
                                         title="<?= $allWatched ? 'Desmarcar toda a série' : 'Marcar toda a série' ?>"
-                                        style="font-size: 0.6rem; border-radius: 6px; padding: 2px 7px; font-weight: 700; text-transform: uppercase; border: 1px solid <?= $allWatched ? '#2ed573' : '#7c4dff' ?>; color: <?= $allWatched ? '#2ed573' : '#a88beb' ?>; background: transparent; white-space: nowrap;"
+                                        style="font-size: 0.6rem; border-radius: 6px; padding: 2px 7px; font-weight: 700; text-transform: uppercase; border: 1px solid <?= $allWatched ? '#2ed573' : '#D99951' ?>; color: <?= $allWatched ? '#2ed573' : '#D99951' ?>; background: transparent; white-space: nowrap;"
                                         onclick="event.stopPropagation();">
                                     <i class="bi <?= $allWatched ? 'bi-check-all' : 'bi-list-check' ?>"></i>
                                     <?= $allWatched ? 'Desmarcar tudo' : 'Marcar tudo' ?>
@@ -584,7 +584,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
         <div class="modal-content text-white p-4" style="border-radius: 20px; background-color: #1a1a24; border: 1px solid #2d2d3e; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
             <div class="d-flex align-items-center justify-content-between mb-3">
                 <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-folder2-open text-accent fs-4" style="color: #a88beb;"></i>
+                    <i class="bi bi-folder2-open text-accent fs-4" style="color: #D99951;"></i>
                     <h5 class="fw-bold mb-0 text-white" style="font-size: 1.05rem;">Adicionar às Listas</h5>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -596,7 +596,7 @@ $this->partial('catalog/js.phtml', ['page' => 'detail']);
 
             <div class="d-flex gap-2">
                 <input type="text" id="quickListCreateInput" class="form-control text-white border-0 py-2 px-3 flex-grow-1" style="background-color: #0c0c12; border-radius: 10px; font-size: 0.78rem;" placeholder="Nova lista...">
-                <button type="button" class="btn text-white rounded-pill px-3 py-1.5 fw-bold" style="background-color: #7c4dff; font-size: 0.75rem;" onclick="quickCreateListFromDetail()">Criar</button>
+                <button type="button" class="btn text-white rounded-pill px-3 py-1.5 fw-bold" style="background-color: #D99951; font-size: 0.75rem;" onclick="quickCreateListFromDetail()">Criar</button>
             </div>
         </div>
     </div>

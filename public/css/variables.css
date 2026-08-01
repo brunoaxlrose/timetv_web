@@ -1,15 +1,54 @@
 :root {
-    --bg-black: #08080a;
-    --bg-dark: #0f0f15;
-    --bg-card: #151520;
-    --border-dark: #1b1b26;
-    --border-light: #26263b;
-    --accent-yellow: #ffd200;
-    --accent-purple: #7c4dff;
-    --accent-blue: #38ef7d;
-    --accent-pink: #ff758f;
-    --text-white: #ffffff;
-    --text-gray: #a5a5b4;
-    --text-muted: #a5a5c0;
+    --palette-navy: #273343;
+    --palette-ivory: #D0CCC3;
+    --palette-silver: #A8A8A8;
+    --palette-amber: #D99951;
+    --palette-graphite: #505052;
+    --bg-black: #273343;
+    --bg-dark: #303c4b;
+    --bg-card: #394452;
+    --border-dark: #505052;
+    --border-light: #A8A8A8;
+    --accent-yellow: #D99951;
+    --accent-purple: #D99951;
+    --accent-blue: #D99951;
+    --accent-pink: #D99951;
+    --text-white: #D0CCC3;
+    --text-gray: #A8A8A8;
+    --text-muted: #A8A8A8;
     --font-family: 'Outfit', sans-serif;
+}
+
+/* Palette preview: neutral navy, ivory, silver, amber and graphite. */
+body,
+.app-container,
+.navbar,
+.offcanvas,
+.dropdown-menu {
+    background-color: var(--bg-black) !important;
+    color: var(--text-white) !important;
+}
+
+.card,
+.modal-content,
+.list-group-item,
+.form-control,
+.input-group-text {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-dark) !important;
+    color: var(--text-white) !important;
+}
+
+.btn-primary,
+.btn-purple,
+.bg-primary {
+    background-color: var(--palette-amber) !important;
+    border-color: var(--palette-amber) !important;
+    color: var(--palette-navy) !important;
+}
+
+.text-primary,
+.text-purple,
+a {
+    color: var(--palette-amber) !important;
 }

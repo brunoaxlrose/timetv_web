@@ -133,9 +133,9 @@
     bottom: 85px;
 }
 .refract-action-btn {
-    background-color: #7c4dff !important;
+    background-color: #D99951 !important;
     color: white !important;
-    box-shadow: 0 4px 20px rgba(124, 77, 255, 0.4);
+    box-shadow: 0 4px 20px rgba(217, 153, 81, 0.4);
     border-radius: 14px;
     font-weight: 700;
 }

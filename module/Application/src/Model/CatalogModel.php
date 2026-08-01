@@ -5,7 +5,7 @@ namespace Application\Model;
 use PDO;
 
 class CatalogModel {
-    private $pdo;
+    private PDO $pdo;
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
@@ -23,88 +23,60 @@ class CatalogModel {
               AND column_name = :column_name
             LIMIT 1
         ");
-        $stmt->execute([
-            ':table_name' => $table,
-            ':column_name' => $column
-        ]);
+        $stmt->execute([':table_name' => $table, ':column_name' => $column]);
         return (bool)$stmt->fetchColumn();
     }
 
-    public function getLocalItemByTvmazeId(int $userId, string $tvmazeId) {
+    private function getLocalItemByField(int $userId, string $field, string $value) {
         $stmt = $this->pdo->prepare("
-            SELECT i.*, ui.status as track_status 
-            FROM item i 
-            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id AND ui.ts_cancelamento IS NULL
-            WHERE i.tvmaze_id = :tvmaze_id
+            SELECT
+                i.*,
+                ui.status AS status_acompanhamento,
+                ui.nota,
+                ui.comentario,
+                COALESCE(ui.quantidade_reassistida, 0) AS quantidade_reassistida,
+                COALESCE(ui.eh_favorito, FALSE) AS eh_favorito
+            FROM item i
+            LEFT JOIN usuario_item ui
+                ON i.id_item = ui.id_item
+               AND ui.id_usuario = :user_id
+               AND ui.ts_cancelamento IS NULL
+            WHERE i.{$field} = :value
             LIMIT 1
         ");
-        $stmt->execute([':user_id' => $userId, ':tvmaze_id' => $tvmazeId]);
+        $stmt->execute([':user_id' => $userId, ':value' => $value]);
         return $stmt->fetch();
+    }
+
+    public function getLocalItemByTvmazeId(int $userId, string $tvmazeId) {
+        return $this->getLocalItemByField($userId, 'tvmaze_id', $tvmazeId);
     }
 
     public function getLocalItemByTmdbId(int $userId, string $tmdbId) {
-        $stmt = $this->pdo->prepare("
-            SELECT i.*, ui.status as track_status
-            FROM item i
-            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id AND ui.ts_cancelamento IS NULL
-            WHERE i.tmdb_id = :tmdb_id
-            LIMIT 1
-        ");
-        $stmt->execute([':user_id' => $userId, ':tmdb_id' => $tmdbId]);
-        return $stmt->fetch();
+        return $this->getLocalItemByField($userId, 'tmdb_id', $tmdbId);
     }
 
     public function getLocalItemByMalId(int $userId, string $malId) {
-        $stmt = $this->pdo->prepare("
-            SELECT i.*, ui.status as track_status
-            FROM item i
-            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id AND ui.ts_cancelamento IS NULL
-            WHERE i.mal_id = :mal_id
-            LIMIT 1
-        ");
-        $stmt->execute([':user_id' => $userId, ':mal_id' => $malId]);
-        return $stmt->fetch();
+        return $this->getLocalItemByField($userId, 'mal_id', $malId);
     }
 
     public function getLocalItemById(int $userId, string $itemId) {
-        $stmt = $this->pdo->prepare("
-            SELECT i.*, ui.status as track_status, ui.rating, ui.comment, COALESCE(ui.rewatch_count, 0) as rewatch_count
-            FROM item i
-            LEFT JOIN usuario_item ui ON i.id_item = ui.id_item AND ui.id_usuario = :user_id AND ui.ts_cancelamento IS NULL
-            WHERE i.id_item = :id
-            LIMIT 1
-        ");
-        $stmt->execute([':id' => $itemId, ':user_id' => $userId]);
-        $item = $stmt->fetch();
-        if (!$item) {
-            return false;
-        }
-
-        $item['is_favorite'] = false;
-        if ($this->hasColumn('usuario_item', 'is_favorite')) {
-            $stmtFav = $this->pdo->prepare("
-                SELECT COALESCE(is_favorite, FALSE)
-                FROM usuario_item
-                WHERE id_usuario = :user_id AND id_item = :id_item AND ts_cancelamento IS NULL
-                LIMIT 1
-            ");
-            $stmtFav->execute([':user_id' => $userId, ':id_item' => $itemId]);
-            $fav = $stmtFav->fetchColumn();
-            $item['is_favorite'] = ($fav !== false) ? (bool)$fav : false;
-        }
-
-        return $item;
+        return $this->getLocalItemByField($userId, 'id_item', $itemId);
     }
 
     public function getEpisodesWithWatchedState(int $userId, string $itemId): array {
         $stmt = $this->pdo->prepare("
-            SELECT e.*, 
-                   (ue.id_usuario_episodio IS NOT NULL) as watched,
-                   COALESCE(ue.rewatch_count, 0) as rewatch_count
+            SELECT
+                e.*,
+                (ue.id_usuario_episodio IS NOT NULL) AS assistido,
+                COALESCE(ue.quantidade_reassistida, 0) AS quantidade_reassistida
             FROM episodio e
-            LEFT JOIN usuario_episodio ue ON e.id_episodio = ue.id_episodio AND ue.id_usuario = :user_id AND ue.ts_cancelamento IS NULL
+            LEFT JOIN usuario_episodio ue
+                ON e.id_episodio = ue.id_episodio
+               AND ue.id_usuario = :user_id
+               AND ue.ts_cancelamento IS NULL
             WHERE e.id_item = :item_id
-            ORDER BY e.season_number ASC, e.episode_number ASC
+            ORDER BY e.numero_temporada ASC, e.numero_episodio ASC
         ");
         $stmt->execute([':item_id' => $itemId, ':user_id' => $userId]);
         return $stmt->fetchAll();
@@ -112,11 +84,16 @@ class CatalogModel {
 
     public function getProgress(int $userId, string $itemId) {
         $stmt = $this->pdo->prepare("
-            SELECT 
-                COUNT(e.id_episodio) as total_count,
-                COUNT(ue.id_usuario_episodio) as watched_count
+            SELECT
+                COUNT(e.id_episodio) AS total_count,
+                COUNT(ue.id_usuario_episodio) AS watched_count,
+                COUNT(e.id_episodio) AS total_episodios,
+                COUNT(ue.id_usuario_episodio) AS episodios_assistidos
             FROM episodio e
-            LEFT JOIN usuario_episodio ue ON e.id_episodio = ue.id_episodio AND ue.id_usuario = :user_id AND ue.ts_cancelamento IS NULL
+            LEFT JOIN usuario_episodio ue
+                ON e.id_episodio = ue.id_episodio
+               AND ue.id_usuario = :user_id
+               AND ue.ts_cancelamento IS NULL
             WHERE e.id_item = :item_id
         ");
         $stmt->execute([':item_id' => $itemId, ':user_id' => $userId]);
@@ -125,11 +102,16 @@ class CatalogModel {
 
     public function getNextUnwatched(int $userId, string $itemId) {
         $stmt = $this->pdo->prepare("
-            SELECT id_episodio, season_number, episode_number, title, air_date, runtime_minutes
-            FROM episodio 
-            WHERE id_item = :item_id 
-              AND id_episodio NOT IN (SELECT id_episodio FROM usuario_episodio WHERE id_usuario = :user_id AND ts_cancelamento IS NULL)
-            ORDER BY season_number ASC, episode_number ASC
+            SELECT id_episodio, numero_temporada, numero_episodio, titulo, data_exibicao, duracao_minutos
+            FROM episodio
+            WHERE id_item = :item_id
+              AND id_episodio NOT IN (
+                  SELECT id_episodio
+                  FROM usuario_episodio
+                  WHERE id_usuario = :user_id
+                    AND ts_cancelamento IS NULL
+              )
+            ORDER BY numero_temporada ASC, numero_episodio ASC
             LIMIT 1
         ");
         $stmt->execute([':item_id' => $itemId, ':user_id' => $userId]);
@@ -144,43 +126,45 @@ class CatalogModel {
 
     public function saveItem(array $itemData): void {
         $stmt = $this->pdo->prepare("
-            INSERT INTO item (id_item, title, type, poster_url, banner_url, tvmaze_id)
-            VALUES (:id, :title, :type, :poster, :banner, :tvmaze_id)
-            ON CONFLICT (id_item) DO UPDATE 
-            SET title = EXCLUDED.title, 
-                poster_url = EXCLUDED.poster_url, 
-                banner_url = EXCLUDED.banner_url,
+            INSERT INTO item (id_item, titulo, tipo, url_poster, url_banner, tvmaze_id)
+            VALUES (:id, :titulo, :tipo, :poster, :banner, :tvmaze_id)
+            ON CONFLICT (id_item) DO UPDATE
+            SET titulo = EXCLUDED.titulo,
+                tipo = EXCLUDED.tipo,
+                url_poster = EXCLUDED.url_poster,
+                url_banner = EXCLUDED.url_banner,
                 tvmaze_id = EXCLUDED.tvmaze_id
         ");
         $stmt->execute([
             ':id' => $itemData['id'],
-            ':title' => $itemData['title'],
-            ':type' => $itemData['type'],
+            ':titulo' => $itemData['titulo'],
+            ':tipo' => $itemData['tipo'],
             ':poster' => $itemData['poster'],
             ':banner' => $itemData['banner'],
-            ':tvmaze_id' => $itemData['tvmaze_id'] ?? null
+            ':tvmaze_id' => $itemData['tvmaze_id'] ?? null,
         ]);
     }
 
     public function getWatchlistStatus(int $userId, string $itemId) {
         $stmt = $this->pdo->prepare("
-            SELECT status FROM usuario_item 
-            WHERE id_usuario = :user_id AND id_item = :item_id AND ts_cancelamento IS NULL
+            SELECT status
+            FROM usuario_item
+            WHERE id_usuario = :user_id
+              AND id_item = :item_id
+              AND ts_cancelamento IS NULL
             LIMIT 1
         ");
-        $stmt->execute([
-            ':user_id' => $userId,
-            ':item_id' => $itemId
-        ]);
+        $stmt->execute([':user_id' => $userId, ':item_id' => $itemId]);
         $res = $stmt->fetch();
         return $res ? $res['status'] : null;
     }
 
     public function getEpisodesByItemId(string $itemId): array {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM episodio 
-            WHERE id_item = :item_id 
-            ORDER BY season_number ASC, episode_number ASC
+            SELECT *
+            FROM episodio
+            WHERE id_item = :item_id
+            ORDER BY numero_temporada ASC, numero_episodio ASC
         ");
         $stmt->execute([':item_id' => $itemId]);
         return $stmt->fetchAll();
@@ -188,32 +172,35 @@ class CatalogModel {
 
     public function saveEpisode(array $epData): void {
         $stmt = $this->pdo->prepare("
-            INSERT INTO episodio (id_item, season_number, episode_number, title, air_date, runtime_minutes, rating, description)
-            VALUES (:item_id, :season, :episode, :title, :air_date, :runtime, :rating, :description)
-            ON CONFLICT (id_item, season_number, episode_number) DO UPDATE
-            SET title = EXCLUDED.title,
-                air_date = EXCLUDED.air_date,
-                runtime_minutes = EXCLUDED.runtime_minutes,
-                rating = EXCLUDED.rating,
-                description = EXCLUDED.description
+            INSERT INTO episodio (id_item, numero_temporada, numero_episodio, titulo, data_exibicao, duracao_minutos, nota, descricao)
+            VALUES (:item_id, :season, :episode, :titulo, :data_exibicao, :duracao_minutos, :nota, :descricao)
+            ON CONFLICT (id_item, numero_temporada, numero_episodio) DO UPDATE
+            SET titulo = EXCLUDED.titulo,
+                data_exibicao = EXCLUDED.data_exibicao,
+                duracao_minutos = EXCLUDED.duracao_minutos,
+                nota = EXCLUDED.nota,
+                descricao = EXCLUDED.descricao
         ");
         $stmt->execute([
             ':item_id' => $epData['item_id'],
             ':season' => $epData['season'],
             ':episode' => $epData['episode'],
-            ':title' => $epData['title'],
-            ':air_date' => $epData['air_date'] ?: null,
-            ':runtime' => $epData['runtime'] ?: null,
-            ':rating' => $epData['rating'] ?: null,
-            ':description' => $epData['description'] ?: null
+            ':titulo' => $epData['titulo'],
+            ':data_exibicao' => $epData['data_exibicao'] ?: null,
+            ':duracao_minutos' => $epData['duracao_minutos'] ?: null,
+            ':nota' => $epData['nota'] ?? null,
+            ':descricao' => $epData['descricao'] ?: null,
         ]);
     }
 
     public function getWatchedEpisodeIds(int $userId, array $episodeIds): array {
-        if (empty($episodeIds)) return [];
+        if (empty($episodeIds)) {
+            return [];
+        }
         $inQuery = implode(',', array_fill(0, count($episodeIds), '?'));
         $stmt = $this->pdo->prepare("
-            SELECT id_episodio FROM usuario_episodio 
+            SELECT id_episodio
+            FROM usuario_episodio
             WHERE id_usuario = ? AND id_episodio IN ($inQuery)
         ");
         $params = array_merge([$userId], $episodeIds);
@@ -223,8 +210,10 @@ class CatalogModel {
 
     public function getCachedSearchResults(string $query) {
         $stmt = $this->pdo->prepare("
-            SELECT results FROM search_cache 
-            WHERE query = :query AND ts_created > CURRENT_TIMESTAMP - INTERVAL '1 day'
+            SELECT results
+            FROM search_cache
+            WHERE query = :query
+              AND ts_created > CURRENT_TIMESTAMP - INTERVAL '1 day'
             LIMIT 1
         ");
         $stmt->execute([':query' => strtolower(trim($query))]);
@@ -236,46 +225,37 @@ class CatalogModel {
         $stmt = $this->pdo->prepare("
             INSERT INTO search_cache (query, results, ts_created)
             VALUES (:query, :results, CURRENT_TIMESTAMP)
-            ON CONFLICT (query) DO UPDATE 
+            ON CONFLICT (query) DO UPDATE
             SET results = EXCLUDED.results, ts_created = CURRENT_TIMESTAMP
         ");
         $stmt->execute([
             ':query' => strtolower(trim($query)),
-            ':results' => json_encode($results)
+            ':results' => json_encode($results),
         ]);
     }
 
     public function searchAllDatabases(string $search, int $userId): array {
-        // Check cache first
         $cached = $this->getCachedSearchResults($search);
         if ($cached !== null) {
-            // Re-bind watched/track statuses from DB for cached items so they stay dynamically up-to-date
             foreach ($cached as &$item) {
                 if (!empty($item['tvmaze_id'])) {
-                    $local = $this->getLocalItemByTvmazeId($userId, $item['tvmaze_id']);
-                    if ($local) {
-                        $item['id_item'] = $local['id_item'];
-                        $item['track_status'] = $local['track_status'];
-                    }
+                    $local = $this->getLocalItemByTvmazeId($userId, (string)$item['tvmaze_id']);
                 } elseif (!empty($item['tmdb_id'])) {
-                    $local = $this->getLocalItemByTmdbId($userId, $item['tmdb_id']);
-                    if ($local) {
-                        $item['id_item'] = $local['id_item'];
-                        $item['track_status'] = $local['track_status'];
-                    }
+                    $local = $this->getLocalItemByTmdbId($userId, (string)$item['tmdb_id']);
                 } elseif (!empty($item['mal_id'])) {
-                    $local = $this->getLocalItemByMalId($userId, $item['mal_id']);
-                    if ($local) {
-                        $item['id_item'] = $local['id_item'];
-                        $item['track_status'] = $local['track_status'];
-                    }
+                    $local = $this->getLocalItemByMalId($userId, (string)$item['mal_id']);
+                } else {
+                    $local = null;
+                }
+
+                if ($local) {
+                    $item = array_merge($item, $local);
                 }
             }
             unset($item);
             return $cached;
         }
 
-        // TVmaze Search
         $options = ['http' => ['header' => "User-Agent: TVTimeClone/1.0\r\n", 'timeout' => 5]];
         $context = stream_context_create($options);
         $apiUrl = "https://api.tvmaze.com/search/shows?q=" . urlencode($search);
@@ -284,85 +264,81 @@ class CatalogModel {
 
         $merged = [];
         $seenKeys = [];
-
-        $getDedupeKey = function($title, $type, $year) {
-            $cleanTitle = preg_replace('/[^a-z0-9]/', '', strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $title)));
-            return $cleanTitle . '_' . $type . '_' . $year;
+        $getDedupeKey = function($titulo, $tipo, $ano) {
+            $cleanTitle = preg_replace('/[^a-z0-9]/', '', strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $titulo)));
+            return $cleanTitle . '_' . $tipo . '_' . $ano;
         };
 
-        // 1. Process TVmaze results
         foreach ($tvmazeResults as $result) {
             $show = $result['show'] ?? null;
-            if (!$show) continue;
-            $summary = strip_tags($show['summary'] ?? '');
-            if (empty($summary)) {
-                $summary = 'Nenhuma sinopse disponível.';
+            if (!$show) {
+                continue;
             }
 
-            $tvmazeId = $show['id'];
-            $localItem = $this->getLocalItemByTvmazeId($userId, $tvmazeId);
+            $localItem = $this->getLocalItemByTvmazeId($userId, (string)$show['id']);
             if ($localItem) {
                 $item = $localItem;
             } else {
-                $showType = 'series';
+                $summary = trim(strip_tags($show['summary'] ?? '')) ?: 'Nenhuma sinopse disponivel.';
                 $genres = $show['genres'] ?? [];
-                if (in_array('Anime', $genres) || 
-                    (isset($show['network']['country']['code']) && $show['network']['country']['code'] === 'JP') ||
-                    (isset($show['webChannel']['country']['code']) && $show['webChannel']['country']['code'] === 'JP')) {
-                    $showType = 'anime';
+                $tipo = 'series';
+                if (
+                    in_array('Anime', $genres, true)
+                    || (($show['network']['country']['code'] ?? null) === 'JP')
+                    || (($show['webChannel']['country']['code'] ?? null) === 'JP')
+                ) {
+                    $tipo = 'anime';
                 }
-                $releaseYear = isset($show['premiered']) ? intval(substr($show['premiered'], 0, 4)) : date('Y');
-                $poster = $show['image']['medium'] ?? 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400';
-                $banner = $show['image']['original'] ?? 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200';
 
+                $ano = isset($show['premiered']) ? (int)substr($show['premiered'], 0, 4) : (int)date('Y');
                 $item = [
                     'id_item' => null,
-                    'tvmaze_id' => $tvmazeId,
-                    'title' => $show['name'],
-                    'type' => $showType,
-                    'poster_url' => $poster,
-                    'banner_url' => $banner,
-                    'description' => $summary,
-                    'release_year' => $releaseYear,
-                    'track_status' => null
+                    'tvmaze_id' => $show['id'],
+                    'tmdb_id' => null,
+                    'mal_id' => null,
+                    'titulo' => $show['name'],
+                    'tipo' => $tipo,
+                    'url_poster' => $show['image']['medium'] ?? 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400',
+                    'url_banner' => $show['image']['original'] ?? 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200',
+                    'descricao' => $summary,
+                    'ano_lancamento' => $ano,
+                    'status_acompanhamento' => null,
                 ];
             }
 
-            $key = $getDedupeKey($item['title'], $item['type'], $item['release_year']);
+            $key = $getDedupeKey($item['titulo'], $item['tipo'], $item['ano_lancamento'] ?? date('Y'));
             if (!isset($seenKeys[$key])) {
                 $seenKeys[$key] = true;
                 $merged[] = $item;
             }
         }
 
-        // 2. Process TMDB results
-        $tmdbResults = \Application\Helper\TmdbHelper::searchMulti($search, 20);
-        foreach ($tmdbResults as $r) {
-            if (!empty($r['tmdb_id'])) {
-                $local = $this->getLocalItemByTmdbId($userId, $r['tmdb_id']);
-                $item = $local ? $local : $r;
-            } else {
-                $item = $r;
+        foreach (\Application\Helper\TmdbHelper::searchMulti($search, 20) as $result) {
+            $item = $result;
+            if (!empty($result['tmdb_id'])) {
+                $local = $this->getLocalItemByTmdbId($userId, (string)$result['tmdb_id']);
+                if ($local) {
+                    $item = array_merge($item, $local);
+                }
             }
 
-            $key = $getDedupeKey($item['title'], $item['type'], $item['release_year'] ?? date('Y'));
+            $key = $getDedupeKey($item['titulo'], $item['tipo'], $item['ano_lancamento'] ?? date('Y'));
             if (!isset($seenKeys[$key])) {
                 $seenKeys[$key] = true;
                 $merged[] = $item;
             }
         }
 
-        // 3. Process Jikan/MAL results
-        $malResults = \Application\Helper\JikanHelper::searchAnime($search, 15);
-        foreach ($malResults as $r) {
-            if (!empty($r['mal_id'])) {
-                $local = $this->getLocalItemByMalId($userId, $r['mal_id']);
-                $item = $local ? $local : $r;
-            } else {
-                $item = $r;
+        foreach (\Application\Helper\JikanHelper::searchAnime($search, 15) as $result) {
+            $item = $result;
+            if (!empty($result['mal_id'])) {
+                $local = $this->getLocalItemByMalId($userId, (string)$result['mal_id']);
+                if ($local) {
+                    $item = array_merge($item, $local);
+                }
             }
 
-            $key = $getDedupeKey($item['title'], $item['type'], $item['release_year'] ?? date('Y'));
+            $key = $getDedupeKey($item['titulo'], $item['tipo'], $item['ano_lancamento'] ?? date('Y'));
             if (!isset($seenKeys[$key])) {
                 $seenKeys[$key] = true;
                 $merged[] = $item;
@@ -370,19 +346,97 @@ class CatalogModel {
         }
 
         $this->cacheSearchResults($search, $merged);
-
         return $merged;
     }
 
     public function getItemComments(int $itemId): array {
         $stmt = $this->pdo->prepare("
-            SELECT ui.comment, ui.rating, ui.ts_atualizacao, u.user_name, u.avatar_url, ui.id_usuario
+            SELECT
+                ui.comentario,
+                ui.nota,
+                ui.ts_atualizacao AS reviewed_at,
+                u.nome_usuario,
+                u.url_avatar,
+                ui.id_usuario
             FROM usuario_item ui
             JOIN usuario u ON ui.id_usuario = u.id_usuario
-            WHERE ui.id_item = :item_id AND ui.comment IS NOT NULL AND ui.comment != ''
+            WHERE ui.id_item = :item_id
+              AND ui.comentario IS NOT NULL
+              AND ui.comentario != ''
             ORDER BY ui.ts_atualizacao DESC
         ");
         $stmt->execute([':item_id' => $itemId]);
+        return $stmt->fetchAll();
+    }
+
+    public function getReleaseCalendar(int $userId, string $startDate, string $endDate): array {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                i.id_item,
+                i.titulo,
+                i.tipo,
+                i.url_poster,
+                i.provedores_streaming,
+                e.id_episodio,
+                e.numero_temporada,
+                e.numero_episodio,
+                e.titulo AS titulo_episodio,
+                e.data_exibicao AS data_evento,
+                ui.status AS status_acompanhamento,
+                EXISTS (
+                    SELECT 1 FROM usuario_episodio ue
+                    WHERE ue.id_usuario = :id_usuario_episodio
+                      AND ue.id_episodio = e.id_episodio
+                      AND ue.ts_cancelamento IS NULL
+                ) AS assistido
+            FROM episodio e
+            JOIN item i ON i.id_item = e.id_item AND i.ts_cancelamento IS NULL
+            LEFT JOIN usuario_item ui
+              ON ui.id_item = i.id_item
+             AND ui.id_usuario = :id_usuario_acompanhamento_episodio
+             AND ui.ts_cancelamento IS NULL
+            WHERE e.data_exibicao BETWEEN :data_inicio_episodio AND :data_fim_episodio
+              AND e.ts_cancelamento IS NULL
+
+            UNION ALL
+
+            SELECT
+                i.id_item,
+                i.titulo,
+                i.tipo,
+                i.url_poster,
+                i.provedores_streaming,
+                NULL AS id_episodio,
+                NULL AS numero_temporada,
+                NULL AS numero_episodio,
+                NULL AS titulo_episodio,
+                i.data_lancamento AS data_evento,
+                ui.status AS status_acompanhamento,
+                FALSE AS assistido
+            FROM item i
+            LEFT JOIN usuario_item ui
+              ON ui.id_item = i.id_item
+             AND ui.id_usuario = :id_usuario_acompanhamento_item
+             AND ui.ts_cancelamento IS NULL
+            WHERE i.data_lancamento BETWEEN :data_inicio_item AND :data_fim_item
+              AND i.ts_cancelamento IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM episodio e
+                  WHERE e.id_item = i.id_item
+                    AND e.data_exibicao = i.data_lancamento
+                    AND e.ts_cancelamento IS NULL
+              )
+            ORDER BY data_evento, titulo
+        ");
+        $stmt->execute([
+            ':id_usuario_episodio' => $userId,
+            ':id_usuario_acompanhamento_episodio' => $userId,
+            ':id_usuario_acompanhamento_item' => $userId,
+            ':data_inicio_episodio' => $startDate,
+            ':data_fim_episodio' => $endDate,
+            ':data_inicio_item' => $startDate,
+            ':data_fim_item' => $endDate,
+        ]);
         return $stmt->fetchAll();
     }
 }

@@ -62,6 +62,6 @@ const styles = StyleSheet.create({
   },
   success: { backgroundColor: '#123221' },
   error: { backgroundColor: '#35151d' },
-  info: { backgroundColor: '#171720' },
+  info: { backgroundColor: colors.surface },
   toastText: { color: colors.text, fontSize: 13, fontWeight: '900', textAlign: 'center' },
 });

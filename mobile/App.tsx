@@ -1,19 +1,37 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { login, User } from './src/api/auth';
-import { MainTabs } from './src/navigation/MainTabs';
-import { clearSession, loadCredentials, saveCredentials, saveUser } from './src/storage/session';
-import { colors } from './src/theme/colors';
-import { LoginScreen } from './src/screens/LoginScreen';
-import { ToastProvider } from './src/components/Toast';
+import { getCurrentUser, login, User } from './src/api/auth';
+import { clearSession, loadCredentials, loadSavedUser, saveCredentials, saveUser } from './src/storage/session';
+import { colors, hydratePalette } from './src/theme/colors';
+
+const MainTabs = lazy(() => import('./src/navigation/MainTabs').then((module) => ({ default: module.MainTabs })));
+const LoginScreen = lazy(() => import('./src/screens/LoginScreen').then((module) => ({ default: module.LoginScreen })));
+const ToastProvider = lazy(() => import('./src/components/Toast').then((module) => ({ default: module.ToastProvider })));
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [booting, setBooting] = useState(true);
+  const [themeReady, setThemeReady] = useState(false);
 
   useEffect(() => {
     async function boot() {
+      await hydratePalette();
+      setThemeReady(true);
+      const savedUser = await loadSavedUser();
+      if (savedUser?.token_api) {
+        try {
+          const response = await getCurrentUser();
+          if (response.data) {
+            const restoredUser = { ...response.data, token_api: savedUser.token_api };
+            await saveUser(restoredUser);
+            setUser(restoredUser);
+            return;
+          }
+        } catch {
+          // Fall back to remembered credentials below when the token has expired.
+        }
+      }
       const credentials = await loadCredentials();
 
       if (credentials) {
@@ -36,8 +54,8 @@ export default function App() {
   }, []);
 
   async function handleAuthenticated(nextUser: User, remember?: { email: string; password: string }) {
+    await saveUser(nextUser);
     if (remember) {
-      await saveUser(nextUser);
       await saveCredentials(remember);
     }
     setUser(nextUser);
@@ -48,7 +66,12 @@ export default function App() {
     setUser(null);
   }
 
+  if (!themeReady) {
+    return <View style={[styles.boot, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.accent} /></View>;
+  }
+
   return (
+    <Suspense fallback={<View style={[styles.boot, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.accent} /></View>}>
     <ToastProvider>
       <StatusBar style="light" />
       {booting ? (
@@ -61,6 +84,7 @@ export default function App() {
         <LoginScreen onAuthenticated={handleAuthenticated} />
       )}
     </ToastProvider>
+    </Suspense>
   );
 }
 

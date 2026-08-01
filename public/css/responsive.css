@@ -16,7 +16,7 @@
         padding: 0 !important;
         border: none;
         box-shadow: none;
-        background-color: #08080a;
+        background-color: #273343;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
@@ -29,7 +29,7 @@
         border: none !important;
         border-radius: 0 !important;
         min-height: 100vh;
-        background-color: #08080a;
+        background-color: #273343;
     }
 
     /* For logged-in users (Dashboard / Main App) on Desktop */

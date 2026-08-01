@@ -22,19 +22,19 @@ class AuthController extends AbstractActionController {
         }
 
         $email = trim((string)($payload['email'] ?? ''));
-        $password = (string)($payload['password'] ?? '');
+        $password = (string)($payload['senha'] ?? '');
 
         if ($email === '' || $password === '') {
             return $this->jsonError('Informe email e senha.', 422);
         }
 
         $user = $this->authModel->getUserByEmail($email);
-        if (!$user || !password_verify($password, $user['password_hash'])) {
+        if (!$user || !password_verify($password, $user['hash_senha'])) {
             return $this->jsonError('Email ou senha incorretos.', 401);
         }
 
         $_SESSION['user_id'] = (int)$user['id_usuario'];
-        $_SESSION['username'] = $user['user_name'];
+        $_SESSION['nome_usuario'] = $user['nome_usuario'];
         $_SESSION['nome'] = $user['nome'];
         $_SESSION['sobrenome'] = $user['sobrenome'];
         $apiToken = $this->authModel->issueApiToken((int)$user['id_usuario']);
@@ -57,10 +57,10 @@ class AuthController extends AbstractActionController {
             $payload = $request->getPost()->toArray();
         }
 
-        $username = trim((string)($payload['user_name'] ?? ''));
+        $username = trim((string)($payload['nome_usuario'] ?? ''));
         $email = trim((string)($payload['email'] ?? ''));
-        $password = (string)($payload['password'] ?? '');
-        $passwordConfirm = (string)($payload['password_confirm'] ?? '');
+        $password = (string)($payload['senha'] ?? '');
+        $passwordConfirm = (string)($payload['confirmacao_senha'] ?? '');
         $nome = $this->capitalizeName(trim((string)($payload['nome'] ?? '')));
         $sobrenome = $this->capitalizeName(trim((string)($payload['sobrenome'] ?? '')));
 
@@ -94,7 +94,7 @@ class AuthController extends AbstractActionController {
 
             $user = $this->authModel->getUserById($userId);
             $_SESSION['user_id'] = (int)$user['id_usuario'];
-            $_SESSION['username'] = $user['user_name'];
+            $_SESSION['nome_usuario'] = $user['nome_usuario'];
             $_SESSION['nome'] = $user['nome'];
             $_SESSION['sobrenome'] = $user['sobrenome'];
             $apiToken = $this->authModel->issueApiToken((int)$user['id_usuario']);
@@ -152,9 +152,10 @@ class AuthController extends AbstractActionController {
 
         $payload = $this->payload();
         $userId = (int)$user['id_usuario'];
-        $username = trim((string)($payload['username'] ?? ''));
+        $username = trim((string)($payload['nome_usuario'] ?? ''));
         $nome = $this->capitalizeName(trim((string)($payload['nome'] ?? '')));
         $sobrenome = $this->capitalizeName(trim((string)($payload['sobrenome'] ?? '')));
+        $avatarUrl = trim((string)($payload['url_avatar'] ?? ($user['url_avatar'] ?? '')));
 
         if (strlen($username) < 3) {
             return $this->jsonError('Nome de usuario deve ter no minimo 3 caracteres.', 422);
@@ -165,10 +166,13 @@ class AuthController extends AbstractActionController {
         if ($this->authModel->isUsernameTaken($username, $userId)) {
             return $this->jsonError('Nome de usuario ja esta em uso.', 409);
         }
+        if ($avatarUrl !== '' && !$this->isValidAvatar($avatarUrl)) {
+            return $this->jsonError('A imagem de perfil e invalida ou muito grande.', 422);
+        }
 
-        $currentPassword = (string)($payload['current_password'] ?? '');
-        $newPassword = (string)($payload['new_password'] ?? '');
-        $confirmPassword = (string)($payload['confirm_new_password'] ?? '');
+        $currentPassword = (string)($payload['senha_atual'] ?? '');
+        $newPassword = (string)($payload['nova_senha'] ?? '');
+        $confirmPassword = (string)($payload['confirmacao_nova_senha'] ?? '');
 
         if ($currentPassword !== '' || $newPassword !== '' || $confirmPassword !== '') {
             if ($currentPassword === '' || $newPassword === '' || $confirmPassword === '') {
@@ -182,15 +186,15 @@ class AuthController extends AbstractActionController {
             }
 
             $user = $this->authModel->getUserById($userId);
-            if (!$user || !password_verify($currentPassword, $user['password_hash'])) {
+            if (!$user || !password_verify($currentPassword, $user['hash_senha'])) {
                 return $this->jsonError('Senha atual incorreta.', 422);
             }
 
             $this->authModel->updatePassword($userId, password_hash($newPassword, PASSWORD_BCRYPT));
         }
 
-        $this->authModel->updateProfile($userId, $username, $nome, $sobrenome);
-        $_SESSION['username'] = $username;
+        $this->authModel->updateProfile($userId, $username, $nome, $sobrenome, $avatarUrl !== '' ? $avatarUrl : null);
+        $_SESSION['nome_usuario'] = $username;
         $_SESSION['nome'] = $nome;
         $_SESSION['sobrenome'] = $sobrenome;
 
@@ -251,14 +255,15 @@ class AuthController extends AbstractActionController {
     private function serializeUser(array $user, ?string $apiToken = null): array {
         $data = [
             'id' => (int)$user['id_usuario'],
-            'username' => $user['user_name'],
+            'nome_usuario' => $user['nome_usuario'],
             'email' => $user['email'],
             'nome' => $user['nome'],
             'sobrenome' => $user['sobrenome'],
+            'url_avatar' => $user['url_avatar'] ?: null,
         ];
 
         if ($apiToken !== null) {
-            $data['api_token'] = $apiToken;
+            $data['token_api'] = $apiToken;
         }
 
         return $data;
@@ -270,6 +275,18 @@ class AuthController extends AbstractActionController {
             $payload = $this->getRequest()->getPost()->toArray();
         }
         return $payload;
+    }
+
+    private function isValidAvatar(string $avatarUrl): bool {
+        if (strlen($avatarUrl) > 750000) {
+            return false;
+        }
+
+        if (preg_match('#^data:image/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$#', $avatarUrl, $matches)) {
+            return base64_decode($matches[2], true) !== false;
+        }
+
+        return filter_var($avatarUrl, FILTER_VALIDATE_URL) !== false;
     }
 
     private function currentUser(): ?array {

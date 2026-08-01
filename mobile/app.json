@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Time View",
-    "slug": "time-view",
+    "name": "CineFio",
+    "slug": "cinefio",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
@@ -9,6 +9,15 @@
     "platforms": [
       "ios",
       "android"
+    ],
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O CineFio acessa suas fotos para voce escolher uma imagem de perfil.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "android": {
       "usesCleartextTraffic": true,

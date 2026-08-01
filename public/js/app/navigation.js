@@ -43,7 +43,7 @@
                     <div class="notif-card__body">
                         <div class="notif-card__title">${$('<span>').text(n.titulo).html()}</div>
                         <div class="notif-card__msg">${$('<span>').text(n.mensagem).html()}</div>
-                        <div class="notif-card__time">${timeAgo(n.ts_criacao)}</div>
+                        <div class="notif-card__time">${timeAgo(n.ts_criacao || n.ts_inclusao)}</div>
                     </div>
                     <div class="notif-card__dot"></div>
                 </div>
