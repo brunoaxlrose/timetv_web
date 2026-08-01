@@ -10,7 +10,7 @@ npm install
 npm run start
 ```
 
-Por padrao, o app usa a API publicada no Render. As duas URLs ficam configuradas em `mobile/.env`:
+Copie `mobile/.env.example` para `mobile/.env`. Por padrao, o app usa a API publicada no Render, mantendo as duas URLs disponiveis localmente:
 
 ```dotenv
 EXPO_PUBLIC_API_ENV=production
