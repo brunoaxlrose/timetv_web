@@ -324,6 +324,58 @@ class CatalogController extends AbstractActionController {
             }
         }
 
+        // Fetch/populate genres if null/empty
+        if (empty($item['genres'])) {
+            $genresStr = null;
+            if ($item['type'] === 'anime' && !empty($item['mal_id'])) {
+                $animeData = \Application\Helper\JikanHelper::getAnimeDetail((int)$item['mal_id']);
+                if ($animeData) {
+                    $genres = [];
+                    if (!empty($animeData['genres']) && is_array($animeData['genres'])) {
+                        foreach ($animeData['genres'] as $g) {
+                            $genres[] = $g['name'];
+                        }
+                    }
+                    if (!empty($animeData['themes']) && is_array($animeData['themes'])) {
+                        foreach ($animeData['themes'] as $t) {
+                            $genres[] = $t['name'];
+                        }
+                    }
+                    $genresStr = !empty($genres) ? implode(', ', $genres) : null;
+                }
+            } elseif ($item['type'] !== 'movie' && !empty($item['tvmaze_id'])) {
+                $url = "https://api.tvmaze.com/shows/" . (int)$item['tvmaze_id'];
+                $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: TVTimeClone/1.0\r\n"]]));
+                if ($json) {
+                    $showData = json_decode($json, true);
+                    if (!empty($showData['genres'])) {
+                        $genresStr = implode(', ', $showData['genres']);
+                    }
+                }
+            } else {
+                $tmdbIdForGenres = $item['tmdb_id'] ?? null;
+                if (!empty($tmdbIdForGenres)) {
+                    $movieData = \Application\Helper\TmdbHelper::getMovieDetail((int)$tmdbIdForGenres);
+                    if ($movieData && !empty($movieData['genres'])) {
+                        $genres = [];
+                        foreach ($movieData['genres'] as $g) {
+                            $genres[] = $g['name'];
+                        }
+                        $genresStr = implode(', ', $genres);
+                    }
+                }
+            }
+
+            if ($genresStr !== null) {
+                $genresStr = self::translateGenres($genresStr);
+                $stmt = $pdo->prepare("UPDATE item SET genres = :genres WHERE id_item = :id");
+                $stmt->execute([':genres' => $genresStr, ':id' => $id]);
+                $item['genres'] = $genresStr;
+            }
+        } else {
+            $item['genres'] = self::translateGenres($item['genres']);
+        }
+
         $episodes = [];
         $progress = null;
         $hasReleasedContent = false;
@@ -370,6 +422,67 @@ class CatalogController extends AbstractActionController {
 
         $comments = $this->catalogModel->getItemComments($id);
 
+        // Recommendations
+        $recommendations = [];
+        if ($item['type'] === 'anime' && !empty($item['mal_id'])) {
+            $recommendations = \Application\Helper\JikanHelper::getRecommendations((int)$item['mal_id'], 8);
+        } else {
+            $tmdbIdForRecs = $item['tmdb_id'] ?? null;
+            if (empty($tmdbIdForRecs)) {
+                $searchType = ($item['type'] === 'movie') ? 'movie' : 'tv';
+                $url = "https://api.themoviedb.org/3/search/" . $searchType . "?api_key=1f54bd990f1cdfb230adb312546d765d&query=" . urlencode($item['title']) . "&language=pt-BR";
+                if ($item['release_year']) {
+                    $url .= ($item['type'] === 'movie') ? "&primary_release_year=" . $item['release_year'] : "&first_air_date_year=" . $item['release_year'];
+                }
+                $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: TimeView/1.0\r\n", 'timeout' => 5]]));
+                if ($json) {
+                    $results = json_decode($json, true)['results'] ?? [];
+                    if (!empty($results[0]['id'])) {
+                        $tmdbIdForRecs = (int)$results[0]['id'];
+                        $stmt = $pdo->prepare("UPDATE item SET tmdb_id = :tmdb_id WHERE id_item = :id");
+                        $stmt->execute([':tmdb_id' => $tmdbIdForRecs, ':id' => $id]);
+                        $item['tmdb_id'] = $tmdbIdForRecs;
+                    }
+                }
+            }
+            if (!empty($tmdbIdForRecs)) {
+                $recommendations = \Application\Helper\TmdbHelper::getRecommendations($item['type'], (int)$tmdbIdForRecs, 8);
+            }
+        if (!empty($item['watch_providers'])) {
+            $providers = json_decode($item['watch_providers'], true);
+            if (is_array($providers)) {
+                $cleaned = [];
+                foreach ($providers as $prov) {
+                    $name = $prov['name'] ?? '';
+                    $targetName = $name;
+                    if (stripos($name, 'Netflix') !== false) {
+                        $targetName = 'Netflix';
+                    } elseif (stripos($name, 'Paramount') !== false) {
+                        $targetName = 'Paramount+';
+                    } elseif (stripos($name, 'Prime Video') !== false || stripos($name, 'Amazon') !== false) {
+                        $targetName = 'Prime Video';
+                    } elseif (stripos($name, 'Apple TV') !== false) {
+                        $targetName = 'Apple TV+';
+                    } elseif (stripos($name, 'Disney') !== false) {
+                        $targetName = 'Disney+';
+                    } elseif (stripos($name, 'HBO') !== false || strcasecmp($name, 'Max') === 0) {
+                        $targetName = 'Max';
+                    } elseif (stripos($name, 'Star+') !== false || stripos($name, 'Star Plus') !== false) {
+                        $targetName = 'Star+';
+                    } elseif (stripos($name, 'Claro') !== false) {
+                        $targetName = 'Claro tv+';
+                    } elseif (stripos($name, 'Crunchyroll') !== false) {
+                        $targetName = 'Crunchyroll';
+                    }
+                    $cleaned[$targetName] = [
+                        'name' => $targetName,
+                        'logo' => $prov['logo'] ?? ''
+                    ];
+                }
+                $item['watch_providers'] = json_encode(array_values($cleaned), JSON_UNESCAPED_UNICODE);
+            }
+        }
+
         $view = new ViewModel([
             'item' => $item,
             'episodes' => $episodes,
@@ -378,7 +491,8 @@ class CatalogController extends AbstractActionController {
             'cast' => $cast,
             'nextUnwatched' => $nextUnwatched,
             'userId' => $userId,
-            'comments' => $comments
+            'comments' => $comments,
+            'recommendations' => $recommendations
         ]);
         $this->layout()->title = $item['title'] . " - Time View";
         return $view;
@@ -513,8 +627,30 @@ class CatalogController extends AbstractActionController {
                 foreach (['BR', 'PT', 'US'] as $country) {
                     if (isset($data['results'][$country]['flatrate'])) {
                         foreach ($data['results'][$country]['flatrate'] as $prov) {
-                            $providers[$prov['provider_name']] = [
-                                'name' => $prov['provider_name'],
+                            $name = $prov['provider_name'];
+                            $targetName = $name;
+                            if (stripos($name, 'Netflix') !== false) {
+                                $targetName = 'Netflix';
+                            } elseif (stripos($name, 'Paramount') !== false) {
+                                $targetName = 'Paramount+';
+                            } elseif (stripos($name, 'Prime Video') !== false || stripos($name, 'Amazon') !== false) {
+                                $targetName = 'Prime Video';
+                            } elseif (stripos($name, 'Apple TV') !== false) {
+                                $targetName = 'Apple TV+';
+                            } elseif (stripos($name, 'Disney') !== false) {
+                                $targetName = 'Disney+';
+                            } elseif (stripos($name, 'HBO') !== false || strcasecmp($name, 'Max') === 0) {
+                                $targetName = 'Max';
+                            } elseif (stripos($name, 'Star+') !== false || stripos($name, 'Star Plus') !== false) {
+                                $targetName = 'Star+';
+                            } elseif (stripos($name, 'Claro') !== false) {
+                                $targetName = 'Claro tv+';
+                            } elseif (stripos($name, 'Crunchyroll') !== false) {
+                                $targetName = 'Crunchyroll';
+                            }
+                            
+                            $providers[$targetName] = [
+                                'name' => $targetName,
                                 'logo' => 'https://image.tmdb.org/t/p/original' . ($prov['logo_path'] ?? '')
                             ];
                         }
@@ -527,5 +663,48 @@ class CatalogController extends AbstractActionController {
         }
 
         return null;
+    }
+
+    private static function translateGenres(?string $genresStr): ?string {
+        if (empty($genresStr)) {
+            return $genresStr;
+        }
+        $map = [
+            'action' => 'Ação',
+            'adventure' => 'Aventura',
+            'anime' => 'Anime',
+            'animation' => 'Animação',
+            'comedy' => 'Comédia',
+            'drama' => 'Drama',
+            'fantasy' => 'Fantasia',
+            'horror' => 'Terror',
+            'mystery' => 'Mistério',
+            'romance' => 'Romance',
+            'sci-fi' => 'Ficção Científica',
+            'science fiction' => 'Ficção Científica',
+            'thriller' => 'Suspense',
+            'crime' => 'Crime',
+            'documentary' => 'Documentário',
+            'family' => 'Família',
+            'history' => 'História',
+            'music' => 'Música',
+            'supernatural' => 'Sobrenatural',
+            'sports' => 'Esportes',
+            'suspense' => 'Suspense',
+            'slice of life' => 'Cotidiano',
+            'war' => 'Guerra',
+            'western' => 'Faroeste'
+        ];
+        $genres = explode(', ', $genresStr);
+        $translated = [];
+        foreach ($genres as $g) {
+            $key = strtolower(trim($g));
+            if (isset($map[$key])) {
+                $translated[] = $map[$key];
+            } else {
+                $translated[] = $g;
+            }
+        }
+        return implode(', ', array_unique($translated));
     }
 }

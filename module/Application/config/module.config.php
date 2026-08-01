@@ -7,6 +7,10 @@ use Application\Controller\CatalogController;
 use Application\Controller\TrackingController;
 use Application\Controller\NotificationController;
 use Application\Controller\ImportExportController;
+use Application\Controller\Api\EpisodeController;
+use Application\Controller\Api\AuthController as ApiAuthController;
+use Application\Controller\Api\FeedbackController;
+use Application\Controller\Api\MobileController;
 use Laminas\Router\Http\Literal;
 
 return [
@@ -202,6 +206,16 @@ return [
                     ],
                 ],
             ],
+            'api-v1-episodes-watched' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/episodes/watched',
+                    'defaults' => [
+                        'controller' => EpisodeController::class,
+                        'action'     => 'markWatched',
+                    ],
+                ],
+            ],
             'api-episode-create' => [
                 'type' => Literal::class,
                 'options' => [
@@ -219,6 +233,76 @@ return [
                     'defaults' => [
                         'controller' => AuthController::class,
                         'action'     => 'googleLogin',
+                    ],
+                ],
+            ],
+            'api-v1-auth-login' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/auth/login',
+                    'defaults' => [
+                        'controller' => ApiAuthController::class,
+                        'action'     => 'login',
+                    ],
+                ],
+            ],
+            'api-v1-auth-register' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/auth/register',
+                    'defaults' => [
+                        'controller' => ApiAuthController::class,
+                        'action'     => 'register',
+                    ],
+                ],
+            ],
+            'api-v1-auth-me' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/auth/me',
+                    'defaults' => [
+                        'controller' => ApiAuthController::class,
+                        'action'     => 'me',
+                    ],
+                ],
+            ],
+            'api-v1-auth-logout' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/auth/logout',
+                    'defaults' => [
+                        'controller' => ApiAuthController::class,
+                        'action'     => 'logout',
+                    ],
+                ],
+            ],
+            'api-v1-auth-update-profile' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/auth/profile',
+                    'defaults' => [
+                        'controller' => ApiAuthController::class,
+                        'action'     => 'updateProfile',
+                    ],
+                ],
+            ],
+            'api-v1-auth-clear-library' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/auth/clear-library',
+                    'defaults' => [
+                        'controller' => ApiAuthController::class,
+                        'action'     => 'clearLibrary',
+                    ],
+                ],
+            ],
+            'api-v1-auth-delete-account' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/auth/delete-account',
+                    'defaults' => [
+                        'controller' => ApiAuthController::class,
+                        'action'     => 'deleteAccount',
                     ],
                 ],
             ],
@@ -259,6 +343,176 @@ return [
                     'defaults' => [
                         'controller' => AuthController::class,
                         'action'     => 'feedback',
+                    ],
+                ],
+            ],
+            'api-v1-feedback' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/feedback',
+                    'defaults' => [
+                        'controller' => FeedbackController::class,
+                        'action'     => 'create',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-dashboard' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/dashboard',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'dashboard',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-collection' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/collection',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'collection',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-search' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/search',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'search',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-lists' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/lists',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'lists',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-list-items' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/lists/items',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'listItems',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-list-create' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/lists/create',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'createList',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-list-delete' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/lists/delete',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'deleteList',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-list-rename' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/lists/rename',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'renameList',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-list-add' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/lists/add',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'addToList',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-favorite-toggle' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/favorite/toggle',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'toggleFavorite',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-track' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/track',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'track',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-episode-rewatch' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/episodes/rewatch',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'rewatchEpisode',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-episode-mark' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/episodes/mark',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'markEpisodes',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-review' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/review',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'review',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-profile' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/profile',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'profile',
+                    ],
+                ],
+            ],
+            'api-v1-mobile-detail' => [
+                'type' => Literal::class,
+                'options' => [
+                    'route'    => '/api/v1/mobile/detail',
+                    'defaults' => [
+                        'controller' => MobileController::class,
+                        'action'     => 'detail',
                     ],
                 ],
             ],
@@ -401,6 +655,10 @@ return [
             TrackingController::class => \Application\Controller\Factory\TrackingControllerFactory::class,
             NotificationController::class => \Application\Controller\Factory\NotificationControllerFactory::class,
             ImportExportController::class => \Application\Controller\Factory\ImportExportControllerFactory::class,
+            EpisodeController::class => \Application\Controller\Factory\ApiEpisodeControllerFactory::class,
+            ApiAuthController::class => \Application\Controller\Factory\ApiAuthControllerFactory::class,
+            FeedbackController::class => \Application\Controller\Factory\ApiFeedbackControllerFactory::class,
+            MobileController::class => \Application\Controller\Factory\ApiMobileControllerFactory::class,
         ],
     ],
     'service_manager' => [

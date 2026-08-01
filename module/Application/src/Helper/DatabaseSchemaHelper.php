@@ -32,6 +32,7 @@ class DatabaseSchemaHelper {
                 total_episodes INT DEFAULT 0,
                 runtime_minutes INT DEFAULT 45,
                 status VARCHAR(50) DEFAULT 'Running',
+                last_sync TIMESTAMP NULL,
                 ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );",
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS tmdb_id INT UNIQUE NULL;",
@@ -39,6 +40,8 @@ class DatabaseSchemaHelper {
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS total_episodes INT DEFAULT 0;",
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS runtime_minutes INT DEFAULT 45;",
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Running';",
+            "ALTER TABLE item ADD COLUMN IF NOT EXISTS genres TEXT NULL;",
+            "ALTER TABLE item ADD COLUMN IF NOT EXISTS last_sync TIMESTAMP NULL;",
 
             // 3. Episodio
             "CREATE TABLE IF NOT EXISTS episodio (
@@ -59,7 +62,7 @@ class DatabaseSchemaHelper {
                 id_usuario_item SERIAL PRIMARY KEY,
                 id_usuario INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
                 id_item INT NOT NULL REFERENCES item(id_item) ON DELETE CASCADE,
-                status VARCHAR(20) NOT NULL DEFAULT 'watching' CHECK (status IN ('watching', 'completed', 'dropped', 'plan_to_watch')),
+                status VARCHAR(20) NOT NULL DEFAULT 'watching' CHECK (status IN ('watching', 'completed', 'dropped', 'plan_to_watch', 'rewatching', 'abandoned')),
                 rating NUMERIC(3,1) NULL,
                 ts_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 CONSTRAINT uk_usuario_item UNIQUE (id_usuario, id_item)
@@ -87,10 +90,12 @@ class DatabaseSchemaHelper {
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS rewatch_count INT DEFAULT 0;",
             "ALTER TABLE usuario_item DROP CONSTRAINT IF EXISTS usuario_item_status_check;",
-            "ALTER TABLE usuario_item ADD CONSTRAINT usuario_item_status_check CHECK (status IN ('watching', 'completed', 'dropped', 'plan_to_watch', 'rewatching'));",
+            "ALTER TABLE usuario_item ADD CONSTRAINT usuario_item_status_check CHECK (status IN ('watching', 'completed', 'dropped', 'plan_to_watch', 'rewatching', 'abandoned'));",
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS release_date DATE;",
             "ALTER TABLE episodio ADD COLUMN IF NOT EXISTS image_url TEXT;",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uk_episodio_item_temporada_numero ON episodio (id_item, season_number, episode_number);",
             "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS avatar_url TEXT;",
+            "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS api_token_hash TEXT NULL;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS comment TEXT NULL;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT FALSE;",
             "ALTER TABLE item ADD COLUMN IF NOT EXISTS watch_providers TEXT NULL;",
@@ -114,7 +119,7 @@ class DatabaseSchemaHelper {
                 id_lista SERIAL PRIMARY KEY,
                 id_usuario INT NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
                 nome VARCHAR(255) NOT NULL,
-                ts_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );",
             "CREATE TABLE IF NOT EXISTS usuario_lista_item (
                 id_lista_item SERIAL PRIMARY KEY,

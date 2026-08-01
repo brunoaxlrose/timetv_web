@@ -216,6 +216,26 @@ class TmdbHelper {
         return self::fetchJson($url);
     }
 
+    public static function getCredits(string $type, int $tmdbId, int $limit = 12): array {
+        $mediaType = $type === 'movie' ? 'movie' : 'tv';
+        $url = self::BASE_URL . '/' . $mediaType . '/' . $tmdbId . '/credits?api_key=' . self::API_KEY . '&language=pt-BR';
+        $data = self::fetchJson($url);
+        if (!$data || empty($data['cast']) || !is_array($data['cast'])) {
+            return [];
+        }
+
+        $cast = [];
+        foreach (array_slice($data['cast'], 0, $limit) as $person) {
+            $cast[] = [
+                'name' => $person['name'] ?? 'Sem nome',
+                'character' => $person['character'] ?? '',
+                'image_url' => !empty($person['profile_path']) ? self::IMG . 'w185' . $person['profile_path'] : null,
+            ];
+        }
+
+        return $cast;
+    }
+
     public static function importMovieFromTmdb(\PDO $pdo, int $tmdbId): int|false {
         $stmt = $pdo->prepare("SELECT id_item FROM item WHERE tmdb_id = :tmdb_id LIMIT 1");
         $stmt->execute([':tmdb_id' => $tmdbId]);
@@ -241,10 +261,20 @@ class TmdbHelper {
             $status = 'Upcoming';
         }
 
+        $genres = [];
+        if (!empty($movie['genres']) && is_array($movie['genres'])) {
+            foreach ($movie['genres'] as $g) {
+                if (!empty($g['name'])) {
+                    $genres[] = $g['name'];
+                }
+            }
+        }
+        $genresStr = !empty($genres) ? implode(', ', $genres) : null;
+
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO item (tmdb_id, title, type, poster_url, banner_url, description, release_year, release_date, total_episodes, runtime_minutes, status)
-                VALUES (:tmdb_id, :title, 'movie', :poster, :banner, :description, :year, :release_date, 1, :runtime, :status)
+                INSERT INTO item (tmdb_id, title, type, poster_url, banner_url, description, release_year, release_date, total_episodes, runtime_minutes, status, genres)
+                VALUES (:tmdb_id, :title, 'movie', :poster, :banner, :description, :year, :release_date, 1, :runtime, :status, :genres)
                 RETURNING id_item
             ");
             $stmt->execute([
@@ -256,7 +286,8 @@ class TmdbHelper {
                 ':year' => $releaseYear, 
                 ':release_date' => $resolvedReleaseDate,
                 ':runtime' => $runtime,
-                ':status' => $status
+                ':status' => $status,
+                ':genres' => $genresStr
             ]);
             $row = $stmt->fetch();
             return $row ? (int)$row['id_item'] : false;
@@ -280,6 +311,16 @@ class TmdbHelper {
         $banner = $movie['backdrop_path'] ? self::IMG . 'original' . $movie['backdrop_path'] : 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200';
         $status = (!empty($releaseDate) && $releaseDate > date('Y-m-d')) ? 'Upcoming' : 'Running';
 
+        $genres = [];
+        if (!empty($movie['genres']) && is_array($movie['genres'])) {
+            foreach ($movie['genres'] as $g) {
+                if (!empty($g['name'])) {
+                    $genres[] = $g['name'];
+                }
+            }
+        }
+        $genresStr = !empty($genres) ? implode(', ', $genres) : null;
+
         try {
             $stmt = $pdo->prepare("
                 UPDATE item
@@ -290,7 +331,8 @@ class TmdbHelper {
                     release_year = :year,
                     release_date = :release_date,
                     runtime_minutes = :runtime,
-                    status = :status
+                    status = :status,
+                    genres = :genres
                 WHERE id_item = :item_id
             ");
             $stmt->execute([
@@ -302,6 +344,7 @@ class TmdbHelper {
                 ':release_date' => $releaseDate,
                 ':runtime' => $runtime,
                 ':status' => $status,
+                ':genres' => $genresStr,
                 ':item_id' => $itemId
             ]);
             return true;
@@ -344,5 +387,172 @@ class TmdbHelper {
             }
         }
         return $allEpisodes;
+    }
+
+    public static function importTvFromTmdb(\PDO $pdo, int $tmdbId, string $fallbackType = 'series'): int|false {
+        $stmt = $pdo->prepare("SELECT id_item FROM item WHERE tmdb_id = :tmdb_id LIMIT 1");
+        $stmt->execute([':tmdb_id' => $tmdbId]);
+        $existing = $stmt->fetch();
+        if ($existing) {
+            self::syncTvMetadataAndEpisodes($pdo, (int)$existing['id_item'], $tmdbId, $fallbackType);
+            return (int)$existing['id_item'];
+        }
+
+        $tv = self::getTvDetail($tmdbId);
+        if (!$tv) return false;
+
+        $title = $tv['name'] ?? $tv['original_name'] ?? 'Sem titulo';
+        $description = trim($tv['overview'] ?? 'Nenhuma sinopse disponivel.');
+        $releaseDate = $tv['first_air_date'] ?? null;
+        $releaseYear = $releaseDate ? (int)substr($releaseDate, 0, 4) : (int)date('Y');
+        $runtimeList = $tv['episode_run_time'] ?? [];
+        $runtime = !empty($runtimeList[0]) ? (int)$runtimeList[0] : 45;
+        $poster = !empty($tv['poster_path']) ? self::IMG . 'w500' . $tv['poster_path'] : 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400';
+        $banner = !empty($tv['backdrop_path']) ? self::IMG . 'original' . $tv['backdrop_path'] : 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200';
+        $genres = [];
+        foreach (($tv['genres'] ?? []) as $g) {
+            if (!empty($g['name'])) {
+                $genres[] = $g['name'];
+            }
+        }
+        $genresStr = !empty($genres) ? implode(', ', $genres) : null;
+        $origins = $tv['origin_country'] ?? [];
+        $type = (in_array('JP', $origins, true) && in_array('Animation', $genres, true)) ? 'anime' : $fallbackType;
+        $type = $type === 'anime' ? 'anime' : 'series';
+
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO item (tmdb_id, title, type, poster_url, banner_url, description, release_year, release_date, total_episodes, runtime_minutes, status, genres, last_sync)
+                VALUES (:tmdb_id, :title, :type, :poster, :banner, :description, :year, :release_date, :total_episodes, :runtime, :status, :genres, CURRENT_TIMESTAMP)
+                RETURNING id_item
+            ");
+            $stmt->execute([
+                ':tmdb_id' => $tmdbId,
+                ':title' => $title,
+                ':type' => $type,
+                ':poster' => $poster,
+                ':banner' => $banner,
+                ':description' => $description,
+                ':year' => $releaseYear,
+                ':release_date' => $releaseDate,
+                ':total_episodes' => (int)($tv['number_of_episodes'] ?? 0),
+                ':runtime' => $runtime,
+                ':status' => $tv['status'] ?? 'Running',
+                ':genres' => $genresStr,
+            ]);
+            $row = $stmt->fetch();
+            if (!$row) return false;
+
+            $itemId = (int)$row['id_item'];
+            self::syncTvMetadataAndEpisodes($pdo, $itemId, $tmdbId, $type);
+            return $itemId;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public static function syncTvMetadataAndEpisodes(\PDO $pdo, int $itemId, int $tmdbId, string $fallbackType = 'series'): bool {
+        $tv = self::getTvDetail($tmdbId);
+        if (!$tv) return false;
+
+        $episodes = self::getTvEpisodes($tmdbId);
+        $title = $tv['name'] ?? $tv['original_name'] ?? 'Sem titulo';
+        $description = trim($tv['overview'] ?? 'Nenhuma sinopse disponivel.');
+        $releaseDate = $tv['first_air_date'] ?? null;
+        $releaseYear = $releaseDate ? (int)substr($releaseDate, 0, 4) : (int)date('Y');
+        $runtimeList = $tv['episode_run_time'] ?? [];
+        $runtime = !empty($runtimeList[0]) ? (int)$runtimeList[0] : 45;
+        $poster = !empty($tv['poster_path']) ? self::IMG . 'w500' . $tv['poster_path'] : 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400';
+        $banner = !empty($tv['backdrop_path']) ? self::IMG . 'original' . $tv['backdrop_path'] : 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=1200';
+        $genres = [];
+        foreach (($tv['genres'] ?? []) as $g) {
+            if (!empty($g['name'])) {
+                $genres[] = $g['name'];
+            }
+        }
+        $genresStr = !empty($genres) ? implode(', ', $genres) : null;
+        $origins = $tv['origin_country'] ?? [];
+        $type = (in_array('JP', $origins, true) && in_array('Animation', $genres, true)) ? 'anime' : $fallbackType;
+        $type = $type === 'anime' ? 'anime' : 'series';
+
+        try {
+            $stmt = $pdo->prepare("
+                UPDATE item
+                SET title = :title,
+                    type = :type,
+                    poster_url = :poster,
+                    banner_url = :banner,
+                    description = :description,
+                    release_year = :year,
+                    release_date = :release_date,
+                    total_episodes = :total_episodes,
+                    runtime_minutes = :runtime,
+                    status = :status,
+                    genres = :genres,
+                    last_sync = CURRENT_TIMESTAMP
+                WHERE id_item = :item_id
+            ");
+            $stmt->execute([
+                ':title' => $title,
+                ':type' => $type,
+                ':poster' => $poster,
+                ':banner' => $banner,
+                ':description' => $description,
+                ':year' => $releaseYear,
+                ':release_date' => $releaseDate,
+                ':total_episodes' => count($episodes) ?: (int)($tv['number_of_episodes'] ?? 0),
+                ':runtime' => $runtime,
+                ':status' => $tv['status'] ?? 'Running',
+                ':genres' => $genresStr,
+                ':item_id' => $itemId,
+            ]);
+
+            $stmtEpisode = $pdo->prepare("
+                INSERT INTO episodio (id_item, season_number, episode_number, title, air_date, image_url, description, runtime_minutes, rating)
+                VALUES (:id_item, :season_number, :episode_number, :title, :air_date, :image_url, :description, :runtime_minutes, :rating)
+                ON CONFLICT (id_item, season_number, episode_number) DO UPDATE SET
+                    title = EXCLUDED.title,
+                    air_date = EXCLUDED.air_date,
+                    image_url = EXCLUDED.image_url,
+                    description = EXCLUDED.description,
+                    runtime_minutes = EXCLUDED.runtime_minutes,
+                    rating = EXCLUDED.rating
+            ");
+
+            foreach ($episodes as $ep) {
+                if (!isset($ep['season_number'], $ep['episode_number'])) {
+                    continue;
+                }
+                $stmtEpisode->execute([
+                    ':id_item' => $itemId,
+                    ':season_number' => (int)$ep['season_number'],
+                    ':episode_number' => (int)$ep['episode_number'],
+                    ':title' => $ep['name'] ?? ('Episodio ' . (int)$ep['episode_number']),
+                    ':air_date' => !empty($ep['air_date']) ? $ep['air_date'] : null,
+                    ':image_url' => !empty($ep['still_path']) ? self::IMG . 'w500' . $ep['still_path'] : null,
+                    ':description' => trim($ep['overview'] ?? ''),
+                    ':runtime_minutes' => (int)($ep['runtime'] ?? $runtime),
+                    ':rating' => isset($ep['vote_average']) ? (float)$ep['vote_average'] : null,
+                ]);
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    public static function getRecommendations(string $type, int $tmdbId, int $limit = 8): array {
+        $mediaType = $type === 'movie' ? 'movie' : 'tv';
+        $url = self::BASE_URL . '/' . $mediaType . '/' . $tmdbId . '/recommendations?api_key=' . self::API_KEY . '&language=pt-BR';
+        $data = self::fetchJson($url);
+        if (!$data || empty($data['results'])) {
+            $url = self::BASE_URL . '/' . $mediaType . '/' . $tmdbId . '/similar?api_key=' . self::API_KEY . '&language=pt-BR';
+            $data = self::fetchJson($url);
+        }
+        if (!$data || empty($data['results']) || !is_array($data['results'])) {
+            return [];
+        }
+        return self::formatTmdbResults($data['results'], $limit);
     }
 }

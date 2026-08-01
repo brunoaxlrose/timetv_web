@@ -48,8 +48,8 @@ class TvmazeHelper {
         $title = $show['name'] ?? 'Sem título';
         $description = strip_tags($show['summary'] ?? 'Nenhuma sinopse disponível.');
         $description = self::translateToPortuguese($description);
-        $releaseYear = isset($show['premiered']) ? intval(substr($show['premiered'], 0, 4)) : date('Y');
-        $runtime = $show['runtime'] ?? 45;
+        $releaseYear = !empty($show['premiered']) ? intval(substr($show['premiered'], 0, 4)) : date('Y');
+        $runtime = !empty($show['runtime']) ? (int)$show['runtime'] : 45;
         
         // Fallback images if TV Maze doesn't provide them
         $poster = $show['image']['medium'] ?? 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=400&auto=format&fit=crop';
@@ -70,10 +70,12 @@ class TvmazeHelper {
         try {
             $pdo->beginTransaction();
 
+            $genresStr = !empty($genres) ? implode(', ', $genres) : null;
+
             // Insert primary item record
             $insertItem = $pdo->prepare("
-                INSERT INTO item (tvmaze_id, title, type, poster_url, banner_url, description, release_year, total_episodes, runtime_minutes, last_sync)
-                VALUES (:tvmaze_id, :title, :type, :poster, :banner, :description, :release_year, :total_episodes, :runtime, CURRENT_TIMESTAMP)
+                INSERT INTO item (tvmaze_id, title, type, poster_url, banner_url, description, release_year, total_episodes, runtime_minutes, last_sync, genres)
+                VALUES (:tvmaze_id, :title, :type, :poster, :banner, :description, :release_year, :total_episodes, :runtime, CURRENT_TIMESTAMP, :genres)
                 RETURNING id_item
             ");
             $insertItem->execute([
@@ -85,7 +87,8 @@ class TvmazeHelper {
                 ':description' => $description,
                 ':release_year' => $releaseYear,
                 ':total_episodes' => $totalEpisodes,
-                ':runtime' => $runtime
+                ':runtime' => $runtime,
+                ':genres' => $genresStr
             ]);
 
             $itemId = $insertItem->fetchColumn();
@@ -102,15 +105,16 @@ class TvmazeHelper {
                 if (empty($epDesc)) {
                     $epDesc = 'Nenhuma sinopse disponível.';
                 }
-                $epRuntime = $ep['runtime'] ?? 45;
+                $epRuntime = !empty($ep['runtime']) ? (int)$ep['runtime'] : 45;
                 $epRating = $ep['rating']['average'] ?? null;
+                $airDate = !empty($ep['airdate']) ? $ep['airdate'] : null;
 
                 $insertEp->execute([
                     ':id_item' => $itemId,
                     ':season_number' => $ep['season'],
                     ':episode_number' => $ep['number'],
                     ':title' => $ep['name'] ?? ('Episódio ' . $ep['number']),
-                    ':air_date' => $ep['airdate'] ?? null,
+                    ':air_date' => $airDate,
                     ':image_url' => $epImage,
                     ':description' => $epDesc,
                     ':runtime_minutes' => $epRuntime,
@@ -120,8 +124,10 @@ class TvmazeHelper {
 
             $pdo->commit();
             return $itemId;
-        } catch (\PDOException $e) {
-            $pdo->rollBack();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             return false;
         }
     }
@@ -183,14 +189,14 @@ class TvmazeHelper {
             if (empty($epDesc)) {
                 $epDesc = 'Nenhuma sinopse disponível.';
             }
-            $epRuntime = $ep['runtime'] ?? 45;
+            $epRuntime = !empty($ep['runtime']) ? (int)$ep['runtime'] : 45;
             $epRating = $ep['rating']['average'] ?? null;
 
             $mergedEpisodes[$key] = [
                 'season' => $ep['season'],
                 'number' => $ep['number'],
                 'title' => $ep['name'] ?? ('Episódio ' . $ep['number']),
-                'air_date' => $ep['airdate'] ?? null,
+                'air_date' => !empty($ep['airdate']) ? $ep['airdate'] : null,
                 'image_url' => $epImage,
                 'description' => $epDesc,
                 'runtime' => $epRuntime,
@@ -205,7 +211,7 @@ class TvmazeHelper {
             if (empty($epDesc)) {
                 $epDesc = 'Nenhuma sinopse disponível.';
             }
-            $epRuntime = $ep['runtime'] ?? 45;
+            $epRuntime = !empty($ep['runtime']) ? (int)$ep['runtime'] : 45;
             $epRating = $ep['vote_average'] ?? null;
 
             if (isset($mergedEpisodes[$key])) {
@@ -226,7 +232,7 @@ class TvmazeHelper {
                     'season' => $ep['season_number'],
                     'number' => $ep['episode_number'],
                     'title' => $ep['name'] ?? ('Episódio ' . $ep['episode_number']),
-                    'air_date' => $ep['air_date'] ?? null,
+                    'air_date' => !empty($ep['air_date']) ? $ep['air_date'] : null,
                     'image_url' => $epImage,
                     'description' => $epDesc,
                     'runtime' => $epRuntime,

@@ -21,12 +21,8 @@ class PdoFactory implements FactoryInterface {
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
         
-        // Ensure tables exist
-        $stmt = $pdo->query("SELECT 1 FROM information_schema.tables WHERE table_name = 'item' LIMIT 1");
-        $schemaExists = $stmt->fetch();
-        if (!$schemaExists) {
-            DatabaseSchemaHelper::ensureTablesExist($pdo);
-        }
+        // Keep lightweight CREATE/ALTER migrations applied even when the base schema already exists.
+        DatabaseSchemaHelper::ensureTablesExist($pdo);
         
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS search_cache (

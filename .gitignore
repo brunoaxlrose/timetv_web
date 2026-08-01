@@ -1,6 +1,17 @@
 vendor/
 cookie.txt
 config/autoload/local.php
+module/data/
+mobile/.env
+mobile/.gradle-apk-cache/
+mobile/.gradle-build-cache/
+mobile/.gradle-cache/
+mobile/.expo/
+mobile/node_modules/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/app/debug.keystore
 .idea/
 .vscode/
 .DS_Store

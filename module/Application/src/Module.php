@@ -34,11 +34,23 @@ class Module {
         }
 
         $routeName = $routeMatch->getMatchedRouteName();
-        $guestRoutes = ['login', 'register', 'api-google-login'];
+        $guestRoutes = ['login', 'register', 'api-google-login', 'api-v1-auth-login', 'api-v1-auth-register'];
 
         $isLoggedIn = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
 
         if (!$isLoggedIn && !in_array($routeName, $guestRoutes)) {
+            if (str_starts_with((string)$routeName, 'api')) {
+                $response = $e->getResponse();
+                $response->getHeaders()->addHeaderLine('Content-Type', 'application/json');
+                $response->setStatusCode(401);
+                $response->setContent(json_encode([
+                    'success' => false,
+                    'data' => null,
+                    'message' => '401 Unauthorized',
+                ]));
+                return $response;
+            }
+
             $response = $e->getResponse();
             $response->getHeaders()->addHeaderLine('Location', '/login');
             $response->setStatusCode(302);
