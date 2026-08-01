@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { getCollection } from '../api/mobile';
 import { Skeleton } from '../components/Skeleton';
@@ -80,21 +80,13 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  async function load(nextStatus = status, nextMedia = media, nextSort = sort, refresh = false) {
+  async function load(refresh = false) {
     if (refresh) setRefreshing(true);
     else if (!items.length) setLoading(true);
 
-    const types = nextMedia === 'all' ? 'movie,series,anime' : nextMedia;
     try {
-      const response = await getCollection(nextStatus, types, nextSort);
-      let nextItems = response.data?.items || [];
-      if (nextSort === 'progress') {
-        nextItems = [...nextItems].sort((a, b) => Number(b.progress_percent || 0) - Number(a.progress_percent || 0));
-      }
-      if (nextSort === 'my_rating') {
-        nextItems = [...nextItems].sort((a, b) => Number(b.nota || 0) - Number(a.nota || 0));
-      }
-      setItems(nextItems);
+      const response = await getCollection('', 'movie,series,anime', 'last_watched');
+      setItems(response.data?.items || []);
       setGroups(response.data?.groups || null);
     } catch {
       // Preserve the last collection while connectivity is unavailable.
@@ -117,12 +109,13 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
   }
 
   function applyFilters() {
-    setStatus(draftStatus);
-    setMedia(draftMedia);
-    setSort(draftSort);
-    setGrouped(draftGrouped);
     setFilterOpen(false);
-    load(draftStatus, draftMedia, draftSort);
+    startTransition(() => {
+      setStatus(draftStatus);
+      setMedia(draftMedia);
+      setSort(draftSort);
+      setGrouped(draftGrouped);
+    });
   }
 
   function resetFilters() {
@@ -132,11 +125,12 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
     setDraftGrouped(true);
   }
 
-  const totalCount = grouped && groups ? Object.values(groups).reduce((sum: number, rows: Item[]) => sum + rows.length, 0) : items.length;
   const hasActiveFilters = !!status || media !== 'all' || sort !== 'last_watched' || !grouped;
+  const selectedRows = status && groups ? groups[statusGroupKey(status)] || [] : items;
   const visibleSections: CollectionSectionData[] = grouped && groups && !status
-    ? groupLabels.map((group) => ({ ...group, data: groups[group.key] || [] })).filter((group) => group.data.length > 0)
-    : [{ key: 'flat' as const, status, label: statusFilters.find((item) => item.key === status)?.label || 'Coleção', color: colors.accent, data: items }];
+    ? groupLabels.map((group) => ({ ...group, data: filterAndSort(groups[group.key] || [], media, sort) })).filter((group) => group.data.length > 0)
+    : [{ key: 'flat' as const, status, label: statusFilters.find((item) => item.key === status)?.label || 'Coleção', color: colors.accent, data: filterAndSort(selectedRows, media, sort) }];
+  const totalCount = visibleSections.reduce((sum, section) => sum + section.data.length, 0);
 
   return (
     <View style={styles.screen}>
@@ -158,7 +152,7 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
         <FlatList
           data={visibleSections}
           keyExtractor={(section) => String(section.key)}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(status, media, sort, true)} tintColor={colors.accent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.accent} />}
           renderItem={({ item: section }) => (
             <CollectionSection
               color={section.color}
@@ -397,6 +391,37 @@ function labelType(type: string) {
   if (type === 'movie') return 'Filme';
   if (type === 'anime') return 'Anime';
   return 'Serie';
+}
+
+function statusGroupKey(status: StatusFilter): keyof Groups {
+  const map: Record<Exclude<StatusFilter, ''>, keyof Groups> = {
+    watching: 'assistindo',
+    em_dia: 'up_to_date',
+    visto: 'concluido',
+    para_ver: 'quero_ver',
+    em_pausa: 'em_pausa',
+    abandonado: 'abandonado',
+    reassistindo: 'reassistindo',
+  };
+  return status ? map[status] : 'assistindo';
+}
+
+function filterAndSort(rows: Item[], media: MediaFilter, sort: SortFilter) {
+  const filtered = media === 'all' ? rows : rows.filter((item) => item.tipo === media);
+  const value = (item: Item) => {
+    if (sort === 'last_added') return dateValue(item.collection_created_at);
+    if (sort === 'last_premiered') return Number(item.ano_lancamento || 0);
+    if (sort === 'progress') return Number(item.progress_percent || 0);
+    if (sort === 'my_rating') return Number(item.nota || 0);
+    if (sort === 'community_rating') return Number(item.avaliacao_media || 0);
+    return dateValue(item.ts_atualizacao);
+  };
+  return [...filtered].sort((left, right) => value(right) - value(left));
+}
+
+function dateValue(value?: string) {
+  const timestamp = value ? Date.parse(value) : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 const styles = StyleSheet.create({

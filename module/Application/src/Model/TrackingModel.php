@@ -78,6 +78,16 @@ class TrackingModel {
                 COALESCE(ui.status, 'assistindo') AS status_acompanhamento,
                 COALESCE(ui.ts_atualizacao, assistidos.ts_ultimo_consumo, i.ts_inclusao) AS ts_atualizacao,
                 COALESCE(ui.ts_inclusao, assistidos.ts_primeiro_consumo, i.ts_inclusao) AS collection_created_at,
+                COALESCE(episode_stats.total_count, 0) AS total_count,
+                COALESCE(episode_stats.watched_count, 0) AS watched_count,
+                COALESCE(episode_stats.remaining_count, 0) AS remaining_count,
+                COALESCE(episode_stats.future_count, 0) AS future_count,
+                next_episode.id_episodio AS next_episode_id,
+                next_episode.numero_temporada AS next_season_number,
+                next_episode.numero_episodio AS next_episode_number,
+                next_episode.titulo AS next_episode_title,
+                next_episode.data_exibicao AS next_air_date,
+                next_episode.duracao_minutos AS next_runtime_minutes,
                 i.*
             FROM (
                 SELECT id_item
@@ -105,6 +115,42 @@ class TrackingModel {
                   AND ue.ts_cancelamento IS NULL
                 GROUP BY e.id_item
             ) assistidos ON assistidos.id_item = i.id_item
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(e.id_episodio) FILTER (
+                        WHERE e.data_exibicao IS NULL OR e.data_exibicao <= CURRENT_DATE
+                    ) AS total_count,
+                    COUNT(ue.id_usuario_episodio) FILTER (
+                        WHERE e.data_exibicao IS NULL OR e.data_exibicao <= CURRENT_DATE
+                    ) AS watched_count,
+                    COUNT(e.id_episodio) FILTER (
+                        WHERE (e.data_exibicao IS NULL OR e.data_exibicao <= CURRENT_DATE)
+                          AND ue.id_usuario_episodio IS NULL
+                    ) AS remaining_count,
+                    COUNT(e.id_episodio) FILTER (
+                        WHERE e.data_exibicao > CURRENT_DATE
+                    ) AS future_count
+                FROM episodio e
+                LEFT JOIN usuario_episodio ue
+                    ON ue.id_episodio = e.id_episodio
+                   AND ue.id_usuario = :stats_user_id
+                   AND ue.ts_cancelamento IS NULL
+                WHERE e.id_item = i.id_item
+            ) episode_stats ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT e.id_episodio, e.numero_temporada, e.numero_episodio, e.titulo, e.data_exibicao, e.duracao_minutos
+                FROM episodio e
+                WHERE e.id_item = i.id_item
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM usuario_episodio ue
+                      WHERE ue.id_episodio = e.id_episodio
+                        AND ue.id_usuario = :next_user_id
+                        AND ue.ts_cancelamento IS NULL
+                  )
+                ORDER BY e.numero_temporada ASC, e.numero_episodio ASC
+                LIMIT 1
+            ) next_episode ON TRUE
             WHERE 1=1
         ";
 
@@ -133,6 +179,8 @@ class TrackingModel {
             ':episode_user_id' => $userId,
             ':joined_user_id' => $userId,
             ':watched_user_id' => $userId,
+            ':stats_user_id' => $userId,
+            ':next_user_id' => $userId,
         ];
         if ($providerFilter !== '') {
             $params[':provider_pattern'] = '%"name":"' . $providerFilter . '"%';

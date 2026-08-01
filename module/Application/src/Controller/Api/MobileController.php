@@ -86,16 +86,28 @@ class MobileController extends AbstractActionController {
         foreach ($items as &$item) {
             $item['next_episode'] = null;
             if (($item['tipo'] ?? '') !== 'movie') {
-                try {
+                if (array_key_exists('remaining_count', $item)) {
+                    $progress = [
+                        'total_count' => (int)($item['total_count'] ?? 0),
+                        'watched_count' => (int)($item['watched_count'] ?? 0),
+                    ];
+                    $remaining = (int)$item['remaining_count'];
+                    $futureEpisodes = (int)($item['future_count'] ?? 0);
+                    if (!empty($item['next_episode_id'])) {
+                        $item['next_episode'] = [
+                            'id_episodio' => (int)$item['next_episode_id'],
+                            'numero_temporada' => (int)$item['next_season_number'],
+                            'numero_episodio' => (int)$item['next_episode_number'],
+                            'titulo' => $item['next_episode_title'] ?? '',
+                            'data_exibicao' => $item['next_air_date'] ?? null,
+                            'duracao_minutos' => isset($item['next_runtime_minutes']) ? (int)$item['next_runtime_minutes'] : null,
+                        ];
+                    }
+                } else {
                     $progress = $this->trackingModel->getProgress($userId, (string)$item['id_item']);
                     $remaining = $this->trackingModel->countReleasedUnwatchedEpisodes($userId, (string)$item['id_item']);
                     $futureEpisodes = $this->trackingModel->countFutureEpisodes((string)$item['id_item']);
                     $item['next_episode'] = $this->trackingModel->getNextUnwatchedEpisode($userId, (string)$item['id_item']);
-                } catch (\Throwable $e) {
-                    $progress = ['total_count' => 0, 'watched_count' => 0];
-                    $remaining = 1;
-                    $futureEpisodes = 0;
-                    $item['next_episode'] = null;
                 }
 
                 $item['progress'] = $progress;
@@ -111,11 +123,11 @@ class MobileController extends AbstractActionController {
                     $groups['reassistindo'][] = $item;
                 } elseif (($item['status_acompanhamento'] ?? '') === 'concluido') {
                     $groups['concluido'][] = $item;
-                } elseif ($remaining === 0 && $futureEpisodes === 0) {
+                } elseif ($progress['total_count'] > 0 && $remaining === 0 && $futureEpisodes === 0) {
                     $item['status_acompanhamento'] = 'concluido';
                     $this->trackingModel->updateWatchlistStatus($userId, (string)$item['id_item'], 'concluido');
                     $groups['concluido'][] = $item;
-                } elseif ($remaining === 0) {
+                } elseif ($progress['total_count'] > 0 && $remaining === 0) {
                     $groups['up_to_date'][] = $item;
                 } else {
                     $groups['assistindo'][] = $item;
@@ -137,6 +149,18 @@ class MobileController extends AbstractActionController {
                     $groups['assistindo'][] = $item;
                 }
             }
+            unset(
+                $item['total_count'],
+                $item['watched_count'],
+                $item['remaining_count'],
+                $item['future_count'],
+                $item['next_episode_id'],
+                $item['next_season_number'],
+                $item['next_episode_number'],
+                $item['next_episode_title'],
+                $item['next_air_date'],
+                $item['next_runtime_minutes']
+            );
         }
         unset($item);
 
@@ -472,20 +496,11 @@ class MobileController extends AbstractActionController {
         $pdo = $this->catalogModel->getPdo();
 
         if ($this->params()->fromQuery('rapido', '0') === '1') {
-            return $this->ok([
-                'item' => $item,
-                'episodes' => $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId),
-                'progress' => $this->catalogModel->getProgress($userId, (string)$itemId),
-                'next_unwatched' => $this->catalogModel->getNextUnwatched($userId, (string)$itemId),
-                'released' => $this->trackingModel->isItemReleased((string)$itemId),
-                'lists' => $this->trackingModel->getItemLists($userId, (int)$itemId),
-                'cast' => [],
-                'reviews' => $this->catalogModel->getItemComments((int)$itemId),
-                'recommendations' => [],
-            ]);
+            return $this->ok($this->localDetailData($userId, (int)$itemId, $item));
         }
 
-        try {
+        if ($this->params()->fromQuery('pular_sincronizacao', '0') !== '1') {
+            try {
             if (($item['tipo'] ?? '') === 'movie' && !empty($item['tmdb_id']) && (empty($item['ts_ultima_sincronizacao']) || time() - strtotime($item['ts_ultima_sincronizacao']) > 86400)) {
                 \Application\Helper\TmdbHelper::syncMovieMetadata($pdo, (int)$item['id_item'], (int)$item['tmdb_id']);
                 $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
@@ -494,7 +509,7 @@ class MobileController extends AbstractActionController {
             if (($item['tipo'] ?? '') !== 'movie' && !empty($item['tvmaze_id'])) {
                 $lastSync = $item['ts_ultima_sincronizacao'] ?? null;
                 $existingEpisodes = $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId);
-                if (empty($existingEpisodes) || empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
+                if (empty($existingEpisodes) || empty($lastSync) || (time() - strtotime($lastSync)) > 86400) {
                     \Application\Helper\TvmazeHelper::syncEpisodes($pdo, (int)$itemId, (int)$item['tvmaze_id']);
                     $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
                 }
@@ -505,7 +520,7 @@ class MobileController extends AbstractActionController {
                 }
             } elseif (($item['tipo'] ?? '') !== 'movie' && !empty($item['tmdb_id'])) {
                 $lastSync = $item['ts_ultima_sincronizacao'] ?? null;
-                if (empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
+                if (empty($lastSync) || (time() - strtotime($lastSync)) > 86400) {
                     \Application\Helper\TmdbHelper::syncTvMetadataAndEpisodes($pdo, (int)$itemId, (int)$item['tmdb_id'], $item['tipo']);
                     $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
                 }
@@ -514,13 +529,18 @@ class MobileController extends AbstractActionController {
             if (($item['tipo'] ?? '') === 'anime' && !empty($item['mal_id'])) {
                 $episodes = $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId);
                 $lastSync = $item['ts_ultima_sincronizacao'] ?? null;
-                if (empty($episodes) || empty($lastSync) || (time() - strtotime($lastSync)) > 3600) {
+                if (empty($episodes) || empty($lastSync) || (time() - strtotime($lastSync)) > 86400) {
                     \Application\Helper\JikanHelper::syncEpisodes($pdo, (int)$itemId, (int)$item['mal_id'], (int)($item['total_episodios'] ?? 0));
                     $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId);
                 }
             }
-        } catch (\Throwable $e) {
-            $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId) ?: $item;
+            } catch (\Throwable $e) {
+                $item = $this->catalogModel->getLocalItemById($userId, (string)$itemId) ?: $item;
+            }
+        }
+
+        if ($this->params()->fromQuery('somente_essencial', '0') === '1') {
+            return $this->ok($this->localDetailData($userId, (int)$itemId, $item));
         }
 
         // Fetch/populate watch providers if null
@@ -563,7 +583,7 @@ class MobileController extends AbstractActionController {
                     }
                 } elseif (($item['tipo'] ?? '') !== 'movie' && !empty($item['tvmaze_id'])) {
                     $url = "https://api.tvmaze.com/shows/" . (int)$item['tvmaze_id'];
-                    $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: TVTimeClone/1.0\r\n"]]));
+                    $json = @file_get_contents($url, false, stream_context_create(['http' => ['header' => "User-Agent: CineFio/1.0\r\n", 'timeout' => 4]]));
                     if ($json) {
                         $showData = json_decode($json, true);
                         if (!empty($showData['genres'])) {
@@ -1114,13 +1134,23 @@ class MobileController extends AbstractActionController {
             return [];
         }
 
-        $context = stream_context_create([
-            'http' => [
-                'header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n",
-                'timeout' => 4,
-            ],
-        ]);
-        $json = @file_get_contents('https://api.tvmaze.com/shows/' . (int)$item['tvmaze_id'] . '/cast', false, $context);
+        $cacheDir = dirname(__DIR__, 4) . '/data/cache/tvmaze';
+        if (!is_dir($cacheDir)) @mkdir($cacheDir, 0777, true);
+        $url = 'https://api.tvmaze.com/shows/' . (int)$item['tvmaze_id'] . '/cast';
+        $cacheFile = $cacheDir . '/' . md5($url) . '.json';
+        $json = is_file($cacheFile) && time() - filemtime($cacheFile) < 21600
+            ? @file_get_contents($cacheFile)
+            : false;
+        if (!$json) {
+            $context = stream_context_create([
+                'http' => [
+                    'header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n",
+                    'timeout' => 4,
+                ],
+            ]);
+            $json = @file_get_contents($url, false, $context);
+            if ($json) @file_put_contents($cacheFile, $json);
+        }
         $rows = $json ? json_decode($json, true) : [];
         if (!is_array($rows)) {
             return [];
@@ -1140,6 +1170,20 @@ class MobileController extends AbstractActionController {
         }
 
         return $cast;
+    }
+
+    private function localDetailData(int $userId, int $itemId, array $item): array {
+        return [
+            'item' => $item,
+            'episodes' => $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId),
+            'progress' => $this->catalogModel->getProgress($userId, (string)$itemId),
+            'next_unwatched' => $this->catalogModel->getNextUnwatched($userId, (string)$itemId),
+            'released' => $this->trackingModel->isItemReleased((string)$itemId),
+            'lists' => $this->trackingModel->getItemLists($userId, $itemId),
+            'cast' => [],
+            'reviews' => $this->catalogModel->getItemComments($itemId),
+            'recommendations' => [],
+        ];
     }
 
     private function getTvmazePersonCredits(int $personId): ?array {

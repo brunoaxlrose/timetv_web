@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { addItemToList, createList, getDetailByItem, markEpisodes, saveReview, toggleFavorite, trackItem } from '../api/mobile';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Marquee } from '../components/Marquee';
@@ -43,7 +43,7 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
     setDetailError('');
     let usableDetail = cached || null;
     try {
-      const response = cached ? null : await getDetailByItem(item, true);
+      const response = cached ? null : await getDetailByItem(item, { rapido: true });
       if (currentRequest !== requestId.current) return;
       if (response?.data) {
         usableDetail = { ...response.data, item: preservePreviewItem(item, response.data.item) };
@@ -56,7 +56,28 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
           setComment(usableDetail.item.comentario || '');
         }
       }
-      const enriched = await getDetailByItem(usableDetail?.item || item);
+      let episodesPrepared = !!usableDetail?.episodes?.length;
+      if ((usableDetail?.item?.tipo || item.tipo) !== 'movie' && !episodesPrepared) {
+        try {
+          const essential = await getDetailByItem(usableDetail?.item || item, { somenteEssencial: true });
+          if (currentRequest !== requestId.current) return;
+          if (essential.data) {
+            usableDetail = { ...essential.data, item: preservePreviewItem(usableDetail?.item || item, essential.data.item) };
+            episodesPrepared = true;
+            detailCache.set(cacheKey, usableDetail);
+            setDetail(usableDetail);
+            if (usableDetail.episodes?.length) setActiveTab('episodes');
+            setFavorite(!!usableDetail.item?.eh_favorito);
+            setRating(Number(usableDetail.item?.nota || 0));
+            setComment(usableDetail.item?.comentario || '');
+          }
+        } catch {
+          episodesPrepared = false;
+        }
+      }
+      const enriched = await getDetailByItem(usableDetail?.item || item, {
+        pularSincronizacao: (usableDetail?.item?.tipo || item.tipo) !== 'movie' && episodesPrepared,
+      });
       if (currentRequest !== requestId.current) return;
       if (enriched.data) {
         usableDetail = { ...enriched.data, item: preservePreviewItem(usableDetail?.item || item, enriched.data.item) };
@@ -111,6 +132,14 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
           ? `Marcar T${nextEpisode.numero_temporada}E${nextEpisode.numero_episodio} como visto`
           : 'Tudo assistido';
 
+  function applyFavoriteState(nextFavorite: boolean, itemId = displayItem.id_item) {
+    setFavorite(nextFavorite);
+    setDetail((current) => current ? {
+      ...current,
+      item: { ...current.item, id_item: itemId, eh_favorito: nextFavorite },
+    } : current);
+  }
+
   async function doFavorite() {
     if (favoriteSaving) return;
     if (favorite) {
@@ -119,18 +148,16 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
     }
 
     setFavoriteSaving(true);
+    applyFavoriteState(true);
     try {
       const response = await toggleFavorite(displayItem, true);
       const nextFavorite = !!response.data?.eh_favorito;
       const itemId = response.data?.item_id ?? displayItem.id_item;
-      setFavorite(nextFavorite);
-      setDetail((current) => current ? {
-        ...current,
-        item: { ...current.item, id_item: itemId, eh_favorito: nextFavorite },
-      } : current);
+      applyFavoriteState(nextFavorite, itemId);
       showToast(response.queued ? 'Favorito salvo offline. Vamos sincronizar depois.' : nextFavorite ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.', response.queued ? 'info' : 'success');
       onDataChanged?.();
     } catch (error) {
+      applyFavoriteState(false);
       showToast(error instanceof Error ? error.message : 'Erro ao favoritar.', 'error');
     } finally {
       setFavoriteSaving(false);
@@ -140,18 +167,16 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
   async function removeFavorite() {
     setConfirmRemoveFavorite(false);
     setFavoriteSaving(true);
+    applyFavoriteState(false);
     try {
       const response = await toggleFavorite(displayItem, false);
       const nextFavorite = !!response.data?.eh_favorito;
       const itemId = response.data?.item_id ?? displayItem.id_item;
-      setFavorite(nextFavorite);
-      setDetail((current) => current ? {
-        ...current,
-        item: { ...current.item, id_item: itemId, eh_favorito: nextFavorite },
-      } : current);
+      applyFavoriteState(nextFavorite, itemId);
       showToast(response.queued ? 'Remocao salva offline. Vamos sincronizar depois.' : 'Removido dos favoritos.', response.queued ? 'info' : 'success');
       onDataChanged?.();
     } catch (error) {
+      applyFavoriteState(true);
       showToast(error instanceof Error ? error.message : 'Erro ao remover favorito.', 'error');
     } finally {
       setFavoriteSaving(false);
@@ -838,7 +863,33 @@ function ListModal({
 }
 
 function HeartIcon({ filled }: { filled: boolean }) {
-  return <Text style={[styles.heartGlyph, filled && styles.heartGlyphFilled]}>{filled ? '\u2665' : '\u2661'}</Text>;
+  const fill = useRef(new Animated.Value(filled ? 1 : 0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fill, {
+        duration: filled ? 180 : 140,
+        easing: Easing.out(Easing.cubic),
+        toValue: filled ? 1 : 0,
+        useNativeDriver: true,
+      }),
+      filled
+        ? Animated.sequence([
+          Animated.timing(scale, { duration: 90, toValue: 0.78, useNativeDriver: true }),
+          Animated.spring(scale, { damping: 7, mass: 0.55, stiffness: 260, toValue: 1.16, useNativeDriver: true }),
+          Animated.spring(scale, { damping: 8, mass: 0.5, stiffness: 220, toValue: 1, useNativeDriver: true }),
+        ])
+        : Animated.spring(scale, { damping: 9, stiffness: 220, toValue: 1, useNativeDriver: true }),
+    ]).start();
+  }, [fill, filled, scale]);
+
+  return (
+    <View style={styles.heartIconStage}>
+      <Animated.Text style={[styles.heartGlyph, { opacity: fill.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>{'\u2661'}</Animated.Text>
+      <Animated.Text style={[styles.heartGlyph, styles.heartGlyphFilled, styles.heartGlyphOverlay, { opacity: fill, transform: [{ scale }] }]}>{'\u2665'}</Animated.Text>
+    </View>
+  );
 }
 
 function ListPlusIcon() {
@@ -924,6 +975,8 @@ const styles = StyleSheet.create({
   actionDisabled: { opacity: 0.65 },
   heartGlyph: { color: colors.text, fontSize: 28, fontWeight: '900', lineHeight: 31 },
   heartGlyphFilled: { color: colors.danger },
+  heartIconStage: { alignItems: 'center', height: 31, justifyContent: 'center', width: 31 },
+  heartGlyphOverlay: { position: 'absolute' },
   pill: { backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 999, borderWidth: 1, paddingHorizontal: 15, paddingVertical: 10 },
   pillText: { color: colors.text, fontWeight: '900' },
   tabBar: { backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 6, marginTop: 26, padding: 5 },

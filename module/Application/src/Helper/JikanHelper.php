@@ -5,6 +5,29 @@ namespace Application\Helper;
 class JikanHelper {
     private const BASE_URL = 'https://api.jikan.moe/v4';
 
+    private static function fetchJson(string $url, int $ttlSeconds = 21600, int $timeoutSeconds = 5): ?array {
+        $cacheDir = dirname(__DIR__, 3) . '/data/cache/jikan';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0777, true);
+        }
+        $cacheFile = $cacheDir . '/' . md5($url) . '.json';
+        if (is_file($cacheFile) && time() - filemtime($cacheFile) < $ttlSeconds) {
+            $cached = @file_get_contents($cacheFile);
+            $decoded = $cached ? json_decode($cached, true) : null;
+            if (is_array($decoded)) return $decoded;
+        }
+
+        $context = stream_context_create(['http' => [
+            'header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n",
+            'timeout' => $timeoutSeconds,
+        ]]);
+        $json = @file_get_contents($url, false, $context);
+        $decoded = $json ? json_decode($json, true) : null;
+        if (!is_array($decoded)) return null;
+        @file_put_contents($cacheFile, json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return $decoded;
+    }
+
     public static function searchAnime(string $query, int $limit = 10): array {
         $url = self::BASE_URL . '/anime?q=' . urlencode($query) . '&limit=' . $limit . '&sfw=true';
         $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
@@ -45,20 +68,14 @@ class JikanHelper {
 
     public static function getAnimeDetail(int $malId): ?array {
         $url = self::BASE_URL . '/anime/' . $malId;
-        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\n", 'timeout' => 8]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        if (!$json) return null;
-        $res = json_decode($json, true);
+        $res = self::fetchJson($url, 21600);
         return $res['data'] ?? null;
     }
 
     public static function getCharacters(int $malId, int $limit = 12): array {
         $url = self::BASE_URL . '/anime/' . $malId . '/characters';
-        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 6]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        if (!$json) return [];
-
-        $res = json_decode($json, true);
+        $res = self::fetchJson($url, 21600);
+        if (!$res) return [];
         $rows = $res['data'] ?? [];
         if (!is_array($rows)) return [];
 
@@ -80,9 +97,8 @@ class JikanHelper {
 
     public static function getCharacterCredits(int $characterId, int $limit = 60): ?array {
         $url = self::BASE_URL . '/characters/' . $characterId . '/full';
-        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        $data = $json ? (json_decode($json, true)['data'] ?? null) : null;
+        $response = self::fetchJson($url, 21600);
+        $data = $response['data'] ?? null;
         if (!$data) return null;
         $credits = [];
         foreach (array_slice($data['anime'] ?? [], 0, $limit) as $row) {
@@ -116,14 +132,10 @@ class JikanHelper {
         $episodes = [];
         $page = 1;
         $hasNextPage = true;
-        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
-
         while ($hasNextPage && $page <= $maxPages) {
             $url = self::BASE_URL . '/anime/' . $malId . '/episodes?page=' . $page;
-            $json = @file_get_contents($url, false, stream_context_create($opts));
-            if (!$json) break;
-
-            $res = json_decode($json, true);
+            $res = self::fetchJson($url, 21600);
+            if (!$res) break;
             $rows = $res['data'] ?? [];
             if (!is_array($rows) || empty($rows)) break;
 
@@ -301,11 +313,8 @@ class JikanHelper {
 
     public static function getRecommendations(int $malId, int $limit = 8): array {
         $url = self::BASE_URL . '/anime/' . $malId . '/recommendations';
-        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        if (!$json) return [];
-
-        $data = json_decode($json, true);
+        $data = self::fetchJson($url, 21600);
+        if (!$data) return [];
         $results = $data['data'] ?? [];
         $items = [];
 

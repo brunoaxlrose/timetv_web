@@ -107,7 +107,7 @@ export function getDetail(itemId: number) {
   }>(`/api/v1/mobile/detail?id=${itemId}`);
 }
 
-export function getDetailByItem(item: Item, rapido = false) {
+export function getDetailByItem(item: Item, options: { rapido?: boolean; somenteEssencial?: boolean; pularSincronizacao?: boolean } = {}) {
   const params = new URLSearchParams();
   if (item.id_item) params.set('id', String(item.id_item));
   if (item.tvmaze_id) params.set('tvmaze_id', String(item.tvmaze_id));
@@ -119,7 +119,9 @@ export function getDetailByItem(item: Item, rapido = false) {
   if (item.data_lancamento) params.set('data_lancamento', item.data_lancamento);
   if (item.url_poster) params.set('url_poster', item.url_poster);
   if (item.url_banner) params.set('url_banner', item.url_banner);
-  if (rapido) params.set('rapido', '1');
+  if (options.rapido) params.set('rapido', '1');
+  if (options.somenteEssencial) params.set('somente_essencial', '1');
+  if (options.pularSincronizacao) params.set('pular_sincronizacao', '1');
   return apiRequest<{
     item: Item;
     episodes: Episode[];

@@ -23,6 +23,9 @@ export type Item = {
   quantidade_reassistida?: number;
   generos?: string;
   provedores_streaming?: string;
+  ts_atualizacao?: string;
+  collection_created_at?: string;
+  avaliacao_media?: number;
 };
 
 export type Episode = {
