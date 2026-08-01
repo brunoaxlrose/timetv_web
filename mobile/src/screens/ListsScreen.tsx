@@ -25,6 +25,8 @@ export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item:
     try {
       const response = await getLists();
       setLists(response.data?.lists || []);
+    } catch {
+      // Preserve lists already shown when there is no cached response yet.
     } finally {
       setLoading(false);
     }
@@ -35,10 +37,13 @@ export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item:
   async function openList(list: UserList) {
     setSelected(list);
     setItems([]);
+    if (list.id_lista < 0) return;
     setLoadingItems(true);
     try {
       const response = await getListItems(list.id_lista);
       setItems(response.data?.items || []);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Nao foi possivel carregar esta lista.', 'error');
     } finally {
       setLoadingItems(false);
     }
@@ -48,11 +53,17 @@ export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item:
     if (!newListName.trim() || savingList) return;
     setSavingList(true);
     try {
-      const response = await createList(newListName.trim());
-      setLists(response.data?.lists || []);
+      const name = newListName.trim();
+      const response = await createList(name);
+      if (response.queued) {
+        const created = response.data?.lists?.[0];
+        if (created) setLists((current) => [created, ...current]);
+      } else {
+        setLists(response.data?.lists || []);
+      }
       setNewListName('');
       setNewListOpen(false);
-      showToast('Lista criada.', 'success');
+      showToast(response.queued ? 'Lista salva offline.' : 'Lista criada.', response.queued ? 'info' : 'success');
     } finally {
       setSavingList(false);
     }
@@ -62,11 +73,17 @@ export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item:
     if (!editingList || !newListName.trim() || savingList) return;
     setSavingList(true);
     try {
-      const response = await renameList(editingList.id_lista, newListName.trim());
-      setLists(response.data?.lists || []);
+      const listId = editingList.id_lista;
+      const name = newListName.trim();
+      const response = await renameList(listId, name);
+      if (response.queued) {
+        setLists((current) => current.map((list) => list.id_lista === listId ? { ...list, nome: name } : list));
+      } else {
+        setLists(response.data?.lists || []);
+      }
       setEditingList(null);
       setNewListName('');
-      showToast('Lista renomeada.', 'success');
+      showToast(response.queued ? 'Alteracao salva offline.' : 'Lista renomeada.', response.queued ? 'info' : 'success');
     } finally {
       setSavingList(false);
     }
@@ -74,11 +91,13 @@ export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item:
 
   async function submitDeleteList() {
     if (!deleteTarget) return;
-    const response = await deleteList(deleteTarget.id_lista);
-    setLists(response.data?.lists || []);
-    if (selected?.id_lista === deleteTarget.id_lista) setSelected(null);
+    const listId = deleteTarget.id_lista;
+    const response = await deleteList(listId);
+    if (response.queued) setLists((current) => current.filter((list) => list.id_lista !== listId));
+    else setLists(response.data?.lists || []);
+    if (selected?.id_lista === listId) setSelected(null);
     setDeleteTarget(null);
-    showToast('Lista excluida.', 'success');
+    showToast(response.queued ? 'Exclusao salva offline.' : 'Lista excluida.', response.queued ? 'info' : 'success');
   }
 
   return (

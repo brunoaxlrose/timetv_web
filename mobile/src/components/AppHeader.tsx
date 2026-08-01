@@ -56,10 +56,10 @@ export function AppHeader({
 
   async function markAllRead() {
     try {
-      await markNotificationsRead();
+      const response = await markNotificationsRead();
       setNotifications([]);
       setCount(0);
-      showToast('Notificações marcadas como lidas.', 'success');
+      showToast(response.queued ? 'Leitura salva offline.' : 'Notificações marcadas como lidas.', response.queued ? 'info' : 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao atualizar notificações.', 'error');
     }
@@ -69,10 +69,10 @@ export function AppHeader({
     if (!feedback.trim() || sendingFeedback) return;
     setSendingFeedback(true);
     try {
-      await sendFeedback(feedbackType, feedback.trim());
+      const response = await sendFeedback(feedbackType, feedback.trim());
       setFeedback('');
       setFeedbackOpen(false);
-      showToast('Feedback enviado.', 'success');
+      showToast(response.queued ? 'Feedback salvo offline.' : 'Feedback enviado.', response.queued ? 'info' : 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao enviar feedback.', 'error');
     } finally {

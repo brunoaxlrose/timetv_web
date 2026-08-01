@@ -14,19 +14,25 @@ export function DashboardScreen({ onOpenItem, onOpenDiscovery, refreshKey = 0 }:
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [courseOpen, setCourseOpen] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   async function load(refresh = false) {
     if (refresh) setRefreshing(true);
     try {
       const response = await getDashboard(1);
-      if (response.data) setData(response.data);
+      if (response.data) {
+        setData(response.data);
+        setLoadError('');
+      }
+    } catch (error) {
+      if (!data) setLoadError(error instanceof Error ? error.message : 'Nao foi possivel carregar o inicio.');
     } finally { setLoading(false); setRefreshing(false); }
   }
 
   useEffect(() => { load(); }, [refreshKey]);
 
   return <ScrollView style={styles.screen} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.accent} />}>
-    {loading ? <><Skeleton height={98} /><PosterSkeletonRow /><PosterSkeletonRow /></> : <>
+    {loading ? <><Skeleton height={98} /><PosterSkeletonRow /><PosterSkeletonRow /></> : loadError && !data ? <Empty text={loadError} /> : <>
       <View style={styles.sectionHeader}>
         <Pressable onPress={() => setCourseOpen((value) => !value)} style={styles.courseTitle}><Text style={styles.sectionTitle}>Em curso</Text><Text style={styles.count}>{data?.continuar_assistindo.length || 0}</Text><Text style={styles.chevron}>{courseOpen ? '⌃' : '⌄'}</Text></Pressable>
         <Pressable onPress={() => onOpenDiscovery('em_curso')} hitSlop={12}><Text style={styles.sectionArrow}>›</Text></Pressable>

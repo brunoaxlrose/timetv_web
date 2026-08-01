@@ -8,5 +8,10 @@ export function sendFeedback(type: 'bug' | 'suggest', content: string, screensho
       content,
       screenshot_base64: screenshotBase64 || '',
     }),
+  }, {
+    offlineMutation: {
+      kind: 'feedback',
+      optimisticData: null,
+    },
   });
 }

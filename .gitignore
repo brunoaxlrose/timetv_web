@@ -11,6 +11,7 @@ mobile/.gradle-build-cache/
 mobile/.gradle-cache/
 mobile/.gradle-user/
 mobile/.expo/
+mobile/dist/
 mobile/node_modules/
 mobile/android/.gradle/
 mobile/android/build/

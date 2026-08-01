@@ -195,12 +195,15 @@ class MobileController extends AbstractActionController {
             return $this->error('Nome da lista e obrigatorio.', 422);
         }
 
-        $listId = $this->trackingModel->createList($this->userId(), $name);
+        $data = $this->idempotent($payload, function() use ($name): array {
+            $listId = $this->trackingModel->createList($this->userId(), $name);
+            return [
+                'list_id' => $listId,
+                'lists' => $this->trackingModel->getUserListsSummary($this->userId()),
+            ];
+        });
 
-        return $this->ok([
-            'list_id' => $listId,
-            'lists' => $this->trackingModel->getUserListsSummary($this->userId()),
-        ]);
+        return $this->ok($data);
     }
 
     public function deleteListAction(): JsonModel {
@@ -283,22 +286,26 @@ class MobileController extends AbstractActionController {
         if ($action === 'add' && $status === 'concluido' && !$this->trackingModel->isItemReleased((string)$itemId)) {
             return $this->error('Este titulo ainda nao foi lancado.', 409);
         }
-
-        if ($action === 'rewatch') {
-            if (!$this->trackingModel->isItemReleased((string)$itemId)) {
-                return $this->error('Este titulo ainda nao foi lancado.', 409);
-            }
-            $this->trackingModel->startRewatching($this->userId(), (string)$itemId);
-        } elseif ($action === 'remove') {
-            $this->trackingModel->removeTrack($this->userId(), (string)$itemId);
-        } else {
-            $this->trackingModel->addTrack($this->userId(), (string)$itemId, $status);
+        if ($action === 'rewatch' && !$this->trackingModel->isItemReleased((string)$itemId)) {
+            return $this->error('Este titulo ainda nao foi lancado.', 409);
         }
 
-        return $this->ok([
-            'item_id' => $itemId,
-            'status' => $action === 'rewatch' ? 'reassistindo' : $status,
-        ]);
+        $data = $this->idempotent($payload, function() use ($action, $itemId, $status): array {
+            if ($action === 'rewatch') {
+                $this->trackingModel->startRewatching($this->userId(), (string)$itemId);
+            } elseif ($action === 'remove') {
+                $this->trackingModel->removeTrack($this->userId(), (string)$itemId);
+            } else {
+                $this->trackingModel->addTrack($this->userId(), (string)$itemId, $status);
+            }
+
+            return [
+                'item_id' => $itemId,
+                'status' => $action === 'rewatch' ? 'reassistindo' : $status,
+            ];
+        });
+
+        return $this->ok($data);
     }
 
     public function rewatchEpisodeAction(): JsonModel {
@@ -311,10 +318,12 @@ class MobileController extends AbstractActionController {
             return $this->error('Este episodio ainda nao foi lancado.', 409);
         }
 
-        return $this->ok([
+        $data = $this->idempotent($payload, fn(): array => [
             'episode_id' => $episodeId,
             'quantidade_reassistida' => $this->trackingModel->rewatchEpisode($this->userId(), $episodeId),
         ]);
+
+        return $this->ok($data);
     }
 
     public function markEpisodesAction(): JsonModel {
@@ -711,6 +720,72 @@ class MobileController extends AbstractActionController {
             $payload = $this->getRequest()->getPost()->toArray();
         }
         return $payload;
+    }
+
+    private function idempotent(array $payload, callable $operation): array {
+        $header = $this->getRequest()->getHeader('X-Idempotency-Key');
+        $mutationId = $header ? trim((string)$header->getFieldValue()) : trim((string)($payload['id_mutacao_cliente'] ?? ''));
+        if ($mutationId === '') {
+            return $operation();
+        }
+        if (!preg_match('/^[A-Za-z0-9._:-]{8,100}$/', $mutationId)) {
+            throw new \InvalidArgumentException('Chave de idempotencia invalida.');
+        }
+
+        $pdo = $this->catalogModel->getPdo();
+        $userId = $this->userId();
+        $startedTransaction = !$pdo->inTransaction();
+        if ($startedTransaction) {
+            $pdo->beginTransaction();
+        }
+
+        try {
+            $stmtInsert = $pdo->prepare("
+                INSERT INTO requisicao_idempotente (id_usuario, id_mutacao_cliente)
+                VALUES (:id_usuario, :id_mutacao_cliente)
+                ON CONFLICT (id_usuario, id_mutacao_cliente) DO NOTHING
+            ");
+            $stmtInsert->execute([
+                ':id_usuario' => $userId,
+                ':id_mutacao_cliente' => $mutationId,
+            ]);
+
+            $stmtExisting = $pdo->prepare("
+                SELECT resposta
+                FROM requisicao_idempotente
+                WHERE id_usuario = :id_usuario
+                  AND id_mutacao_cliente = :id_mutacao_cliente
+                FOR UPDATE
+            ");
+            $stmtExisting->execute([
+                ':id_usuario' => $userId,
+                ':id_mutacao_cliente' => $mutationId,
+            ]);
+            $stored = $stmtExisting->fetchColumn();
+            if ($stored !== false && $stored !== null) {
+                $data = json_decode((string)$stored, true, 512, JSON_THROW_ON_ERROR);
+                if ($startedTransaction) $pdo->commit();
+                return is_array($data) ? $data : [];
+            }
+
+            $data = $operation();
+            $stmtUpdate = $pdo->prepare("
+                UPDATE requisicao_idempotente
+                SET resposta = CAST(:resposta AS JSONB)
+                WHERE id_usuario = :id_usuario
+                  AND id_mutacao_cliente = :id_mutacao_cliente
+            ");
+            $stmtUpdate->execute([
+                ':resposta' => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
+                ':id_usuario' => $userId,
+                ':id_mutacao_cliente' => $mutationId,
+            ]);
+            if ($startedTransaction) $pdo->commit();
+            return $data;
+        } catch (\Throwable $error) {
+            if ($startedTransaction && $pdo->inTransaction()) $pdo->rollBack();
+            throw $error;
+        }
     }
 
     private function itemResolveErrorMessage(): string {

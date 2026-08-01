@@ -25,6 +25,8 @@ export function SearchScreen({ onOpenItem }: { onOpenItem: (item: Item) => void 
       setItems(response.data?.items || []);
       setPopular(response.data?.popular || []);
       setRecent(response.data?.recent_searches || []);
+    } catch {
+      // Keep the last result visible; the offline banner explains the connection state.
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }

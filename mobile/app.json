@@ -1,11 +1,17 @@
 {
   "expo": {
     "name": "CineFio",
-    "slug": "cinefio",
+    "slug": "cinefiotime",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1fee84ef-fad2-4cb5-b0d5-40a0912aea88"
+    },
     "platforms": [
       "ios",
       "android"
@@ -17,14 +23,24 @@
           "photosPermission": "O CineFio acessa suas fotos para voce escolher uma imagem de perfil.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "android": {
-      "usesCleartextTraffic": true,
       "package": "com.brunoaxlrose.timeview"
+    },
+    "ios": {
+      "bundleIdentifier": "com.brunoaxlrose.cinefio",
+      "supportsTablet": true
     },
     "assetBundlePatterns": [
       "**/*"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1fee84ef-fad2-4cb5-b0d5-40a0912aea88"
+      }
+    },
+    "owner": "brunoaxlroses-organization"
   }
 }

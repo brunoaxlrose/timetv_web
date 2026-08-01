@@ -115,6 +115,8 @@ class DatabaseSchemaHelper {
             );",
             "ALTER TABLE feedback ADD COLUMN IF NOT EXISTS captura_tela TEXT NULL;",
             "ALTER TABLE feedback ADD COLUMN IF NOT EXISTS ts_cancelamento TIMESTAMP NULL;",
+            "ALTER TABLE feedback ADD COLUMN IF NOT EXISTS id_mutacao_cliente VARCHAR(100) NULL;",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uk_feedback_usuario_mutacao ON feedback (id_usuario, id_mutacao_cliente) WHERE id_mutacao_cliente IS NOT NULL;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS quantidade_reassistida INT DEFAULT 0;",
             "ALTER TABLE usuario_item DROP CONSTRAINT IF EXISTS usuario_item_status_check;",
@@ -161,6 +163,16 @@ class DatabaseSchemaHelper {
                 CONSTRAINT usuario_lista_item_fk_lista FOREIGN KEY (id_lista) REFERENCES usuario_lista(id_lista) ON DELETE CASCADE,
                 CONSTRAINT usuario_lista_item_fk_item FOREIGN KEY (id_item) REFERENCES item(id_item) ON DELETE CASCADE,
                 CONSTRAINT unique_lista_item UNIQUE (id_lista, id_item)
+            );",
+            "CREATE TABLE IF NOT EXISTS requisicao_idempotente (
+                id_requisicao_idempotente SERIAL PRIMARY KEY,
+                id_usuario INT NOT NULL,
+                id_mutacao_cliente VARCHAR(100) NOT NULL,
+                resposta JSONB NULL,
+                ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ts_cancelamento TIMESTAMP NULL,
+                CONSTRAINT requisicao_idempotente_fk_usuario FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+                CONSTRAINT uk_requisicao_idempotente_usuario_mutacao UNIQUE (id_usuario, id_mutacao_cliente)
             );"
         ];
 

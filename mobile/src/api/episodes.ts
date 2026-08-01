@@ -11,5 +11,11 @@ export function markEpisodeWatched(episodeId: number) {
     body: JSON.stringify({
       episode_id: episodeId,
     }),
+  }, {
+    offlineMutation: {
+      kind: 'episode_mark',
+      optimisticData: { episode_id: episodeId, watched: true },
+      dedupeKey: `episode-watched:${episodeId}`,
+    },
   });
 }

@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { getCurrentUser, login, User } from './src/api/auth';
+import { initializeApiOfflineSupport, isOfflineError } from './src/api/client';
 import { clearSession, loadCredentials, loadSavedUser, saveCredentials, saveUser } from './src/storage/session';
 import { colors, hydratePalette } from './src/theme/colors';
 
@@ -15,6 +16,7 @@ export default function App() {
   const [themeReady, setThemeReady] = useState(false);
 
   useEffect(() => {
+    const stopOfflineSupport = initializeApiOfflineSupport();
     async function boot() {
       await hydratePalette();
       setThemeReady(true);
@@ -28,7 +30,11 @@ export default function App() {
             setUser(restoredUser);
             return;
           }
-        } catch {
+        } catch (error) {
+          if (isOfflineError(error)) {
+            setUser(savedUser);
+            return;
+          }
           // Fall back to remembered credentials below when the token has expired.
         }
       }
@@ -42,8 +48,12 @@ export default function App() {
             setUser(response.data);
             return;
           }
-        } catch {
-          await clearSession();
+        } catch (error) {
+          if (savedUser && isOfflineError(error)) {
+            setUser(savedUser);
+            return;
+          }
+          if (!isOfflineError(error)) await clearSession();
         }
       }
 
@@ -51,6 +61,7 @@ export default function App() {
     }
 
     boot().finally(() => setBooting(false));
+    return stopOfflineSupport;
   }, []);
 
   async function handleAuthenticated(nextUser: User, remember?: { email: string; password: string }) {

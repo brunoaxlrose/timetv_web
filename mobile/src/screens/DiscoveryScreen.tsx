@@ -27,6 +27,8 @@ export function DiscoveryScreen({ section, onBack, onOpenItem }: { section: Sect
       if (section === 'em_curso') setCourseRows(response.data?.continuar_assistindo || []);
       setItems((current) => juntar(current, novos));
       setPagina(nextPage);
+    } catch {
+      // Keep loaded pages available until connectivity returns.
     } finally { setLoading(false); }
   }
 

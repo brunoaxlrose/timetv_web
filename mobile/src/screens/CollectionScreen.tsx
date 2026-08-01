@@ -96,6 +96,8 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
       }
       setItems(nextItems);
       setGroups(response.data?.groups || null);
+    } catch {
+      // Preserve the last collection while connectivity is unavailable.
     } finally {
       setLoading(false);
       setRefreshing(false);

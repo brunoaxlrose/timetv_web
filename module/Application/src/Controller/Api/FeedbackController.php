@@ -11,7 +11,8 @@ class FeedbackController extends AbstractActionController {
     }
 
     public function createAction(): JsonModel {
-        if (!isset($_SESSION['user_id'])) {
+        $userId = $this->userId();
+        if ($userId <= 0) {
             return $this->jsonError('Nao autorizado.', 401);
         }
 
@@ -28,6 +29,10 @@ class FeedbackController extends AbstractActionController {
         $type = trim((string)($payload['type'] ?? 'bug'));
         $content = trim((string)($payload['content'] ?? ''));
         $screenshot = trim((string)($payload['screenshot_base64'] ?? ''));
+        $idempotencyHeader = $request->getHeader('X-Idempotency-Key');
+        $mutationId = $idempotencyHeader
+            ? trim((string)$idempotencyHeader->getFieldValue())
+            : trim((string)($payload['id_mutacao_cliente'] ?? ''));
 
         if ($content === '') {
             return $this->jsonError('Escreva a mensagem do feedback.', 422);
@@ -35,10 +40,11 @@ class FeedbackController extends AbstractActionController {
 
         try {
             $this->authModel->saveFeedback(
-                (int)$_SESSION['user_id'],
+                $userId,
                 $type,
                 $content,
-                $screenshot !== '' ? $screenshot : null
+                $screenshot !== '' ? $screenshot : null,
+                $mutationId !== '' ? $mutationId : null
             );
 
             return new JsonModel([
@@ -49,6 +55,18 @@ class FeedbackController extends AbstractActionController {
         } catch (\Throwable $e) {
             return $this->jsonError('Erro ao salvar feedback.', 500);
         }
+    }
+
+    private function userId(): int {
+        if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
+            return (int)$_SESSION['user_id'];
+        }
+        $header = (string)$this->getRequest()->getHeader('Authorization');
+        if (preg_match('/Bearer\s+(.*)$/i', $header, $matches)) {
+            $user = $this->authModel->getUserByToken(trim($matches[1]));
+            return $user ? (int)$user['id_usuario'] : 0;
+        }
+        return 0;
     }
 
     private function jsonError(string $message, int $statusCode): JsonModel {

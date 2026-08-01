@@ -85,16 +85,18 @@ class AuthModel {
         $stmt->execute([':id' => $userId]);
     }
 
-    public function saveFeedback(int $userId, string $type, string $content, ?string $screenshot): void {
+    public function saveFeedback(int $userId, string $type, string $content, ?string $screenshot, ?string $mutationId = null): void {
         $stmt = $this->pdo->prepare("
-            INSERT INTO feedback (id_usuario, tipo_feedback, conteudo, captura_tela)
-            VALUES (:id_usuario, :tipo, :conteudo, :captura_tela)
+            INSERT INTO feedback (id_usuario, tipo_feedback, conteudo, captura_tela, id_mutacao_cliente)
+            VALUES (:id_usuario, :tipo, :conteudo, :captura_tela, :id_mutacao_cliente)
+            ON CONFLICT DO NOTHING
         ");
         $stmt->execute([
             ':id_usuario' => $userId,
             ':tipo' => $type,
             ':conteudo' => $content,
-            ':captura_tela' => $screenshot
+            ':captura_tela' => $screenshot,
+            ':id_mutacao_cliente' => $mutationId,
         ]);
     }
 

@@ -146,9 +146,19 @@ export function getPersonCredits(personId: number, source: string) {
 }
 
 export function createList(name: string) {
+  const tempListId = temporaryId();
   return apiRequest<{ list_id: number; lists: UserList[] }>('/api/v1/mobile/lists/create', {
     method: 'POST',
     body: JSON.stringify({ name }),
+  }, {
+    offlineMutation: {
+      kind: 'list_create',
+      optimisticData: {
+        list_id: tempListId,
+        lists: [{ id_lista: tempListId, nome: name, item_count: 0 }],
+      },
+      tempListId,
+    },
   });
 }
 
@@ -156,6 +166,12 @@ export function deleteList(listId: number) {
   return apiRequest<{ lists: UserList[] }>('/api/v1/mobile/lists/delete', {
     method: 'POST',
     body: JSON.stringify({ list_id: listId }),
+  }, {
+    offlineMutation: {
+      kind: 'list_delete',
+      optimisticData: { lists: [] },
+      dedupeKey: `list-delete:${listId}`,
+    },
   });
 }
 
@@ -163,6 +179,12 @@ export function renameList(listId: number, name: string) {
   return apiRequest<{ lists: UserList[] }>('/api/v1/mobile/lists/rename', {
     method: 'POST',
     body: JSON.stringify({ list_id: listId, name }),
+  }, {
+    offlineMutation: {
+      kind: 'list_rename',
+      optimisticData: { lists: [{ id_lista: listId, nome: name, item_count: 0 }] },
+      dedupeKey: `list-rename:${listId}`,
+    },
   });
 }
 
@@ -170,6 +192,12 @@ export function addItemToList(listId: number, item: Item) {
   return apiRequest<{ list_id: number; item_id: number; items: Item[] }>('/api/v1/mobile/lists/add', {
     method: 'POST',
     body: JSON.stringify({ list_id: listId, ...itemPayload(item) }),
+  }, {
+    offlineMutation: {
+      kind: 'list_add',
+      optimisticData: { list_id: listId, item_id: Number(item.id_item || 0), items: [item] },
+      dedupeKey: `list-add:${listId}:${itemKey(item)}`,
+    },
   });
 }
 
@@ -177,6 +205,12 @@ export function toggleFavorite(item: Item, isFavorite?: boolean) {
   return apiRequest<{ item_id: number; eh_favorito: boolean }>('/api/v1/mobile/favorite/toggle', {
     method: 'POST',
     body: JSON.stringify({ ...itemPayload(item), eh_favorito: isFavorite }),
+  }, {
+    offlineMutation: {
+      kind: 'favorite',
+      optimisticData: { item_id: Number(item.id_item || 0), eh_favorito: Boolean(isFavorite) },
+      dedupeKey: `favorite:${itemKey(item)}`,
+    },
   });
 }
 
@@ -184,6 +218,12 @@ export function trackItem(item: Item, status = 'assistindo', action: 'add' | 're
   return apiRequest<{ item_id: number; status: string }>('/api/v1/mobile/track', {
     method: 'POST',
     body: JSON.stringify({ ...itemPayload(item), status, action }),
+  }, {
+    offlineMutation: {
+      kind: 'track',
+      optimisticData: { item_id: Number(item.id_item || 0), status: action === 'rewatch' ? 'reassistindo' : status },
+      dedupeKey: action === 'rewatch' ? undefined : `track:${itemKey(item)}`,
+    },
   });
 }
 
@@ -191,6 +231,11 @@ export function rewatchEpisode(episodeId: number) {
   return apiRequest<{ episode_id: number; quantidade_reassistida: number }>('/api/v1/mobile/episodes/rewatch', {
     method: 'POST',
     body: JSON.stringify({ episode_id: episodeId }),
+  }, {
+    offlineMutation: {
+      kind: 'episode_rewatch',
+      optimisticData: { episode_id: episodeId, quantidade_reassistida: 1 },
+    },
   });
 }
 
@@ -199,7 +244,9 @@ export function markEpisodes(payload: {
   episode_id?: number;
   numero_temporada?: number;
   mode: 'single' | 'preceding' | 'season' | 'all';
-}) {
+}, currentEpisodes: Episode[] = []) {
+  const optimisticEpisodes = markEpisodesLocally(currentEpisodes, payload);
+  const watchedCount = optimisticEpisodes.filter((episode) => episode.assistido).length;
   return apiRequest<{
     item_id: number;
     episodes: Episode[];
@@ -208,6 +255,16 @@ export function markEpisodes(payload: {
   }>('/api/v1/mobile/episodes/mark', {
     method: 'POST',
     body: JSON.stringify(payload),
+  }, {
+    offlineMutation: {
+      kind: 'episode_mark',
+      optimisticData: {
+        item_id: payload.item_id,
+        episodes: optimisticEpisodes,
+        progress: { total_count: optimisticEpisodes.length, watched_count: watchedCount },
+        next_unwatched: optimisticEpisodes.find((episode) => !episode.assistido) || null,
+      },
+    },
   });
 }
 
@@ -221,6 +278,24 @@ export function saveReview(item: Item, nota: number | null, comentario: string) 
   }>('/api/v1/mobile/review', {
     method: 'POST',
     body: JSON.stringify({ ...itemPayload(item), nota, comentario }),
+  }, {
+    offlineMutation: {
+      kind: 'review',
+      optimisticData: {
+        item_id: Number(item.id_item || 0),
+        nota,
+        comentario: comentario || null,
+        avaliacao: nota && comentario ? {
+          id_usuario: 0,
+          nome_usuario: 'Voce',
+          nota,
+          comentario,
+          reviewed_at: new Date().toISOString(),
+        } : null,
+        total_avaliacoes: 1,
+      },
+      dedupeKey: `review:${itemKey(item)}`,
+    },
   });
 }
 
@@ -238,4 +313,29 @@ function itemPayload(item: Item) {
     url_banner: item.url_banner,
     descricao: item.descricao,
   };
+}
+
+function itemKey(item: Item) {
+  return item.id_item || item.tmdb_id || item.tvmaze_id || item.mal_id || `${item.tipo}:${item.titulo}`;
+}
+
+function temporaryId() {
+  return -Math.max(1, Date.now());
+}
+
+function markEpisodesLocally(
+  episodes: Episode[],
+  payload: { episode_id?: number; numero_temporada?: number; mode: 'single' | 'preceding' | 'season' | 'all' },
+) {
+  const target = episodes.find((episode) => episode.id_episodio === payload.episode_id);
+  return episodes.map((episode) => {
+    let shouldMark = payload.mode === 'all';
+    if (payload.mode === 'single') shouldMark = episode.id_episodio === payload.episode_id;
+    if (payload.mode === 'season') shouldMark = episode.numero_temporada === payload.numero_temporada;
+    if (payload.mode === 'preceding' && target) {
+      shouldMark = episode.numero_temporada < target.numero_temporada
+        || (episode.numero_temporada === target.numero_temporada && episode.numero_episodio <= target.numero_episodio);
+    }
+    return shouldMark ? { ...episode, assistido: true } : episode;
+  });
 }

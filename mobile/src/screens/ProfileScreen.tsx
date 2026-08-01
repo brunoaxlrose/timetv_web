@@ -36,7 +36,9 @@ export function ProfileScreen({
   const [timeInfoOpen, setTimeInfoOpen] = useState(false);
 
   useEffect(() => {
-    getProfile().then((res) => setProfile(res.data)).finally(() => setLoading(false));
+    getProfile().then((res) => setProfile(res.data)).catch(() => {
+      // Preserve the cached profile while offline.
+    }).finally(() => setLoading(false));
   }, [refreshKey]);
 
   const initials = `${user.nome?.[0] || ''}${user.sobrenome?.[0] || ''}` || 'TV';

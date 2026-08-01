@@ -13,7 +13,7 @@ type DetailTab = 'about' | 'episodes';
 type DetailData = Awaited<ReturnType<typeof getDetailByItem>>['data'];
 const detailCache = new Map<string, DetailData>();
 
-export function DetailScreen({ item, onBack, onSelectItem, onSelectPerson, onDataChanged }: { item: Item; onBack: () => void; onSelectItem?: (item: Item) => void; onSelectPerson?: (person: CastMember) => void; onDataChanged?: () => void }) {
+export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSelectPerson, onDataChanged }: { item: Item; refreshKey?: number; onBack: () => void; onSelectItem?: (item: Item) => void; onSelectPerson?: (person: CastMember) => void; onDataChanged?: () => void }) {
   const cacheKey = itemKey(item);
   const [detail, setDetail] = useState<DetailData | null>(() => {
     const cached = detailCache.get(cacheKey);
@@ -84,7 +84,7 @@ export function DetailScreen({ item, onBack, onSelectItem, onSelectPerson, onDat
   useEffect(() => {
     setActiveTab('about');
     load();
-  }, [item.id_item, item.tmdb_id, item.tvmaze_id, item.mal_id]);
+  }, [item.id_item, item.tmdb_id, item.tvmaze_id, item.mal_id, refreshKey]);
 
   useEffect(() => {
     if (detail) detailCache.set(cacheKey, detail);
@@ -128,7 +128,7 @@ export function DetailScreen({ item, onBack, onSelectItem, onSelectPerson, onDat
         ...current,
         item: { ...current.item, id_item: itemId, eh_favorito: nextFavorite },
       } : current);
-      showToast(nextFavorite ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.', 'success');
+      showToast(response.queued ? 'Favorito salvo offline. Vamos sincronizar depois.' : nextFavorite ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.', response.queued ? 'info' : 'success');
       onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao favoritar.', 'error');
@@ -149,7 +149,7 @@ export function DetailScreen({ item, onBack, onSelectItem, onSelectPerson, onDat
         ...current,
         item: { ...current.item, id_item: itemId, eh_favorito: nextFavorite },
       } : current);
-      showToast('Removido dos favoritos.', 'success');
+      showToast(response.queued ? 'Remocao salva offline. Vamos sincronizar depois.' : 'Removido dos favoritos.', response.queued ? 'info' : 'success');
       onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao remover favorito.', 'error');
@@ -175,7 +175,7 @@ export function DetailScreen({ item, onBack, onSelectItem, onSelectPerson, onDat
           item_id: Number(displayItem.id_item),
           episode_id: nextEpisode.id_episodio,
           mode: 'single',
-        });
+        }, detail?.episodes || []);
         applyEpisodePayload(response.data);
       }
       showToast('Marcado como assistido.', 'success');
@@ -222,7 +222,7 @@ export function DetailScreen({ item, onBack, onSelectItem, onSelectPerson, onDat
           ? [response.data.avaliacao, ...current.reviews.filter((review) => review.id_usuario !== response.data?.avaliacao?.id_usuario)]
           : current.reviews,
       } : current);
-      showToast('Avaliacao salva.', 'success');
+      showToast(response.queued ? 'Avaliacao salva offline. Vamos sincronizar depois.' : 'Avaliacao salva.', response.queued ? 'info' : 'success');
       onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao salvar avaliacao.', 'error');
@@ -534,7 +534,7 @@ function EpisodeGroups({
     if (savingSeason) return;
     setSavingSeason(season);
     try {
-      const response = await markEpisodes({ item_id: itemId, numero_temporada: season, mode: 'season' });
+      const response = await markEpisodes({ item_id: itemId, numero_temporada: season, mode: 'season' }, episodes);
       onEpisodesChanged(response.data);
       showToast(`Temporada ${season} marcada como assistida.`, 'success');
     } catch (error) {
@@ -573,6 +573,7 @@ function EpisodeGroups({
           <EpisodeRow
             key={episode.id_episodio}
             episode={episode}
+            episodes={episodes}
             itemId={itemId}
             onEpisodesChanged={onEpisodesChanged}
           />
@@ -625,10 +626,12 @@ function DetailExtrasSkeleton() {
 
 function EpisodeRow({
   episode,
+  episodes,
   itemId,
   onEpisodesChanged,
 }: {
   episode: Episode;
+  episodes: Episode[];
   itemId: number;
   onEpisodesChanged: (payload?: { episodes: Episode[]; progress: { total_count: number; watched_count: number }; next_unwatched: Episode | null } | null) => void;
 }) {
@@ -647,7 +650,7 @@ function EpisodeRow({
     setChoiceOpen(false);
     setLoading(true);
     try {
-      const response = await markEpisodes({ item_id: itemId, episode_id: episode.id_episodio, mode: 'single' });
+      const response = await markEpisodes({ item_id: itemId, episode_id: episode.id_episodio, mode: 'single' }, episodes);
       onEpisodesChanged(response.data);
       setWatched(true);
       showToast('Episodio marcado como assistido.', 'success');
@@ -661,7 +664,7 @@ function EpisodeRow({
     setChoiceOpen(false);
     setLoading(true);
     try {
-      const response = await markEpisodes({ item_id: itemId, episode_id: episode.id_episodio, mode: 'preceding' });
+      const response = await markEpisodes({ item_id: itemId, episode_id: episode.id_episodio, mode: 'preceding' }, episodes);
       onEpisodesChanged(response.data);
       setWatched(true);
       showToast('Episodios anteriores marcados.', 'success');
@@ -773,7 +776,7 @@ function ListModal({
     try {
       const response = await addItemToList(list.id_lista, item);
       onAdded(list.id_lista, response.data?.item_id);
-      showToast(`Adicionado em ${list.nome}.`, 'success');
+      showToast(response.queued ? `Salvo offline em ${list.nome}.` : `Adicionado em ${list.nome}.`, response.queued ? 'info' : 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao adicionar na lista.', 'error');
     } finally {
@@ -794,7 +797,7 @@ function ListModal({
       setLocalLists((current) => [...current, nextList]);
       setNewListName('');
       onAdded(listId, added.data?.item_id, name);
-      showToast(`Lista ${name} criada e título adicionado.`, 'success');
+      showToast(created.queued || added.queued ? `Lista ${name} salva offline.` : `Lista ${name} criada e título adicionado.`, created.queued || added.queued ? 'info' : 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao criar a lista.', 'error');
     } finally { setCreating(false); }

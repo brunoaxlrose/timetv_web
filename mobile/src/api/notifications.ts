@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './client';
+import { apiRequest } from './client';
 
 export type NotificationItem = {
   id_notificacao?: number;
@@ -13,27 +13,23 @@ export type NotificationItem = {
   created_at?: string;
 };
 
-export function getNotifications() {
-  return requestNotifications('/api/notifications');
+export async function getNotifications() {
+  const response = await apiRequest<{ count: number; notifications: NotificationItem[] }>('/api/notifications');
+  return {
+    success: response.success,
+    count: response.data?.count || 0,
+    notifications: response.data?.notifications || [],
+    offline: response.offline,
+  };
 }
 
-export function markNotificationsRead() {
-  return requestNotifications('/api/notifications/read', { method: 'POST' });
-}
-
-async function requestNotifications(path: string, options: RequestInit = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      Accept: 'application/json',
-      ...(options.headers || {}),
+export async function markNotificationsRead() {
+  const response = await apiRequest<null>('/api/notifications/read', { method: 'POST' }, {
+    offlineMutation: {
+      kind: 'notification_read',
+      optimisticData: null,
+      dedupeKey: 'notifications-read',
     },
   });
-
-  const body = await response.json();
-  if (!response.ok || !body.success) {
-    throw new Error(body.message || 'Erro ao carregar notificacoes.');
-  }
-  return body as { success: boolean; count?: number; notifications?: NotificationItem[] };
+  return response;
 }

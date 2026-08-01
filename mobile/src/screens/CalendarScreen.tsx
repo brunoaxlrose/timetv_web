@@ -26,6 +26,8 @@ export function CalendarScreen({ onBack, onOpenItem }: { onBack: () => void; onO
       const nextEvents = response.data?.calendario || [];
       calendarCache.set(mes, nextEvents);
       setEventos(nextEvents);
+    }).catch(() => {
+      // Keep the selected month's cached events while offline.
     }).finally(() => {
       if (currentRequest === requestId.current) setLoading(false);
     });

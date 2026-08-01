@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, View } from 'react-native';
 import { User } from '../api/auth';
 import { AppHeader } from '../components/AppHeader';
+import { OfflineBanner } from '../components/OfflineBanner';
 import { alpha, colors } from '../theme/colors';
 import { CastMember, Item } from '../types';
 import { CollectionScreen } from '../screens/CollectionScreen';
@@ -13,6 +14,7 @@ import { SearchScreen } from '../screens/SearchScreen';
 import { CalendarScreen } from '../screens/CalendarScreen';
 import { DiscoveryScreen } from '../screens/DiscoveryScreen';
 import { PersonScreen } from '../screens/PersonScreen';
+import { getOfflineSnapshot, subscribeOfflineState } from '../offline/manager';
 
 type Tab = 'home' | 'lists' | 'collection' | 'profile' | 'search';
 
@@ -32,6 +34,14 @@ export function MainTabs({
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set(['home']));
   const [showCalendar, setShowCalendar] = useState(false);
   const [discovery, setDiscovery] = useState<'populares' | 'em_breve' | 'em_curso' | null>(null);
+  const offlineState = useSyncExternalStore(subscribeOfflineState, getOfflineSnapshot, getOfflineSnapshot);
+  const lastSyncedAt = useRef(offlineState.lastSyncedAt);
+
+  useEffect(() => {
+    if (!offlineState.lastSyncedAt || offlineState.lastSyncedAt === lastSyncedAt.current) return;
+    lastSyncedAt.current = offlineState.lastSyncedAt;
+    setDataRefreshKey((value) => value + 1);
+  }, [offlineState.lastSyncedAt]);
 
   function openItem(item: Item) {
     setSelectedItem(item);
@@ -55,6 +65,7 @@ export function MainTabs({
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.headerSafe}><AppHeader user={user} onLogout={onLogout} onCalendar={() => { setSelectedItem(null); setSelectedPerson(null); setDiscovery(null); setShowCalendar(true); }} onProfile={() => openTab('profile')} /></SafeAreaView>
+      <OfflineBanner />
 
       <View style={styles.content}>
         <View style={[styles.tabPage, (tab !== 'home' || overlayOpen) && styles.hidden]}><DashboardScreen onOpenItem={openItem} onOpenDiscovery={setDiscovery} refreshKey={dataRefreshKey} /></View>
@@ -65,7 +76,7 @@ export function MainTabs({
         {selectedPerson ? (
           <View style={styles.overlayPage}><PersonScreen castMember={selectedPerson} onBack={() => setSelectedPerson(null)} onOpenItem={(credit) => { setSelectedPerson(null); setSelectedItem(credit); }} /></View>
         ) : selectedItem ? (
-          <View style={styles.overlayPage}><DetailScreen key={`${selectedItem.id_item || 0}-${selectedItem.tmdb_id || 0}-${selectedItem.tvmaze_id || 0}-${selectedItem.mal_id || 0}`} item={selectedItem} onBack={() => setSelectedItem(null)} onSelectItem={(recItem) => setSelectedItem(recItem)} onSelectPerson={setSelectedPerson} onDataChanged={invalidateUserData} /></View>
+          <View style={styles.overlayPage}><DetailScreen key={`${selectedItem.id_item || 0}-${selectedItem.tmdb_id || 0}-${selectedItem.tvmaze_id || 0}-${selectedItem.mal_id || 0}`} item={selectedItem} refreshKey={dataRefreshKey} onBack={() => setSelectedItem(null)} onSelectItem={(recItem) => setSelectedItem(recItem)} onSelectPerson={setSelectedPerson} onDataChanged={invalidateUserData} /></View>
         ) : discovery ? (
           <View style={styles.overlayPage}><DiscoveryScreen section={discovery} onBack={() => setDiscovery(null)} onOpenItem={openItem} /></View>
         ) : showCalendar ? (
