@@ -113,7 +113,9 @@ export function DiscoveryScreen({ section, onBack, onOpenItem }: { section: Sect
 function TopTenCard({ item, index, onPress }: { item: Item; index: number; onPress: (item: Item) => void }) {
   return (
     <View style={styles.topTenWrap}>
-      <Text style={styles.topTenIndex}>{index + 1}</Text>
+      <View style={styles.topTenBadge}>
+        <Text style={styles.topTenIndex}>{index + 1}</Text>
+      </View>
       <View style={styles.topTenPosterWrap}>
         <PosterCard item={item} onPress={onPress} />
       </View>
@@ -181,9 +183,24 @@ const styles = StyleSheet.create({
   row: { alignItems: 'flex-start' },
   card: { paddingHorizontal: 6, width: '33.333%' },
   loader: { marginVertical: 24 },
-  topTenWrap: { minHeight: 188, position: 'relative' },
-  topTenIndex: { color: colors.accent, fontSize: 60, fontWeight: '900', left: -2, opacity: 0.28, position: 'absolute', top: 72, zIndex: 1 },
-  topTenPosterWrap: { marginLeft: 24, zIndex: 2 },
+  topTenWrap: { minHeight: 188, paddingTop: 18, position: 'relative' },
+  topTenBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.accent,
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: 'center',
+    left: 8,
+    minWidth: 32,
+    paddingHorizontal: 8,
+    position: 'absolute',
+    top: 0,
+    zIndex: 3,
+  },
+  topTenIndex: { color: colors.accent, fontSize: 15, fontWeight: '900' },
+  topTenPosterWrap: { zIndex: 2 },
   courseList: { gap: 10, paddingBottom: 115, paddingHorizontal: 16 },
   courseCard: { backgroundColor: colors.surface, borderLeftColor: colors.accent, borderLeftWidth: 4, borderRadius: 15, flexDirection: 'row', minHeight: 136, padding: 10 },
   coursePoster: { backgroundColor: colors.surface, borderRadius: 9, height: 116, width: 80 },

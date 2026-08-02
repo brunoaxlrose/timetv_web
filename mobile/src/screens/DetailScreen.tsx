@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import type { ReactNode } from 'react';
 import { addItemToList, createList, getDetailByItem, markEpisodes, saveReview, toggleFavorite, trackItem } from '../api/mobile';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { Marquee } from '../components/Marquee';
 import { Skeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { alpha, colors } from '../theme/colors';
@@ -11,10 +11,12 @@ import { CastMember, Episode, Item, UserList } from '../types';
 type SelectableList = UserList & { has_item?: boolean };
 type DetailTab = 'about' | 'episodes';
 type DetailData = Awaited<ReturnType<typeof getDetailByItem>>['data'];
+type ReactionValue = 1 | 2 | 3;
 const detailCache = new Map<string, DetailData>();
 
 export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSelectPerson, onDataChanged }: { item: Item; refreshKey?: number; onBack: () => void; onSelectItem?: (item: Item) => void; onSelectPerson?: (person: CastMember) => void; onDataChanged?: () => void }) {
   const cacheKey = itemKey(item);
+  const reactionAnchorRef = useRef<View>(null);
   const [detail, setDetail] = useState<DetailData | null>(() => {
     const cached = detailCache.get(cacheKey);
     return cached ? { ...cached, item: preservePreviewItem(item, cached.item) } : null;
@@ -23,8 +25,11 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
   const [enriching, setEnriching] = useState(() => !detailCache.has(cacheKey));
   const [activeTab, setActiveTab] = useState<DetailTab>('about');
   const [favorite, setFavorite] = useState(!!item.eh_favorito);
-  const [rating, setRating] = useState(Number(item.nota || 0));
-  const [comment, setComment] = useState(item.comentario || '');
+  const [reaction, setReaction] = useState<ReactionValue | null>(() => reactionFromRating(Number(item.nota || 0)));
+  const [reactionSaving, setReactionSaving] = useState(false);
+  const [reactionPopupOpen, setReactionPopupOpen] = useState(false);
+  const [reactionPopupAnchor, setReactionPopupAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [savingReactionValue, setSavingReactionValue] = useState<ReactionValue | null>(null);
   const [listOpen, setListOpen] = useState(false);
   const [confirmRemoveFavorite, setConfirmRemoveFavorite] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,8 +57,7 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
         setActiveTab(usableDetail.item?.tipo !== 'movie' && usableDetail.episodes?.length ? 'episodes' : 'about');
         if (usableDetail.item) {
           setFavorite(!!usableDetail.item.eh_favorito);
-          setRating(Number(usableDetail.item.nota || 0));
-          setComment(usableDetail.item.comentario || '');
+          setReaction(reactionFromRating(Number(usableDetail.item.nota || 0)));
         }
       }
       let episodesPrepared = !!usableDetail?.episodes?.length;
@@ -68,8 +72,7 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
             setDetail(usableDetail);
             if (usableDetail.episodes?.length) setActiveTab('episodes');
             setFavorite(!!usableDetail.item?.eh_favorito);
-            setRating(Number(usableDetail.item?.nota || 0));
-            setComment(usableDetail.item?.comentario || '');
+            setReaction(reactionFromRating(Number(usableDetail.item?.nota || 0)));
           }
         } catch {
           episodesPrepared = false;
@@ -84,8 +87,7 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
         detailCache.set(cacheKey, usableDetail);
         setDetail(usableDetail);
         setFavorite(!!usableDetail.item?.eh_favorito);
-        setRating(Number(usableDetail.item?.nota || 0));
-        setComment(usableDetail.item?.comentario || '');
+        setReaction(reactionFromRating(Number(usableDetail.item?.nota || 0)));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Nao foi possivel carregar este titulo.';
@@ -125,7 +127,6 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
   const totalCount = Number(detail?.progress?.total_count || 0);
   const isWatched = isMovie ? displayItem.status_acompanhamento === 'concluido' : totalCount > 0 && watchedCount >= totalCount;
   const canRewatch = isMovie && released && isWatched;
-  const hasExistingReview = !!Number(displayItem.nota || 0) && !!String(displayItem.comentario || '').trim();
   const mainButtonLabel = !released
     ? availableLabel(displayItem.data_lancamento)
     : isMovie && isWatched
@@ -160,7 +161,6 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
       const itemId = response.data?.item_id ?? displayItem.id_item;
       applyFavoriteState(nextFavorite, itemId);
       showToast(response.queued ? 'Favorito salvo offline. Vamos sincronizar depois.' : nextFavorite ? 'Adicionado aos favoritos.' : 'Removido dos favoritos.', response.queued ? 'info' : 'success');
-      onDataChanged?.();
     } catch (error) {
       applyFavoriteState(false);
       showToast(error instanceof Error ? error.message : 'Erro ao favoritar.', 'error');
@@ -179,7 +179,6 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
       const itemId = response.data?.item_id ?? displayItem.id_item;
       applyFavoriteState(nextFavorite, itemId);
       showToast(response.queued ? 'Remocao salva offline. Vamos sincronizar depois.' : 'Removido dos favoritos.', response.queued ? 'info' : 'success');
-      onDataChanged?.();
     } catch (error) {
       applyFavoriteState(true);
       showToast(error instanceof Error ? error.message : 'Erro ao remover favorito.', 'error');
@@ -209,7 +208,6 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
         applyEpisodePayload(response.data);
       }
       showToast('Marcado como assistido.', 'success');
-      onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao marcar como visto.', 'error');
     } finally {
@@ -227,8 +225,7 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
         ...current,
         item: { ...current.item, id_item: itemId, status_acompanhamento: isMovie ? 'concluido' : 'assistindo', quantidade_reassistida: Number(current.item.quantidade_reassistida || 0) + 1 },
       } : current);
-      showToast('Reassistir iniciado.', 'success');
-      onDataChanged?.();
+      showToast('Reassistido com sucesso.', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao iniciar reassistir.', 'error');
     } finally {
@@ -236,40 +233,47 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
     }
   }
 
-  async function doSaveReview(nextRating = rating) {
-    if (!released || saving) return;
-    if (!nextRating || !comment.trim()) {
-      showToast('Escolha uma estrela e escreva um comentario.', 'info');
+  async function doSaveReview(nextReaction: ReactionValue | null = reaction) {
+    if (!released || reactionSaving) return;
+    const nextRating = reactionToRating(nextReaction);
+    if (!nextRating) {
+      showToast('Escolha uma reacao antes de salvar.', 'info');
       return;
     }
-    setSaving(true);
+    setReactionSaving(true);
     try {
-      const response = await saveReview(displayItem, nextRating, comment.trim());
+      const response = await saveReview(displayItem, nextRating, '');
       setDetail((current) => current ? {
         ...current,
-        item: { ...current.item, nota: nextRating, comentario: comment.trim() },
+        item: { ...current.item, nota: nextRating, comentario: '' },
         reviews: response.data?.avaliacao
           ? [response.data.avaliacao, ...current.reviews.filter((review) => review.id_usuario !== response.data?.avaliacao?.id_usuario)]
           : current.reviews,
       } : current);
       showToast(response.queued ? 'Avaliacao salva offline. Vamos sincronizar depois.' : 'Avaliacao salva.', response.queued ? 'info' : 'success');
-      onDataChanged?.();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Erro ao salvar avaliacao.', 'error');
     } finally {
-      setSaving(false);
+      setReactionSaving(false);
+      setSavingReactionValue(null);
     }
+  }
+
+  function openReactionPopup() {
+    reactionAnchorRef.current?.measureInWindow((x, y, width, height) => {
+      setReactionPopupAnchor({ x, y, width, height });
+      setReactionPopupOpen(true);
+    });
   }
 
   function applyEpisodePayload(payload?: { episodes: Episode[]; progress: { total_count: number; watched_count: number }; next_unwatched: Episode | null } | null) {
     if (!payload) return;
-    setDetail((current) => current ? {
+  setDetail((current) => current ? {
       ...current,
       episodes: payload.episodes,
       progress: payload.progress,
       next_unwatched: payload.next_unwatched,
     } : current);
-    onDataChanged?.();
   }
 
   return (
@@ -316,7 +320,10 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
                 <View style={styles.bannerMetaInfo}>
                   <Text style={styles.bannerYearText}>{displayItem.ano_lancamento || 'Sem ano'}</Text>
                   <Text style={styles.bannerDot}>•</Text>
-                  <Text style={styles.bannerTypeText}>{labelType(displayItem.tipo)}</Text>
+                  <View style={styles.bannerTypeBadge}>
+                    <Text style={styles.bannerTypeIcon}>{typeGlyph(displayItem.tipo)}</Text>
+                    <Text style={styles.bannerTypeText}>{labelType(displayItem.tipo)}</Text>
+                  </View>
                 </View>
                 {displayItem.generos ? (
                   <View style={styles.bannerGenresRow}>
@@ -363,6 +370,16 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
                 <Text style={styles.description}>{displayItem.descricao || 'Nenhuma sinopse disponivel.'}</Text>
 
                 <View style={styles.inlineActionRow}>
+                  {isDetailReady && released ? (
+                    <Pressable ref={reactionAnchorRef} disabled={!canInteractWithItem} onPress={openReactionPopup} style={[styles.reactionLauncher, reaction && styles.reactionLauncherActive, !canInteractWithItem && styles.actionDisabled]}>
+                      <Text style={[styles.reactionLauncherGlyph, reaction && styles.reactionLauncherGlyphActive]}>
+                        {reaction ? (reaction === 1 ? '👎' : reaction === 2 ? '👍' : '❤') : '⊕'}
+                      </Text>
+                      {reaction ? <View style={styles.reactionLauncherBadge} /> : null}
+                    </Pressable>
+                  ) : (
+                    <View style={styles.reactionLauncherPlaceholder} />
+                  )}
                   <Pressable disabled={!canInteractWithItem} onPress={() => setListOpen(true)} style={[styles.listFab, !canInteractWithItem && styles.actionDisabled]}>
                     <ListPlusIcon />
                   </Pressable>
@@ -418,60 +435,6 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
                 </View>
               ) : null}
 
-              {!hasExistingReview ? <View style={styles.reviewBox}>
-                <Text style={styles.reviewTitle}>A minha avaliacao</Text>
-                <View style={styles.stars}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Text
-                      key={star}
-                      onPress={() => released && !hasExistingReview && setRating(star)}
-                      style={[styles.star, rating >= star && styles.starActive, (!released || hasExistingReview) && styles.starDisabled]}
-                    >
-                      {rating >= star ? '\u2605' : '\u2606'}
-                    </Text>
-                  ))}
-                </View>
-                <TextInput
-                  editable={released && !hasExistingReview}
-                  multiline
-                  onChangeText={setComment}
-                  placeholder={released ? 'Deixe um comentario sobre este título...' : 'Disponível após o lançamento.'}
-                  placeholderTextColor={colors.muted}
-                  style={[styles.commentInput, (!released || hasExistingReview) && styles.commentDisabled]}
-                  value={comment}
-                />
-                {released && !hasExistingReview ? (
-                  <Pressable disabled={!rating || !comment.trim() || saving} onPress={() => doSaveReview()} style={[styles.saveReviewButton, (!rating || !comment.trim() || saving) && styles.saveReviewDisabled]}>
-                    <Text style={styles.saveReviewText}>Salvar avaliacao</Text>
-                  </Pressable>
-                ) : null}
-              </View> : null}
-
-              <View style={styles.communityBox}>
-                <View style={styles.communityHeader}>
-                  <Text style={styles.communityTitle}>Avaliações</Text>
-                  <Text style={styles.communityCount}>{detail?.reviews?.length || 0}</Text>
-                </View>
-                {(detail?.reviews || []).length ? <Marquee
-                  data={detail?.reviews || []}
-                  keyExtractor={(review, index) => `${review.id_usuario || 'user'}-${index}`}
-                  renderItem={(review) => (
-                    <View style={styles.communityCard}>
-                      <View style={styles.communityTop}>
-                        <View style={styles.communityAvatar}>
-                          <Text style={styles.communityAvatarText}>{initials(review.nome_usuario || 'U')}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.communityUser}>{review.nome_usuario || 'Usuário'}</Text>
-                          <Text style={styles.communityMeta}>{formatDateTime(review.reviewed_at)}</Text>
-                        </View>
-                        <Text style={styles.communityRating}>★ {Number(review.nota || 0).toFixed(1)}</Text>
-                      </View>
-                      <Text numberOfLines={4} style={styles.communityComment}>{review.comentario}</Text>
-                    </View>
-                  )}
-                /> : <View style={styles.communityEmpty}><Text style={styles.communityEmptyTitle}>Sem avaliações ainda.</Text><Text style={styles.communityEmptyText}>Quando alguém avaliar este título, elas aparecem aqui.</Text></View>}
-              </View>
             </>
           ) : null}
 
@@ -484,20 +447,6 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
           ) : null}
         </View>
 
-          <View style={styles.bottomActionRow}>
-            <Pressable disabled={!canInteractWithItem} onPress={() => setListOpen(true)} style={[styles.listFab, !canInteractWithItem && styles.actionDisabled]}>
-              <ListPlusIcon />
-            </Pressable>
-            {isMovie ? (
-              <Pressable disabled={!canInteractWithItem || !released || isWatched || saving} onPress={markMainWatched} style={[styles.watchButton, (!canInteractWithItem || !released || isWatched) && styles.watchButtonDisabled]}>
-                {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.watchButtonText}>{mainButtonLabel}</Text>}
-              </Pressable>
-            ) : (
-              <Pressable disabled={!hasEpisodes} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, !hasEpisodes && styles.watchButtonDisabled]}>
-                <Text style={styles.watchButtonText}>{episodeDataPending ? 'Carregando episodios...' : hasEpisodes ? 'Ver episodios' : 'Aguardando episodios'}</Text>
-              </Pressable>
-            )}
-          </View>
         </>
       )}
 
@@ -514,9 +463,62 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
               ? current.lists.map((list) => list.id_lista === listId ? { ...list, has_item: true } : list)
               : [...current.lists, { id_lista: listId, nome: listName || 'Nova lista', item_count: 1, has_item: true }],
           } : current);
-          onDataChanged?.();
         }}
       />
+      <Modal visible={reactionPopupOpen} transparent animationType="fade" onRequestClose={() => setReactionPopupOpen(false)}>
+        <Pressable onPress={() => setReactionPopupOpen(false)} style={styles.reactionOverlay}>
+          <Pressable
+            onPress={() => null}
+            style={[
+              styles.reactionPopup,
+              reactionPopupAnchor ? {
+                left: Math.max(16, reactionPopupAnchor.x - 60),
+                top: Math.max(16, reactionPopupAnchor.y - 82),
+              } : null,
+            ]}
+          >
+            <ReactionButton
+              active={reaction === 1}
+              disabled={!canInteractWithItem || !released || reactionSaving}
+              label="Não gostei"
+              onPress={() => {
+                setReaction(1);
+                setSavingReactionValue(1);
+                setReactionPopupOpen(false);
+                void doSaveReview(1);
+              }}
+            >
+              {savingReactionValue === 1 && reactionSaving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.reactionPopupGlyph}>👎</Text>}
+            </ReactionButton>
+            <ReactionButton
+              active={reaction === 2}
+              disabled={!canInteractWithItem || !released || reactionSaving}
+              label="Gostei"
+              onPress={() => {
+                setReaction(2);
+                setSavingReactionValue(2);
+                setReactionPopupOpen(false);
+                void doSaveReview(2);
+              }}
+            >
+              {savingReactionValue === 2 && reactionSaving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.reactionPopupGlyph}>👍</Text>}
+            </ReactionButton>
+            <ReactionButton
+              active={reaction === 3}
+              disabled={!canInteractWithItem || !released || reactionSaving}
+              label="Amei"
+              onPress={() => {
+                setReaction(3);
+                setSavingReactionValue(3);
+                setReactionPopupOpen(false);
+                void doSaveReview(3);
+              }}
+            >
+              {savingReactionValue === 3 && reactionSaving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.reactionPopupGlyph}>❤</Text>}
+            </ReactionButton>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <ConfirmModal
         visible={confirmRemoveFavorite}
@@ -908,6 +910,46 @@ function ListPlusIcon() {
   );
 }
 
+function ReactionButton({
+  active,
+  disabled,
+  label,
+  children,
+  onPress,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  children: ReactNode;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityLabel={label} disabled={disabled} onPress={onPress} style={[styles.reactionButton, active && styles.reactionButtonActive, disabled && styles.reactionButtonDisabled]}>
+      {children}
+    </Pressable>
+  );
+}
+
+function reactionFromRating(rating: number): ReactionValue | null {
+  if (rating >= 4) return 3;
+  if (rating >= 2.5) return 2;
+  if (rating > 0) return 1;
+  return null;
+}
+
+function reactionToRating(reaction: ReactionValue | null): number {
+  switch (reaction) {
+    case 1:
+      return 1;
+    case 2:
+      return 3;
+    case 3:
+      return 5;
+    default:
+      return 0;
+  }
+}
+
 function itemKey(item: Item) {
   return `${item.id_item || 0}:${item.tmdb_id || 0}:${item.tvmaze_id || 0}:${item.mal_id || 0}:${item.tipo}`;
 }
@@ -941,6 +983,12 @@ function labelType(type: string) {
   if (type === 'movie') return 'Filme';
   if (type === 'anime') return 'Anime';
   return 'Serie';
+}
+
+function typeGlyph(type: string) {
+  if (type === 'movie') return '▶';
+  if (type === 'anime') return '✦';
+  return '▣';
 }
 
 function initials(name: string) {
@@ -1008,6 +1056,19 @@ const styles = StyleSheet.create({
   castName: { color: colors.text, fontSize: 12, fontWeight: '900', marginTop: 8 },
   castCharacter: { color: colors.muted, fontSize: 11, marginTop: 2 },
   sectionTitle: { color: colors.accent, fontSize: 13, fontWeight: '900', marginBottom: 8, marginTop: 28, textAlign: 'center', textTransform: 'uppercase' },
+  reactionLauncher: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 999, borderWidth: 1, height: 54, justifyContent: 'center', position: 'relative', width: 54 },
+  reactionLauncherPlaceholder: { borderRadius: 999, height: 54, width: 54 },
+  reactionLauncherActive: { backgroundColor: alpha(colors.accent, 0.14), borderColor: colors.accent },
+  reactionLauncherGlyph: { color: colors.text, fontSize: 19, fontWeight: '900' },
+  reactionLauncherGlyphActive: { color: colors.accent },
+  reactionLauncherBadge: { backgroundColor: colors.accent, borderRadius: 999, bottom: 8, height: 8, position: 'absolute', right: 8, width: 8 },
+  reactionButton: { alignItems: 'center', backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 999, borderWidth: 1, height: 54, justifyContent: 'center', width: 54 },
+  reactionButtonActive: { backgroundColor: alpha(colors.accent, 0.18), borderColor: colors.accent },
+  reactionButtonDisabled: { opacity: 0.45 },
+  reactionGlyph: { fontSize: 20, fontWeight: '900' },
+  reactionOverlay: { backgroundColor: 'rgba(0,0,0,0.34)', flex: 1 },
+  reactionPopup: { alignItems: 'center', backgroundColor: alpha(colors.background, 0.98), borderColor: colors.surfaceRaised, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 14, paddingHorizontal: 18, paddingVertical: 14, position: 'absolute' },
+  reactionPopupGlyph: { color: colors.text, fontSize: 18, fontWeight: '900' },
   reviewBox: { backgroundColor: colors.surface, borderColor: colors.surfaceRaised, borderRadius: 16, borderWidth: 1, marginTop: 24, padding: 16 },
   reviewTitle: { color: colors.text, fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
   communityBox: { marginTop: 24 },
@@ -1148,6 +1209,8 @@ const styles = StyleSheet.create({
   bannerMetaInfo: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 4 },
   bannerYearText: { color: '#c8c8e3', fontSize: 12, fontWeight: '700' },
   bannerDot: { color: '#c8c8e3', fontSize: 10 },
+  bannerTypeBadge: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  bannerTypeIcon: { color: colors.accent, fontSize: 11, fontWeight: '900', marginTop: -1 },
   bannerTypeText: { color: '#c8c8e3', fontSize: 12, fontWeight: '700' },
   bannerGenresRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
   bannerGenreBadge: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },

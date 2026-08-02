@@ -20,20 +20,27 @@ class AuthModel {
     public function issueApiToken(int $userId): string {
         $token = bin2hex(random_bytes(32));
         $hash = hash('sha256', $token);
-        $stmt = $this->pdo->prepare("UPDATE usuario SET hash_token_api = :hash WHERE id_usuario = :id");
+        $stmt = $this->pdo->prepare("UPDATE usuario SET hash_token_api = :hash, hash_token_api_ts_inclusao = CURRENT_TIMESTAMP WHERE id_usuario = :id");
         $stmt->execute([':hash' => $hash, ':id' => $userId]);
         return $token;
     }
 
     public function getUserByToken(string $token) {
         $hash = hash('sha256', $token);
-        $stmt = $this->pdo->prepare("SELECT * FROM usuario WHERE hash_token_api = :hash AND ts_cancelamento IS NULL LIMIT 1");
+        $stmt = $this->pdo->prepare("
+            SELECT *
+            FROM usuario
+            WHERE hash_token_api = :hash
+              AND ts_cancelamento IS NULL
+              AND hash_token_api_ts_inclusao >= (CURRENT_TIMESTAMP - INTERVAL '24 hours')
+            LIMIT 1
+        ");
         $stmt->execute([':hash' => $hash]);
         return $stmt->fetch();
     }
 
     public function clearApiToken(int $userId): void {
-        $stmt = $this->pdo->prepare("UPDATE usuario SET hash_token_api = NULL WHERE id_usuario = :id");
+        $stmt = $this->pdo->prepare("UPDATE usuario SET hash_token_api = NULL, hash_token_api_ts_inclusao = NULL WHERE id_usuario = :id");
         $stmt->execute([':id' => $userId]);
     }
 

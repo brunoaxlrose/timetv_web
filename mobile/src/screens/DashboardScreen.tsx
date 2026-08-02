@@ -20,6 +20,7 @@ export function DashboardScreen({ onOpenItem, onOpenDiscovery, refreshKey = 0 }:
   const [refreshing, setRefreshing] = useState(false);
   const [courseOpen, setCourseOpen] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const popularItems = filterOutTopTen(data?.populares || [], data?.top_10_filmes || [], data?.top_10_series || []);
 
   async function load(refresh = false) {
     const cacheStillFresh = dashboardCache && Date.now() - dashboardCacheAt < DASHBOARD_CACHE_TTL;
@@ -110,25 +111,25 @@ export function DashboardScreen({ onOpenItem, onOpenDiscovery, refreshKey = 0 }:
           <SectionHeader title="Populares" onPress={() => onOpenDiscovery('populares')} />
           <FlatList
             horizontal
-            data={(data?.populares || []).slice(0, 10)}
+            data={popularItems.slice(0, 10)}
             keyExtractor={(item, index) => `popular-${item.tmdb_id || index}`}
             renderItem={({ item }) => <View style={styles.posterCard}><PosterCard item={item} onPress={onOpenItem} /></View>}
             showsHorizontalScrollIndicator={false}
           />
 
-          <SectionHeader title="Top 10 Filmes" onPress={() => onOpenDiscovery('top_10_filmes')} />
+          <SectionHeader title="Top 10 Filmes" />
           <FlatList
             horizontal
-            data={data?.top_10_filmes || []}
+            data={dedupeByTitle(data?.top_10_filmes || []).slice(0, 10)}
             keyExtractor={(item, index) => `top-filme-${item.id_item || item.tmdb_id || index}`}
             renderItem={({ item, index }) => <TopTenCard item={item} index={index} onPress={onOpenItem} />}
             showsHorizontalScrollIndicator={false}
           />
 
-          <SectionHeader title="Top 10 Series" onPress={() => onOpenDiscovery('top_10_series')} />
+          <SectionHeader title="Top 10 Series" />
           <FlatList
             horizontal
-            data={data?.top_10_series || []}
+            data={dedupeByTitle(data?.top_10_series || []).slice(0, 10)}
             keyExtractor={(item, index) => `top-serie-${item.id_item || item.tmdb_id || index}`}
             renderItem={({ item, index }) => <TopTenCard item={item} index={index} onPress={onOpenItem} />}
             showsHorizontalScrollIndicator={false}
@@ -148,21 +149,52 @@ export function DashboardScreen({ onOpenItem, onOpenDiscovery, refreshKey = 0 }:
   );
 }
 
-function SectionHeader({ title, onPress }: { title: string; onPress: () => void }) {
+function SectionHeader({ title, onPress }: { title: string; onPress?: () => void }) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <Pressable onPress={onPress} hitSlop={12}>
-        <Text style={styles.sectionArrow}>›</Text>
-      </Pressable>
+      {onPress ? (
+        <Pressable onPress={onPress} hitSlop={12}>
+          <Text style={styles.sectionArrow}>›</Text>
+        </Pressable>
+      ) : <View style={styles.sectionArrowSpacer} />}
     </View>
   );
+}
+
+function dedupeByTitle(items: Item[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = normalizeKey(item);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function filterOutTopTen(populares: Item[], topFilmes: Item[], topSeries: Item[]) {
+  const excluded = new Set<string>();
+  [...topFilmes, ...topSeries].forEach((item) => {
+    const key = normalizeKey(item);
+    if (key) excluded.add(key);
+  });
+
+  return populares.filter((item) => {
+    const key = normalizeKey(item);
+    return !key || !excluded.has(key);
+  });
+}
+
+function normalizeKey(item: Item) {
+  return String(item.tmdb_id || item.tvmaze_id || item.mal_id || item.id_item || item.titulo || '').trim().toLowerCase();
 }
 
 function TopTenCard({ item, index, onPress }: { item: Item; index: number; onPress: (item: Item) => void }) {
   return (
     <View style={styles.topTenCard}>
-      <Text style={styles.topTenIndex}>{index + 1}</Text>
+      <View style={styles.topTenBadge}>
+        <Text style={styles.topTenIndex}>{index + 1}</Text>
+      </View>
       <View style={styles.topTenPoster}>
         <PosterCard item={item} onPress={onPress} />
       </View>
@@ -226,6 +258,7 @@ const styles = StyleSheet.create({
   sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, marginTop: 20 },
   sectionTitle: { color: colors.accent, fontSize: 14, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
   sectionArrow: { color: colors.accent, fontSize: 34, lineHeight: 34 },
+  sectionArrowSpacer: { width: 20 },
   count: { color: colors.accent, fontWeight: '900' },
   courseTitle: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   chevron: { color: colors.accent, fontSize: 22 },
@@ -241,9 +274,24 @@ const styles = StyleSheet.create({
   date: { color: colors.accent, fontSize: 12, marginTop: 12 },
   check: { alignSelf: 'flex-end', color: colors.accent, fontSize: 25 },
   posterCard: { marginRight: 12 },
-  topTenCard: { marginRight: 12, minHeight: 188, position: 'relative' },
-  topTenIndex: { color: colors.accent, fontSize: 60, fontWeight: '900', left: 0, opacity: 0.28, position: 'absolute', top: 74, zIndex: 1 },
-  topTenPoster: { marginLeft: 24, zIndex: 2 },
+  topTenCard: { marginRight: 12, minHeight: 188, paddingTop: 18, position: 'relative' },
+  topTenBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceRaised,
+    borderColor: colors.accent,
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: 'center',
+    left: 8,
+    minWidth: 32,
+    paddingHorizontal: 8,
+    position: 'absolute',
+    top: 0,
+    zIndex: 3,
+  },
+  topTenIndex: { color: colors.accent, fontSize: 15, fontWeight: '900' },
+  topTenPoster: { zIndex: 2 },
   empty: { backgroundColor: colors.surface, borderRadius: 14, padding: 20 },
   emptyText: { color: colors.muted, textAlign: 'center' },
 });

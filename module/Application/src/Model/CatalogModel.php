@@ -361,8 +361,7 @@ class CatalogModel {
             FROM usuario_item ui
             JOIN usuario u ON ui.id_usuario = u.id_usuario
             WHERE ui.id_item = :item_id
-              AND ui.comentario IS NOT NULL
-              AND ui.comentario != ''
+              AND ui.nota IS NOT NULL
             ORDER BY ui.ts_atualizacao DESC
         ");
         $stmt->execute([':item_id' => $itemId]);

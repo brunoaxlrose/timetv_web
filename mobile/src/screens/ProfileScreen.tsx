@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { reloadAppAsync } from 'expo';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -6,7 +6,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { clearLibrary, deleteAccount, logout, updateProfile, User } from '../api/auth';
 import { getProfile } from '../api/mobile';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { Marquee } from '../components/Marquee';
 import { PosterCard } from '../components/PosterCard';
 import { PosterSkeletonRow, Skeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
@@ -67,7 +66,6 @@ export function ProfileScreen({
   const initials = `${user.nome?.[0] || ''}${user.sobrenome?.[0] || ''}` || 'TV';
   const activityItems = groupActivity(profile?.history || []);
   const visibleActivity = showAllActivity ? activityItems : activityItems.slice(0, 10);
-  const reviews = profile?.reviews || [];
 
   return (
     <ScrollView
@@ -107,7 +105,6 @@ export function ProfileScreen({
             <Stat label="Filmes" value={profile?.stats.moviesCount || 0} />
             <Stat label="Series" value={profile?.stats.seriesCount || 0} />
             <Stat label="Animes" value={profile?.stats.animeCount || 0} />
-            <Stat label="Avaliações" value={profile?.stats.evaluationCount || 0} />
           </View>
 
           <Text style={styles.sectionTitle}>Favoritos</Text>
@@ -120,13 +117,6 @@ export function ProfileScreen({
             showsHorizontalScrollIndicator={false}
             ListEmptyComponent={<EmptyCard title="Nenhum favorito ainda." body="Toque no coracão em qualquer titulo para guardar aqui." />}
           />
-
-          <Text style={styles.sectionTitle}>Avaliações</Text>
-          {reviews.length ? <Marquee
-            data={reviews}
-            keyExtractor={(item, index) => String(item.id_item || index)}
-            renderItem={(item) => <ReviewCard comment={item.comentario} posterUrl={item.url_poster} rating={Number(item.nota || 0)} title={item.titulo} type={item.tipo} year={item.ano_lancamento} onPress={onOpenItem} item={item as unknown as Item} />}
-          /> : <EmptyCard title="Sem avaliações ainda." body="Quando avaliares um filme, série ou anime, ele aparece aqui." />}
 
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Atividade recente</Text>
@@ -178,38 +168,6 @@ function EmptyCard({ title, body }: { title: string; body: string }) {
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyBody}>{body}</Text>
     </View>
-  );
-}
-
-function ReviewCard({
-  title,
-  year,
-  rating,
-  comment,
-  posterUrl,
-  type,
-  onPress,
-  item,
-}: {
-  title: string;
-  year?: number;
-  rating: number;
-  comment: string;
-  posterUrl: string;
-  type: Item['tipo'];
-  onPress: (item: Item) => void;
-  item: Item;
-}) {
-  return (
-    <Pressable onPress={() => onPress(item)} style={styles.reviewCard}>
-      <Image source={{ uri: posterUrl }} style={styles.reviewPoster} />
-      <View style={styles.reviewCopy}>
-        <Text numberOfLines={1} style={styles.reviewTitleItem}>{title}</Text>
-        <Text style={styles.reviewMeta}>{year ? `${year} - ${labelType(type)}` : labelType(type)}</Text>
-        <Text style={styles.reviewStars}>{'★'.repeat(Math.max(1, Math.round(rating)))} {rating.toFixed(1)}</Text>
-        <Text numberOfLines={3} style={styles.reviewComment}>{comment}</Text>
-      </View>
-    </Pressable>
   );
 }
 

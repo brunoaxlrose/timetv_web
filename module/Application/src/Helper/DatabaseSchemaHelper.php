@@ -15,6 +15,7 @@ class DatabaseSchemaHelper {
                 sobrenome VARCHAR(100) NOT NULL DEFAULT '',
                 url_avatar TEXT NULL,
                 hash_token_api TEXT NULL,
+                hash_token_api_ts_inclusao TIMESTAMP NULL,
                 ts_inclusao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 ts_cancelamento TIMESTAMP NULL
             );",
@@ -126,6 +127,7 @@ class DatabaseSchemaHelper {
             "CREATE UNIQUE INDEX IF NOT EXISTS uk_episodio_item_temporada_numero ON episodio (id_item, numero_temporada, numero_episodio);",
             "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS url_avatar TEXT;",
             "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS hash_token_api TEXT NULL;",
+            "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS hash_token_api_ts_inclusao TIMESTAMP NULL;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS comentario TEXT NULL;",
             "ALTER TABLE usuario_item ADD COLUMN IF NOT EXISTS eh_favorito BOOLEAN NOT NULL DEFAULT FALSE;",
             "ALTER TABLE usuario_episodio ADD COLUMN IF NOT EXISTS quantidade_reassistida INT DEFAULT 0;",

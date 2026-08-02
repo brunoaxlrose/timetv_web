@@ -289,11 +289,11 @@ export function saveReview(item: Item, nota: number | null, comentario: string) 
         item_id: Number(item.id_item || 0),
         nota,
         comentario: comentario || null,
-        avaliacao: nota && comentario ? {
+        avaliacao: nota ? {
           id_usuario: 0,
           nome_usuario: 'Voce',
           nota,
-          comentario,
+          comentario: comentario || '',
           reviewed_at: new Date().toISOString(),
         } : null,
         total_avaliacoes: 1,

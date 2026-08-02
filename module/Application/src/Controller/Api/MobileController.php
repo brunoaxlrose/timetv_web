@@ -52,41 +52,14 @@ class MobileController extends AbstractActionController {
             'quero_ver' => $this->trackingModel->getPlanToWatch($userId),
             'proximos' => $this->catalogModel->getReleaseCalendar($userId, date('Y-m-d'), date('Y-m-d', strtotime('+90 days')), 20),
             'calendario' => $calendar,
-            'populares' => TmdbHelper::getPopular(10, $page),
-            'top_10_filmes' => $this->buildTopTitlesForDashboard('movie', 10),
-            'top_10_series' => $this->buildTopTitlesForDashboard('series', 10),
+            'populares' => TmdbHelper::getPopular(20, $page),
+            'top_10_filmes' => TmdbHelper::getPopularMovies(10, $page),
+            'top_10_series' => TmdbHelper::getPopularSeriesOnly(10, $page),
             'em_breve' => TmdbHelper::getUpcoming(10, $page),
             'pagina' => $page,
             'tem_mais_populares' => true,
             'tem_mais_em_breve' => true,
         ]);
-    }
-
-    private function buildTopTitlesForDashboard(string $type, int $limit): array {
-        $localItems = $this->trackingModel->getTopTitlesByType($type, $limit);
-        if (count($localItems) >= $limit) {
-            return array_slice($localItems, 0, $limit);
-        }
-
-        $fallbackItems = $type === 'movie'
-            ? TmdbHelper::getPopularMovies($limit * 2, 1)
-            : TmdbHelper::getPopularSeriesOnly($limit * 2, 1);
-
-        $merged = [];
-        $seen = [];
-        foreach (array_merge($localItems, $fallbackItems) as $item) {
-            $key = strtolower((string)($item['titulo'] ?? '')) . '|' . ($item['tipo'] ?? '') . '|' . ($item['tmdb_id'] ?? $item['id_item'] ?? '');
-            if (isset($seen[$key])) {
-                continue;
-            }
-            $seen[$key] = true;
-            $merged[] = $item;
-            if (count($merged) >= $limit) {
-                break;
-            }
-        }
-
-        return $merged;
     }
 
     public function collectionAction(): JsonModel {
@@ -436,8 +409,8 @@ class MobileController extends AbstractActionController {
         $rating = ($rating === null || $rating === '') ? null : (float)$rating;
         $comment = $comment === '' ? null : $comment;
 
-        if ($rating === null || $rating <= 0 || $comment === null) {
-            return $this->error('Escolha uma estrela e escreva um comentario.', 422);
+        if ($rating === null || $rating <= 0) {
+            return $this->error('Escolha uma avaliacao.', 422);
         }
 
         $pdo = $this->catalogModel->getPdo();

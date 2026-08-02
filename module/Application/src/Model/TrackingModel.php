@@ -818,7 +818,7 @@ class TrackingModel {
             }
         }
 
-        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM usuario_item WHERE id_usuario = :user_id AND nota IS NOT NULL AND comentario IS NOT NULL AND ts_cancelamento IS NULL");
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM usuario_item WHERE id_usuario = :user_id AND nota IS NOT NULL AND ts_cancelamento IS NULL");
         $stmt->execute([':user_id' => $userId]);
         $stats['evaluationCount'] = (int)$stmt->fetchColumn();
 
@@ -987,8 +987,6 @@ class TrackingModel {
             WHERE ui.id_usuario = :user_id
               AND ui.ts_cancelamento IS NULL
               AND ui.nota IS NOT NULL
-              AND ui.comentario IS NOT NULL
-              AND TRIM(ui.comentario) <> ''
             ORDER BY ui.ts_atualizacao DESC
             LIMIT :limit
         ");

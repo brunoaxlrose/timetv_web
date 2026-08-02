@@ -56,6 +56,8 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     position: 'absolute',
     right: 18,
+    zIndex: 9999,
+    elevation: 30,
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 18,
