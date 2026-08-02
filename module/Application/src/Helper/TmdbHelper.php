@@ -161,6 +161,54 @@ class TmdbHelper {
         return self::formatTmdbResults($upcomingResults, $limit);
     }
 
+    public static function getPopularMovies(int $limit = 12, int $page = 1): array {
+        $page = max(1, $page);
+        $today = date('Y-m-d');
+        $url = self::BASE_URL . '/discover/movie?api_key=' . self::API_KEY
+            . '&language=pt-BR&region=BR&sort_by=popularity.desc&include_adult=false&page=' . $page
+            . '&primary_release_date.lte=' . urlencode($today);
+        $data = self::fetchJson($url);
+        if (!$data || empty($data['results']) || !is_array($data['results'])) {
+            return [];
+        }
+        return self::formatTmdbResults($data['results'], $limit);
+    }
+
+    public static function getPopularSeriesOnly(int $limit = 12, int $page = 1): array {
+        $page = max(1, $page);
+        $today = date('Y-m-d');
+        $url = self::BASE_URL . '/discover/tv?api_key=' . self::API_KEY
+            . '&language=pt-BR&sort_by=popularity.desc&include_adult=false&page=' . $page
+            . '&first_air_date.lte=' . urlencode($today)
+            . '&without_genres=16,10766';
+        $data = self::fetchJson($url);
+        if (!$data || empty($data['results']) || !is_array($data['results'])) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($data['results'] as $result) {
+            if (count($items) >= $limit) {
+                break;
+            }
+            $result['media_type'] = 'tv';
+            $genreIds = $result['genre_ids'] ?? [];
+            if (in_array(10766, $genreIds, true) || in_array(16, $genreIds, true)) {
+                continue;
+            }
+            $formatted = self::formatTmdbResults([$result], 1);
+            if (!$formatted) {
+                continue;
+            }
+            if (($formatted[0]['tipo'] ?? '') !== 'series') {
+                continue;
+            }
+            $items[] = $formatted[0];
+        }
+
+        return $items;
+    }
+
     public static function getCalendarReleases(string $startDate, string $endDate, int $limit = 80): array {
         $sources = [
             ['path' => 'movie', 'start' => 'primary_release_date.gte', 'end' => 'primary_release_date.lte'],

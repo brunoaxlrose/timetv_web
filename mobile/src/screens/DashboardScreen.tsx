@@ -116,15 +116,6 @@ export function DashboardScreen({ onOpenItem, onOpenDiscovery, refreshKey = 0 }:
             showsHorizontalScrollIndicator={false}
           />
 
-          <SectionHeader title="Em breve" onPress={() => onOpenDiscovery('em_breve')} />
-          <FlatList
-            horizontal
-            data={(data?.em_breve || []).slice(0, 10)}
-            keyExtractor={(item, index) => `breve-${item.tmdb_id || index}`}
-            renderItem={({ item }) => <View style={styles.posterCard}><PosterCard item={item} onPress={onOpenItem} /></View>}
-            showsHorizontalScrollIndicator={false}
-          />
-
           <SectionHeader title="Top 10 Filmes" onPress={() => onOpenDiscovery('top_10_filmes')} />
           <FlatList
             horizontal
@@ -140,6 +131,15 @@ export function DashboardScreen({ onOpenItem, onOpenDiscovery, refreshKey = 0 }:
             data={data?.top_10_series || []}
             keyExtractor={(item, index) => `top-serie-${item.id_item || item.tmdb_id || index}`}
             renderItem={({ item, index }) => <TopTenCard item={item} index={index} onPress={onOpenItem} />}
+            showsHorizontalScrollIndicator={false}
+          />
+
+          <SectionHeader title="Em breve" onPress={() => onOpenDiscovery('em_breve')} />
+          <FlatList
+            horizontal
+            data={(data?.em_breve || []).slice(0, 10)}
+            keyExtractor={(item, index) => `breve-${item.tmdb_id || index}`}
+            renderItem={({ item }) => <View style={styles.posterCard}><PosterCard item={item} onPress={onOpenItem} /></View>}
             showsHorizontalScrollIndicator={false}
           />
         </>

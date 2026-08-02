@@ -53,13 +53,40 @@ class MobileController extends AbstractActionController {
             'proximos' => $this->catalogModel->getReleaseCalendar($userId, date('Y-m-d'), date('Y-m-d', strtotime('+90 days')), 20),
             'calendario' => $calendar,
             'populares' => TmdbHelper::getPopular(10, $page),
+            'top_10_filmes' => $this->buildTopTitlesForDashboard('movie', 10),
+            'top_10_series' => $this->buildTopTitlesForDashboard('series', 10),
             'em_breve' => TmdbHelper::getUpcoming(10, $page),
-            'top_10_filmes' => $this->trackingModel->getTopTitlesByType('movie', 10),
-            'top_10_series' => $this->trackingModel->getTopTitlesByType('series', 10),
             'pagina' => $page,
             'tem_mais_populares' => true,
             'tem_mais_em_breve' => true,
         ]);
+    }
+
+    private function buildTopTitlesForDashboard(string $type, int $limit): array {
+        $localItems = $this->trackingModel->getTopTitlesByType($type, $limit);
+        if (count($localItems) >= $limit) {
+            return array_slice($localItems, 0, $limit);
+        }
+
+        $fallbackItems = $type === 'movie'
+            ? TmdbHelper::getPopularMovies($limit * 2, 1)
+            : TmdbHelper::getPopularSeriesOnly($limit * 2, 1);
+
+        $merged = [];
+        $seen = [];
+        foreach (array_merge($localItems, $fallbackItems) as $item) {
+            $key = strtolower((string)($item['titulo'] ?? '')) . '|' . ($item['tipo'] ?? '') . '|' . ($item['tmdb_id'] ?? $item['id_item'] ?? '');
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $merged[] = $item;
+            if (count($merged) >= $limit) {
+                break;
+            }
+        }
+
+        return $merged;
     }
 
     public function collectionAction(): JsonModel {
