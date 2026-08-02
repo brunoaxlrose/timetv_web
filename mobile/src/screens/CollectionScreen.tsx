@@ -27,6 +27,9 @@ type CollectionSectionData = {
   color: string;
   data: Item[];
 };
+const COLLECTION_CACHE_TTL = 60_000;
+let collectionCache: { items: Item[]; groups: Groups | null } | null = null;
+let collectionCacheAt = 0;
 
 const statusFilters: Array<{ key: StatusFilter; label: string; color: string }> = [
   { key: 'watching', label: 'A ver', color: '#f6c45f' },
@@ -65,8 +68,8 @@ const groupLabels: Array<{ key: keyof Groups; status: StatusFilter; label: strin
 ];
 
 export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item: Item) => void; refreshKey?: number }) {
-  const [items, setItems] = useState<Item[]>([]);
-  const [groups, setGroups] = useState<Groups | null>(null);
+  const [items, setItems] = useState<Item[]>(() => collectionCache?.items || []);
+  const [groups, setGroups] = useState<Groups | null>(() => collectionCache?.groups || null);
   const [status, setStatus] = useState<StatusFilter>('');
   const [media, setMedia] = useState<MediaFilter>('all');
   const [sort, setSort] = useState<SortFilter>('last_watched');
@@ -77,17 +80,28 @@ export function CollectionScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (
   const [draftMedia, setDraftMedia] = useState<MediaFilter>('all');
   const [draftSort, setDraftSort] = useState<SortFilter>('last_watched');
   const [draftGrouped, setDraftGrouped] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !collectionCache);
   const [refreshing, setRefreshing] = useState(false);
 
   async function load(refresh = false) {
+    const cached = collectionCache;
+    const cacheStillFresh = cached && Date.now() - collectionCacheAt < COLLECTION_CACHE_TTL;
+    if (!refresh && cacheStillFresh) {
+      setItems(cached.items);
+      setGroups(cached.groups);
+      setLoading(false);
+    }
     if (refresh) setRefreshing(true);
     else if (!items.length) setLoading(true);
 
     try {
       const response = await getCollection('', 'movie,series,anime', 'last_watched');
-      setItems(response.data?.items || []);
-      setGroups(response.data?.groups || null);
+      const nextItems = response.data?.items || [];
+      const nextGroups = response.data?.groups || null;
+      collectionCache = { items: nextItems, groups: nextGroups };
+      collectionCacheAt = Date.now();
+      setItems(nextItems);
+      setGroups(nextGroups);
     } catch {
       // Preserve the last collection while connectivity is unavailable.
     } finally {

@@ -116,6 +116,8 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
   const isMovie = displayItem.tipo === 'movie';
   const nextEpisode = detail?.next_unwatched || null;
   const hasEpisodes = !!detail?.episodes?.length && !!displayItem.id_item && !isMovie;
+  const expectedEpisodes = Number(displayItem.total_episodios || detail?.progress?.total_count || 0);
+  const episodeDataPending = !isMovie && (enriching || (expectedEpisodes > 0 && !hasEpisodes));
   const canUseItemActions = !!(displayItem.id_item || displayItem.tmdb_id || displayItem.tvmaze_id || displayItem.mal_id);
   const watchedCount = Number(detail?.progress?.watched_count || 0);
   const totalCount = Number(detail?.progress?.total_count || 0);
@@ -366,8 +368,8 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
                       {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.watchButtonText}>{canUseItemActions ? mainButtonLabel : 'Item indisponivel'}</Text>}
                     </Pressable>
                   ) : (
-                    <Pressable disabled={!hasEpisodes || enriching} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, (!hasEpisodes || enriching) && styles.watchButtonDisabled]}>
-                      <Text style={styles.watchButtonText}>{enriching ? 'Carregando episódios...' : hasEpisodes ? 'Ver episodios' : 'Sem episodios'}</Text>
+                    <Pressable disabled={!hasEpisodes} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, !hasEpisodes && styles.watchButtonDisabled]}>
+                      <Text style={styles.watchButtonText}>{episodeDataPending ? 'Carregando episodios...' : hasEpisodes ? 'Ver episodios' : 'Aguardando episodios'}</Text>
                     </Pressable>
                   )}
                 </View>
@@ -488,8 +490,8 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
                 {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.watchButtonText}>{mainButtonLabel}</Text>}
               </Pressable>
             ) : (
-              <Pressable disabled={!hasEpisodes || enriching} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, (!hasEpisodes || enriching) && styles.watchButtonDisabled]}>
-                <Text style={styles.watchButtonText}>{enriching ? 'Carregando episódios...' : hasEpisodes ? 'Ver episódios' : 'Sem episódios'}</Text>
+              <Pressable disabled={!hasEpisodes} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, !hasEpisodes && styles.watchButtonDisabled]}>
+                <Text style={styles.watchButtonText}>{episodeDataPending ? 'Carregando episodios...' : hasEpisodes ? 'Ver episodios' : 'Aguardando episodios'}</Text>
               </Pressable>
             )}
           </View>

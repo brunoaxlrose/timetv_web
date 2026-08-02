@@ -1,14 +1,13 @@
 import { StatusBar } from 'expo-status-bar';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { getCurrentUser, login, User } from './src/api/auth';
 import { initializeApiOfflineSupport, isOfflineError } from './src/api/client';
+import { ToastProvider } from './src/components/Toast';
+import { MainTabs } from './src/navigation/MainTabs';
+import { LoginScreen } from './src/screens/LoginScreen';
 import { clearSession, loadCredentials, loadSavedUser, saveCredentials, saveUser } from './src/storage/session';
 import { colors, hydratePalette } from './src/theme/colors';
-
-const MainTabs = lazy(() => import('./src/navigation/MainTabs').then((module) => ({ default: module.MainTabs })));
-const LoginScreen = lazy(() => import('./src/screens/LoginScreen').then((module) => ({ default: module.LoginScreen })));
-const ToastProvider = lazy(() => import('./src/components/Toast').then((module) => ({ default: module.ToastProvider })));
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -26,7 +25,7 @@ export default function App() {
           const response = await getCurrentUser();
           if (response.data) {
             const restoredUser = { ...response.data, token_api: savedUser.token_api };
-            await saveUser(restoredUser);
+            await persistUserSafely(restoredUser);
             setUser(restoredUser);
             return;
           }
@@ -44,8 +43,8 @@ export default function App() {
         try {
           const response = await login(credentials.email, credentials.password);
           if (response.data) {
-            await saveUser(response.data);
             setUser(response.data);
+            await persistUserSafely(response.data);
             return;
           }
         } catch (error) {
@@ -65,11 +64,11 @@ export default function App() {
   }, []);
 
   async function handleAuthenticated(nextUser: User, remember?: { email: string; password: string }) {
-    await saveUser(nextUser);
+    setUser(nextUser);
+    await persistUserSafely(nextUser);
     if (remember) {
       await saveCredentials(remember);
     }
-    setUser(nextUser);
   }
 
   async function handleLogout() {
@@ -82,7 +81,6 @@ export default function App() {
   }
 
   return (
-    <Suspense fallback={<View style={[styles.boot, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.accent} /></View>}>
     <ToastProvider>
       <StatusBar style="light" />
       {booting ? (
@@ -95,8 +93,15 @@ export default function App() {
         <LoginScreen onAuthenticated={handleAuthenticated} />
       )}
     </ToastProvider>
-    </Suspense>
   );
+}
+
+async function persistUserSafely(user: User) {
+  try {
+    await saveUser(user);
+  } catch (error) {
+    console.warn('Nao foi possivel persistir a sessao localmente.', error);
+  }
 }
 
 const styles = StyleSheet.create({

@@ -30,11 +30,7 @@ class JikanHelper {
 
     public static function searchAnime(string $query, int $limit = 10): array {
         $url = self::BASE_URL . '/anime?q=' . urlencode($query) . '&limit=' . $limit . '&sfw=true';
-        $opts = ['http' => ['header' => "User-Agent: CineFio/1.0\r\nAccept: application/json\r\n", 'timeout' => 8]];
-        $json = @file_get_contents($url, false, stream_context_create($opts));
-        if (!$json) return [];
-
-        $data = json_decode($json, true);
+        $data = self::fetchJson($url, 21600, 8);
         $results = $data['data'] ?? [];
         $items = [];
 
@@ -53,14 +49,14 @@ class JikanHelper {
                 'tvmaze_id'     => null,
                 'tmdb_id'       => null,
                 'mal_id'        => $r['mal_id'],
-                'title'         => $title,
-                'type'          => 'anime',
-                'poster_url'    => $poster,
-                'banner_url'    => $banner,
-                'description'   => $overview,
+                'titulo'        => $title,
+                'tipo'          => 'anime',
+                'url_poster'    => $poster,
+                'url_banner'    => $banner,
+                'descricao'     => $overview,
                 'ano_lancamento'  => $releaseYear,
-                'track_status'  => null,
-                'source'        => 'mal'
+                'status_acompanhamento'  => null,
+                'origem'        => 'mal'
             ];
         }
         return $items;
@@ -200,30 +196,30 @@ class JikanHelper {
             $pdo->beginTransaction();
 
             $stmt = $pdo->prepare("
-                INSERT INTO episodio (id_item, season_number, episode_number, title, air_date, description, runtime_minutes, rating)
-                VALUES (:id_item, :season_number, :episode_number, :title, :air_date, :description, :runtime_minutes, :rating)
-                ON CONFLICT (id_item, season_number, episode_number) DO UPDATE SET
-                    title = EXCLUDED.title,
-                    air_date = COALESCE(EXCLUDED.air_date, episodio.air_date),
-                    description = COALESCE(NULLIF(EXCLUDED.description, ''), episodio.description),
-                    runtime_minutes = EXCLUDED.runtime_minutes,
-                    rating = EXCLUDED.rating
+                INSERT INTO episodio (id_item, numero_temporada, numero_episodio, titulo, data_exibicao, descricao, duracao_minutos, nota)
+                VALUES (:id_item, :numero_temporada, :numero_episodio, :titulo, :data_exibicao, :descricao, :duracao_minutos, :nota)
+                ON CONFLICT (id_item, numero_temporada, numero_episodio) DO UPDATE SET
+                    titulo = EXCLUDED.titulo,
+                    data_exibicao = COALESCE(EXCLUDED.data_exibicao, episodio.data_exibicao),
+                    descricao = COALESCE(NULLIF(EXCLUDED.descricao, ''), episodio.descricao),
+                    duracao_minutos = EXCLUDED.duracao_minutos,
+                    nota = EXCLUDED.nota
             ");
 
             foreach ($episodes as $episode) {
                 $stmt->execute([
                     ':id_item' => $itemId,
-                    ':season_number' => (int)$episode['season_number'],
-                    ':episode_number' => (int)$episode['episode_number'],
-                    ':title' => $episode['title'],
-                    ':air_date' => $episode['air_date'],
-                    ':description' => $episode['description'],
-                    ':runtime_minutes' => (int)$episode['runtime_minutes'],
-                    ':rating' => $episode['rating'],
+                    ':numero_temporada' => (int)$episode['season_number'],
+                    ':numero_episodio' => (int)$episode['episode_number'],
+                    ':titulo' => $episode['title'],
+                    ':data_exibicao' => $episode['air_date'],
+                    ':descricao' => $episode['description'],
+                    ':duracao_minutos' => (int)$episode['runtime_minutes'],
+                    ':nota' => $episode['rating'],
                 ]);
             }
 
-            $update = $pdo->prepare("UPDATE item SET total_episodes = :total, ts_ultima_sincronizacao = CURRENT_TIMESTAMP WHERE id_item = :item_id");
+            $update = $pdo->prepare("UPDATE item SET total_episodios = :total, ts_ultima_sincronizacao = CURRENT_TIMESTAMP WHERE id_item = :item_id");
             $update->execute([':total' => max($totalEpisodes, count($episodes)), ':item_id' => $itemId]);
 
             $pdo->commit();
@@ -275,8 +271,8 @@ class JikanHelper {
 
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO item (mal_id, titulo, tipo, poster_url, banner_url, descricao, ano_lancamento, total_episodes, runtime_minutes, genres)
-                VALUES (:mal_id, :titulo, 'anime', :poster, :banner, :descricao, :ano_lancamento, :episodes, 24, :genres)
+                INSERT INTO item (mal_id, titulo, tipo, url_poster, url_banner, descricao, ano_lancamento, total_episodios, duracao_minutos, generos, ts_inclusao)
+                VALUES (:mal_id, :titulo, 'anime', :poster, :banner, :descricao, :ano_lancamento, :episodes, 24, :genres, CURRENT_TIMESTAMP)
                 RETURNING id_item
             ");
             $stmt->execute([
@@ -331,14 +327,14 @@ class JikanHelper {
                 'tvmaze_id'     => null,
                 'tmdb_id'       => null,
                 'mal_id'        => $entry['mal_id'],
-                'title'         => $entry['title'] ?? 'Anime sem titulo',
-                'type'          => 'anime',
-                'poster_url'    => $poster,
-                'banner_url'    => $banner,
-                'description'   => '',
+                'titulo'        => $entry['title'] ?? 'Anime sem titulo',
+                'tipo'          => 'anime',
+                'url_poster'    => $poster,
+                'url_banner'    => $banner,
+                'descricao'     => '',
                 'ano_lancamento'  => (int)date('Y'),
-                'track_status'  => null,
-                'source'        => 'mal'
+                'status_acompanhamento'  => null,
+                'origem'        => 'mal'
             ];
         }
         return $items;

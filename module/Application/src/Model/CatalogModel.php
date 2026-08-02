@@ -369,8 +369,8 @@ class CatalogModel {
         return $stmt->fetchAll();
     }
 
-    public function getReleaseCalendar(int $userId, string $startDate, string $endDate): array {
-        $stmt = $this->pdo->prepare("
+    public function getReleaseCalendar(int $userId, string $startDate, string $endDate, ?int $limit = null): array {
+        $query = "
             SELECT
                 i.id_item,
                 i.titulo,
@@ -427,16 +427,23 @@ class CatalogModel {
                     AND e.ts_cancelamento IS NULL
               )
             ORDER BY data_evento, titulo
-        ");
-        $stmt->execute([
-            ':id_usuario_episodio' => $userId,
-            ':id_usuario_acompanhamento_episodio' => $userId,
-            ':id_usuario_acompanhamento_item' => $userId,
-            ':data_inicio_episodio' => $startDate,
-            ':data_fim_episodio' => $endDate,
-            ':data_inicio_item' => $startDate,
-            ':data_fim_item' => $endDate,
-        ]);
+        ";
+        if ($limit !== null && $limit > 0) {
+            $query .= " LIMIT :limit";
+        }
+
+        $stmt = $this->pdo->prepare($query);
+        $stmt->bindValue(':id_usuario_episodio', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':id_usuario_acompanhamento_episodio', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':id_usuario_acompanhamento_item', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':data_inicio_episodio', $startDate);
+        $stmt->bindValue(':data_fim_episodio', $endDate);
+        $stmt->bindValue(':data_inicio_item', $startDate);
+        $stmt->bindValue(':data_fim_item', $endDate);
+        if ($limit !== null && $limit > 0) {
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        }
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 }

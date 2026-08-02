@@ -78,6 +78,8 @@ class TrackingModel {
                 COALESCE(ui.status, 'assistindo') AS status_acompanhamento,
                 COALESCE(ui.ts_atualizacao, assistidos.ts_ultimo_consumo, i.ts_inclusao) AS ts_atualizacao,
                 COALESCE(ui.ts_inclusao, assistidos.ts_primeiro_consumo, i.ts_inclusao) AS collection_created_at,
+                COALESCE(ui.nota, 0) AS nota,
+                COALESCE(ui.eh_favorito, FALSE) AS eh_favorito,
                 COALESCE(episode_stats.total_count, 0) AS total_count,
                 COALESCE(episode_stats.watched_count, 0) AS watched_count,
                 COALESCE(episode_stats.remaining_count, 0) AS remaining_count,
@@ -88,7 +90,20 @@ class TrackingModel {
                 next_episode.titulo AS next_episode_title,
                 next_episode.data_exibicao AS next_air_date,
                 next_episode.duracao_minutos AS next_runtime_minutes,
-                i.*
+                i.id_item,
+                i.tvmaze_id,
+                i.tmdb_id,
+                i.mal_id,
+                i.titulo,
+                i.tipo,
+                i.url_poster,
+                i.url_banner,
+                i.ano_lancamento,
+                i.data_lancamento,
+                i.total_episodios,
+                i.duracao_minutos,
+                i.ts_inclusao,
+                i.avaliacao_media
             FROM (
                 SELECT id_item
                 FROM usuario_item
@@ -665,7 +680,22 @@ class TrackingModel {
 
     public function getFavorites(int $userId, int $limit = 10): array {
         $stmt = $this->pdo->prepare("
-            SELECT i.*, ui.status AS status_acompanhamento, ui.eh_favorito, ui.ts_atualizacao
+            SELECT
+                i.id_item,
+                i.tvmaze_id,
+                i.tmdb_id,
+                i.mal_id,
+                i.titulo,
+                i.tipo,
+                i.url_poster,
+                i.url_banner,
+                i.ano_lancamento,
+                i.data_lancamento,
+                i.total_episodios,
+                i.duracao_minutos,
+                ui.status AS status_acompanhamento,
+                ui.eh_favorito,
+                ui.ts_atualizacao
             FROM usuario_item ui
             JOIN item i ON ui.id_item = i.id_item
             WHERE ui.id_usuario = :user_id
@@ -736,16 +766,7 @@ class TrackingModel {
         $stmt->execute([':user_id' => $userId]);
         $stats['totalRewatched'] = (int)$stmt->fetchColumn();
 
-        $stmtItems = $this->pdo->prepare("
-            SELECT ui.status AS status_acompanhamento, i.id_item, i.tipo, i.duracao_minutos
-            FROM usuario_item ui
-            JOIN item i ON ui.id_item = i.id_item
-            WHERE ui.id_usuario = :user_id
-              AND ui.ts_cancelamento IS NULL
-              AND ui.status <> 'avaliado'
-        ");
-        $stmtItems->execute([':user_id' => $userId]);
-        $userItems = $stmtItems->fetchAll();
+        $userItems = $this->getUserCollectionQuery($userId, ['movie', 'series', 'anime'], 'last_watched');
 
         foreach ($userItems as $item) {
             if ($item['status_acompanhamento'] === 'em_pausa') {
@@ -758,25 +779,15 @@ class TrackingModel {
             }
 
             if ($item['tipo'] !== 'movie') {
-                $stmtRem = $this->pdo->prepare("
-                    SELECT COUNT(e.id_episodio)
-                    FROM episodio e
-                    WHERE e.id_item = :item_id
-                      AND (e.data_exibicao IS NULL OR e.data_exibicao <= CURRENT_DATE)
-                      AND e.id_episodio NOT IN (
-                          SELECT id_episodio
-                          FROM usuario_episodio
-                          WHERE id_usuario = :user_id
-                            AND ts_cancelamento IS NULL
-                      )
-                ");
-                $stmtRem->execute([':item_id' => $item['id_item'], ':user_id' => $userId]);
-                $remaining = (int)$stmtRem->fetchColumn();
+                $remaining = (int)($item['remaining_count'] ?? 0);
+                $futureEpisodes = (int)($item['future_count'] ?? 0);
 
                 if ($item['status_acompanhamento'] === 'concluido') {
                     $stats['completedCount']++;
-                } elseif ($remaining === 0) {
+                } elseif ($remaining === 0 && $futureEpisodes > 0) {
                     $stats['upToDateCount']++;
+                } elseif ($remaining === 0 && (int)($item['watched_count'] ?? 0) > 0) {
+                    $stats['completedCount']++;
                 } else {
                     $stats['watchingCount']++;
                 }
@@ -841,7 +852,7 @@ class TrackingModel {
         return $stmt->fetchAll();
     }
 
-    public function getActivityHistory(int $userId): array {
+    public function getActivityHistory(int $userId, int $limit = 100): array {
         $stmt = $this->pdo->prepare("
             (
                 SELECT
@@ -887,9 +898,11 @@ class TrackingModel {
                   AND ui.ts_cancelamento IS NULL
             )
             ORDER BY watched_at DESC
-            LIMIT 1000
+            LIMIT :limit
         ");
-        $stmt->execute([':user_id' => $userId]);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 
@@ -955,7 +968,22 @@ class TrackingModel {
         $stmt = $this->pdo->prepare("
             SELECT
                 ui.ts_atualizacao,
-                i.*,
+                i.id_item,
+                i.tvmaze_id,
+                i.tmdb_id,
+                i.mal_id,
+                i.titulo,
+                i.tipo,
+                i.url_poster,
+                i.url_banner,
+                i.ano_lancamento,
+                i.data_lancamento,
+                i.total_episodios,
+                i.duracao_minutos,
+                i.provedores_streaming,
+                COALESCE(ui.nota, 0) AS nota,
+                COALESCE(ui.eh_favorito, FALSE) AS eh_favorito,
+                ui.status AS status_acompanhamento,
                 next_ep.id_episodio AS next_id_episodio,
                 next_ep.numero_temporada AS next_numero_temporada,
                 next_ep.numero_episodio AS next_numero_episodio,
@@ -1027,7 +1055,23 @@ class TrackingModel {
 
     public function getPlanToWatch(int $userId): array {
         $stmt = $this->pdo->prepare("
-            SELECT ui.status AS status_acompanhamento, ui.ts_atualizacao, i.*
+            SELECT
+                ui.status AS status_acompanhamento,
+                ui.ts_atualizacao,
+                i.id_item,
+                i.tvmaze_id,
+                i.tmdb_id,
+                i.mal_id,
+                i.titulo,
+                i.tipo,
+                i.url_poster,
+                i.url_banner,
+                i.ano_lancamento,
+                i.data_lancamento,
+                i.total_episodios,
+                i.duracao_minutos,
+                COALESCE(ui.nota, 0) AS nota,
+                COALESCE(ui.eh_favorito, FALSE) AS eh_favorito
             FROM usuario_item ui
             JOIN item i ON ui.id_item = i.id_item
             WHERE ui.id_usuario = :user_id

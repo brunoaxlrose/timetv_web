@@ -7,12 +7,14 @@ import { Episode, Item } from '../types';
 
 type Section = 'populares' | 'em_breve' | 'em_curso';
 type CourseRow = { item: Item; next_episode: Episode; progress?: { total_count: number; watched_count: number } };
+const DISCOVERY_CACHE_TTL = 60_000;
+const discoveryCache = new Map<Section, { items: Item[]; courseRows: CourseRow[]; pagina: number; at: number }>();
 
 export function DiscoveryScreen({ section, onBack, onOpenItem }: { section: Section; onBack: () => void; onOpenItem: (item: Item) => void }) {
-  const [items, setItems] = useState<Item[]>([]);
-  const [pagina, setPagina] = useState(0);
-  const [courseRows, setCourseRows] = useState<CourseRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<Item[]>(() => discoveryCache.get(section)?.items || []);
+  const [pagina, setPagina] = useState(() => discoveryCache.get(section)?.pagina || 0);
+  const [courseRows, setCourseRows] = useState<CourseRow[]>(() => discoveryCache.get(section)?.courseRows || []);
+  const [loading, setLoading] = useState(() => !discoveryCache.get(section));
   const title = section === 'populares' ? 'Tendências' : section === 'em_breve' ? 'Em breve' : 'Em curso';
 
   async function loadMore() {
@@ -24,15 +26,31 @@ export function DiscoveryScreen({ section, onBack, onOpenItem }: { section: Sect
       const novos = section === 'em_curso'
         ? (response.data?.continuar_assistindo || []).map((row) => row.item)
         : response.data?.[section] || [];
-      if (section === 'em_curso') setCourseRows(response.data?.continuar_assistindo || []);
-      setItems((current) => juntar(current, novos));
+      const nextCourseRows = section === 'em_curso' ? (response.data?.continuar_assistindo || []) : courseRows;
+      const nextItems = section === 'em_curso' ? items : juntar(items, novos);
+      if (section === 'em_curso') setCourseRows(nextCourseRows);
+      setItems(nextItems);
       setPagina(nextPage);
+      discoveryCache.set(section, { items: nextItems, courseRows: nextCourseRows, pagina: nextPage, at: Date.now() });
     } catch {
       // Keep loaded pages available until connectivity returns.
     } finally { setLoading(false); }
   }
 
-  useEffect(() => { loadMore(); }, [section]);
+  useEffect(() => {
+    const cached = discoveryCache.get(section);
+    if (cached && Date.now() - cached.at < DISCOVERY_CACHE_TTL) {
+      setItems(cached.items);
+      setCourseRows(cached.courseRows);
+      setPagina(cached.pagina);
+      setLoading(false);
+      return;
+    }
+    setItems([]);
+    setCourseRows([]);
+    setPagina(0);
+    loadMore();
+  }, [section]);
 
   return <View style={styles.screen}>
     <View style={styles.header}><Pressable onPress={onBack} style={styles.backButton}><Text style={styles.back}>‹</Text></Pressable><Text style={styles.icon}>{section === 'populares' ? '●' : '✦'}</Text><Text style={styles.title}>{title}</Text></View>
@@ -41,7 +59,7 @@ export function DiscoveryScreen({ section, onBack, onOpenItem }: { section: Sect
 }
 
 function CourseCard({ row, onPress }: { row: CourseRow; onPress: () => void }) {
-  const total = Number(row.progress?.total_count || row.item.progress?.total_count || 0);
+  const total = Number(row.progress?.total_count || row.item.progress?.total_count || row.item.total_episodios || 0);
   const watched = Number(row.progress?.watched_count || row.item.progress?.watched_count || 0);
   const percent = total ? Math.min(100, watched / total * 100) : Number(row.item.progress_percent || 0);
   return <Pressable onPress={onPress} style={styles.courseCard}>{row.item.url_poster ? <Image source={{ uri: row.item.url_poster }} style={styles.coursePoster} /> : <View style={styles.coursePoster} />}<View style={styles.courseCopy}><Text numberOfLines={1} style={styles.courseTitle}>{row.item.titulo}</Text><View style={styles.courseMetaRow}><Text style={styles.courseEpisode}>T{String(row.next_episode.numero_temporada).padStart(2, '0')} · E{String(row.next_episode.numero_episodio).padStart(2, '0')}</Text><ProviderBadges value={row.item.provedores_streaming} /></View><Text numberOfLines={1} style={styles.courseEpisodeTitle}>{row.next_episode.titulo}</Text><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${percent}%` }]} /></View><Text style={styles.progressText}>{watched}/{total || '?'} episódios · Restam {Math.max(0, total - watched)}</Text></View><Text style={styles.courseCheck}>✓</Text></Pressable>;

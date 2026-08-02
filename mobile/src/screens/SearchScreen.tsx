@@ -1,34 +1,55 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { searchCatalog } from '../api/mobile';
 import { PosterCard } from '../components/PosterCard';
 import { PosterSkeletonRow } from '../components/Skeleton';
 import { colors } from '../theme/colors';
 import { Item } from '../types';
+const SEARCH_CACHE_TTL = 60_000;
+type SearchPayload = { items: Item[]; popular: Item[]; recent: string[] };
+const searchCache = new Map<string, { data: SearchPayload; at: number }>();
 
 export function SearchScreen({ onOpenItem }: { onOpenItem: (item: Item) => void }) {
   const { width } = useWindowDimensions();
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<Item[]>([]);
-  const [popular, setPopular] = useState<Item[]>([]);
+  const [popular, setPopular] = useState<Item[]>(() => searchCache.get('')?.data.popular || []);
   const [recent, setRecent] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => !searchCache.get(''));
+  const [refreshing, setRefreshing] = useState(false);
   const requestId = useRef(0);
 
-  async function runSearch(value: string) {
+  async function runSearch(value: string, refresh = false) {
     const currentRequest = ++requestId.current;
-    setLoading(true);
-    if (value.trim()) setItems([]);
+    const cacheKey = value.trim().toLowerCase();
+    const cached = searchCache.get(cacheKey);
+    if (!refresh && cached && Date.now() - cached.at < SEARCH_CACHE_TTL) {
+      setItems(cached.data.items);
+      setPopular(cached.data.popular);
+      setRecent(cached.data.recent);
+      setLoading(false);
+    }
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
     try {
       const response = await searchCatalog(value);
       if (currentRequest !== requestId.current) return;
-      setItems(response.data?.items || []);
-      setPopular(response.data?.popular || []);
-      setRecent(response.data?.recent_searches || []);
+      const nextPayload = {
+        items: response.data?.items || [],
+        popular: response.data?.popular || [],
+        recent: response.data?.recent_searches || [],
+      };
+      searchCache.set(cacheKey, { data: nextPayload, at: Date.now() });
+      setItems(nextPayload.items);
+      setPopular(nextPayload.popular);
+      setRecent(nextPayload.recent);
     } catch {
       // Keep the last result visible; the offline banner explains the connection state.
     } finally {
-      if (currentRequest === requestId.current) setLoading(false);
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }
 
@@ -48,7 +69,7 @@ export function SearchScreen({ onOpenItem }: { onOpenItem: (item: Item) => void 
       <Text style={styles.title}>Pesquisar</Text>
       <TextInput
         value={query}
-        onChangeText={(value) => { requestId.current += 1; setItems([]); setQuery(value); }}
+        onChangeText={(value) => { requestId.current += 1; setQuery(value); }}
         placeholder="Filmes, series, anime..."
         placeholderTextColor={colors.muted}
         style={styles.input}
@@ -80,6 +101,7 @@ export function SearchScreen({ onOpenItem }: { onOpenItem: (item: Item) => void 
           renderItem={({ item }) => <PosterCard item={item} onPress={onOpenItem} width={cardWidth} />}
           columnWrapperStyle={[styles.gridRow, { width: gridWidth }]}
           contentContainerStyle={styles.gridContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => runSearch(query, true)} tintColor={colors.accent} />}
           ListHeaderComponent={!query.trim() ? <Text style={[styles.blockTitle, { width: gridWidth }]}>Populares agora</Text> : null}
           ListEmptyComponent={<Text style={styles.empty}>{query.trim() ? 'Nada encontrado.' : 'Carregando populares...'}</Text>}
         />

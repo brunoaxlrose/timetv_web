@@ -7,20 +7,30 @@ import { colors } from '../theme/colors';
 import { Item } from '../types';
 
 type Dados = NonNullable<Awaited<ReturnType<typeof getDashboard>>['data']>;
+const DASHBOARD_CACHE_TTL = 60_000;
+let dashboardCache: Dados | null = null;
+let dashboardCacheAt = 0;
 
 export function DashboardScreen({ onOpenItem, onOpenDiscovery, refreshKey = 0 }: { onOpenItem: (item: Item) => void; onOpenDiscovery: (section: 'populares' | 'em_breve' | 'em_curso') => void; refreshKey?: number }) {
-  const [data, setData] = useState<Dados | null>(null);
+  const [data, setData] = useState<Dados | null>(() => dashboardCache);
   const [aba, setAba] = useState<'continuar' | 'proximos'>('continuar');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !dashboardCache);
   const [refreshing, setRefreshing] = useState(false);
   const [courseOpen, setCourseOpen] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   async function load(refresh = false) {
+    const cacheStillFresh = dashboardCache && Date.now() - dashboardCacheAt < DASHBOARD_CACHE_TTL;
+    if (!refresh && cacheStillFresh) {
+      setData(dashboardCache);
+      setLoading(false);
+    }
     if (refresh) setRefreshing(true);
     try {
       const response = await getDashboard(1);
       if (response.data) {
+        dashboardCache = response.data;
+        dashboardCacheAt = Date.now();
         setData(response.data);
         setLoadError('');
       }
@@ -59,7 +69,7 @@ export function DashboardScreen({ onOpenItem, onOpenDiscovery, refreshKey = 0 }:
 function SectionHeader({ title, onPress }: { title: string; onPress: () => void }) { return <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{title}</Text><Pressable onPress={onPress} hitSlop={12}><Text style={styles.sectionArrow}>›</Text></Pressable></View>; }
 
 function ContinueCard({ row, onPress }: { row: Dados['continuar_assistindo'][number]; onPress: () => void }) {
-  const total = row.progress?.total_count || row.item.progress?.total_count || 0;
+  const total = row.progress?.total_count || row.item.progress?.total_count || row.item.total_episodios || 0;
   const watched = row.progress?.watched_count || row.item.progress?.watched_count || 0;
   const percent = total > 0 ? Math.min(100, watched / total * 100) : row.item.progress_percent || 0;
   const remaining = Math.max(0, total - watched);

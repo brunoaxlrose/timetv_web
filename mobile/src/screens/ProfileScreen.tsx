@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { reloadAppAsync } from 'expo';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,6 +13,10 @@ import { useToast } from '../components/Toast';
 import { saveUser } from '../storage/session';
 import { alpha, colors, getActivePaletteKey, PaletteKey, palettes, savePalette } from '../theme/colors';
 import { Item } from '../types';
+const PROFILE_CACHE_TTL = 60_000;
+type ProfileData = Awaited<ReturnType<typeof getProfile>>['data'];
+let profileCache: ProfileData | null = null;
+let profileCacheAt = 0;
 
 export function ProfileScreen({
   user,
@@ -27,18 +31,37 @@ export function ProfileScreen({
   onUserUpdated: (user: User) => void;
   refreshKey?: number;
 }) {
-  const [profile, setProfile] = useState<Awaited<ReturnType<typeof getProfile>>['data'] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<ProfileData | null>(() => profileCache);
+  const [loading, setLoading] = useState(() => !profileCache);
+  const [refreshing, setRefreshing] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null);
   const [activityJournalOpen, setActivityJournalOpen] = useState(false);
   const [timeInfoOpen, setTimeInfoOpen] = useState(false);
 
-  useEffect(() => {
-    getProfile().then((res) => setProfile(res.data)).catch(() => {
+  async function load(refresh = false) {
+    const cacheStillFresh = profileCache && Date.now() - profileCacheAt < PROFILE_CACHE_TTL;
+    if (!refresh && cacheStillFresh) {
+      setProfile(profileCache);
+      setLoading(false);
+    }
+    if (refresh) setRefreshing(true);
+    try {
+      const res = await getProfile();
+      profileCache = res.data || null;
+      profileCacheAt = Date.now();
+      setProfile(res.data);
+    } catch {
       // Preserve the cached profile while offline.
-    }).finally(() => setLoading(false));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
   }, [refreshKey]);
 
   const initials = `${user.nome?.[0] || ''}${user.sobrenome?.[0] || ''}` || 'TV';
@@ -47,7 +70,10 @@ export function ProfileScreen({
   const reviews = profile?.reviews || [];
 
   return (
-    <ScrollView style={styles.screen}>
+    <ScrollView
+      style={styles.screen}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.accent} />}
+    >
       <View style={styles.header}>
         <View style={styles.avatar}>{user.url_avatar ? <Image source={{ uri: user.url_avatar }} style={styles.avatarImage} /> : <Text style={styles.avatarText}>{initials}</Text>}</View>
         <View style={{ flex: 1 }}>

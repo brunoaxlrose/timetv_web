@@ -50,10 +50,10 @@ class MobileController extends AbstractActionController {
             'continuar_assistindo' => $this->trackingModel->getContinueWatching($userId),
             'listas' => $this->trackingModel->getUserListsSummary($userId),
             'quero_ver' => $this->trackingModel->getPlanToWatch($userId),
-            'proximos' => $this->catalogModel->getReleaseCalendar($userId, date('Y-m-d'), date('Y-m-d', strtotime('+90 days'))),
+            'proximos' => $this->catalogModel->getReleaseCalendar($userId, date('Y-m-d'), date('Y-m-d', strtotime('+90 days')), 20),
             'calendario' => $calendar,
-            'populares' => TmdbHelper::getPopular(20, $page),
-            'em_breve' => TmdbHelper::getUpcoming(20, $page),
+            'populares' => TmdbHelper::getPopular(10, $page),
+            'em_breve' => TmdbHelper::getUpcoming(10, $page),
             'pagina' => $page,
             'tem_mais_populares' => true,
             'tem_mais_em_breve' => true,
@@ -462,7 +462,7 @@ class MobileController extends AbstractActionController {
                 'hours' => floor(($minutes % 1440) / 60),
                 'minutes' => $minutes % 60,
             ],
-            'history' => array_slice($this->trackingModel->getActivityHistory($userId), 0, $limit),
+            'history' => $this->trackingModel->getActivityHistory($userId, $limit),
             'favorites' => $this->trackingModel->getFavorites($userId, $limit),
             'reviews' => $this->trackingModel->getUserReviews($userId, $limit),
             'limit' => $limit,
@@ -471,6 +471,7 @@ class MobileController extends AbstractActionController {
 
     public function detailAction(): JsonModel {
         $userId = $this->userId();
+        $fastResolve = $this->params()->fromQuery('rapido', '0') === '1' || $this->params()->fromQuery('somente_essencial', '0') === '1';
         $itemId = $this->resolveItemId([
             'item_id' => (int)$this->params()->fromQuery('id', 0),
             'tvmaze_id' => (int)$this->params()->fromQuery('tvmaze_id', 0),
@@ -483,7 +484,7 @@ class MobileController extends AbstractActionController {
             'url_poster' => $this->params()->fromQuery('url_poster', ''),
             'url_banner' => $this->params()->fromQuery('url_banner', ''),
             'rapido' => $this->params()->fromQuery('rapido', '0') === '1',
-        ]);
+        ], $fastResolve);
         if ($itemId <= 0) {
             return $this->error($this->itemResolveErrorMessage(), 422);
         }
@@ -690,7 +691,7 @@ class MobileController extends AbstractActionController {
 
         return $this->ok([
             'item' => $item,
-            'episodes' => $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId),
+            'episodes' => $this->episodesForDetail($userId, (int)$itemId, $item),
             'progress' => $this->catalogModel->getProgress($userId, (string)$itemId),
             'next_unwatched' => $this->catalogModel->getNextUnwatched($userId, (string)$itemId),
             'released' => $this->trackingModel->isItemReleased((string)$itemId),
@@ -843,7 +844,7 @@ class MobileController extends AbstractActionController {
         return 0;
     }
 
-    private function resolveItemId(array $payload): int {
+    private function resolveItemId(array $payload, bool $preferLocalPlaceholder = false): int {
         $itemId = (int)($payload['item_id'] ?? $payload['id_item'] ?? 0);
         if ($itemId > 0) {
             return $itemId;
@@ -861,7 +862,7 @@ class MobileController extends AbstractActionController {
             return $existingExternalId;
         }
 
-        if (!empty($payload['rapido']) && trim((string)($payload['titulo'] ?? '')) !== '') {
+        if (($preferLocalPlaceholder || !empty($payload['rapido'])) && trim((string)($payload['titulo'] ?? '')) !== '') {
             $quickItemId = $this->createLocalItemFromPayload($payload);
             if ($quickItemId > 0) {
                 return $quickItemId;
@@ -1173,9 +1174,10 @@ class MobileController extends AbstractActionController {
     }
 
     private function localDetailData(int $userId, int $itemId, array $item): array {
+        $episodes = $this->episodesForDetail($userId, $itemId, $item);
         return [
             'item' => $item,
-            'episodes' => $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId),
+            'episodes' => $episodes,
             'progress' => $this->catalogModel->getProgress($userId, (string)$itemId),
             'next_unwatched' => $this->catalogModel->getNextUnwatched($userId, (string)$itemId),
             'released' => $this->trackingModel->isItemReleased((string)$itemId),
@@ -1184,6 +1186,54 @@ class MobileController extends AbstractActionController {
             'reviews' => $this->catalogModel->getItemComments($itemId),
             'recommendations' => [],
         ];
+    }
+
+    private function episodesForDetail(int $userId, int $itemId, array $item): array {
+        $episodes = $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId);
+        if (!empty($episodes) || ($item['tipo'] ?? '') === 'movie') {
+            return $episodes;
+        }
+
+        $totalEpisodes = (int)($item['total_episodios'] ?? 0);
+        if ($totalEpisodes <= 0) {
+            return [];
+        }
+
+        return $this->seedPlaceholderEpisodes($userId, $itemId, $totalEpisodes, (string)($item['tipo'] ?? 'series'));
+    }
+
+    private function seedPlaceholderEpisodes(int $userId, int $itemId, int $totalEpisodes, string $type): array {
+        $totalEpisodes = max(0, min($totalEpisodes, 1500));
+        if ($totalEpisodes === 0 || $type === 'movie') {
+            return [];
+        }
+
+        $pdo = $this->catalogModel->getPdo();
+        try {
+            $pdo->beginTransaction();
+            $stmt = $pdo->prepare("
+                INSERT INTO episodio (id_item, numero_temporada, numero_episodio, titulo, data_exibicao, descricao, duracao_minutos)
+                VALUES (:id_item, 1, :numero_episodio, :titulo, NULL, '', :duracao_minutos)
+                ON CONFLICT (id_item, numero_temporada, numero_episodio) DO NOTHING
+            ");
+
+            $runtime = $type === 'anime' ? 24 : 45;
+            for ($episodeNumber = 1; $episodeNumber <= $totalEpisodes; $episodeNumber++) {
+                $stmt->execute([
+                    ':id_item' => $itemId,
+                    ':numero_episodio' => $episodeNumber,
+                    ':titulo' => 'Episodio ' . $episodeNumber,
+                    ':duracao_minutos' => $runtime,
+                ]);
+            }
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+        }
+
+        return $this->catalogModel->getEpisodesWithWatchedState($userId, (string)$itemId);
     }
 
     private function getTvmazePersonCredits(int $personId): ?array {

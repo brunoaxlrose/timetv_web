@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { createList, deleteList, getListItems, getLists, renameList } from '../api/mobile';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { PosterCard } from '../components/PosterCard';
@@ -18,10 +18,12 @@ export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item:
   const [editingList, setEditingList] = useState<UserList | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserList | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadingItems, setLoadingItems] = useState(false);
   const [savingList, setSavingList] = useState(false);
 
-  async function load() {
+  async function load(refresh = false) {
+    if (refresh) setRefreshing(true);
     try {
       const response = await getLists();
       setLists(response.data?.lists || []);
@@ -29,6 +31,7 @@ export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item:
       // Preserve lists already shown when there is no cached response yet.
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -101,7 +104,10 @@ export function ListsScreen({ onOpenItem, refreshKey = 0 }: { onOpenItem: (item:
   }
 
   return (
-    <ScrollView style={styles.screen}>
+    <ScrollView
+      style={styles.screen}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.accent} />}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>As tuas listas</Text>
         <Pressable onPress={() => setNewListOpen(true)} style={styles.createButton}>

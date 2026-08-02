@@ -10,6 +10,8 @@ export type Item = {
   descricao?: string;
   ano_lancamento?: number;
   data_lancamento?: string;
+  total_episodios?: number;
+  duracao_minutos?: number;
   status_acompanhamento?: string | null;
   eh_favorito?: boolean;
   progress_percent?: number;
