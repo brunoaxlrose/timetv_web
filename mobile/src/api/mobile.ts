@@ -33,6 +33,8 @@ export function getDashboard(pagina = 1, mes?: string) {
     calendario: EventoCalendario[];
     populares: Item[];
     em_breve: Item[];
+    top_10_filmes: Item[];
+    top_10_series: Item[];
     pagina: number;
     tem_mais_populares: boolean;
     tem_mais_em_breve: boolean;

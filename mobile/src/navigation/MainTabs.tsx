@@ -33,7 +33,7 @@ export function MainTabs({
   const [dataRefreshKey, setDataRefreshKey] = useState(0);
   const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set(['home']));
   const [showCalendar, setShowCalendar] = useState(false);
-  const [discovery, setDiscovery] = useState<'populares' | 'em_breve' | 'em_curso' | null>(null);
+  const [discovery, setDiscovery] = useState<'populares' | 'em_breve' | 'em_curso' | 'top_10_filmes' | 'top_10_series' | null>(null);
   const offlineState = useSyncExternalStore(subscribeOfflineState, getOfflineSnapshot, getOfflineSnapshot);
   const lastSyncedAt = useRef(offlineState.lastSyncedAt);
 

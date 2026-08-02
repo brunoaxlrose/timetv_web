@@ -103,7 +103,7 @@ class TrackingModel {
                 i.total_episodios,
                 i.duracao_minutos,
                 i.ts_inclusao,
-                i.avaliacao_media
+                0::numeric AS avaliacao_media
             FROM (
                 SELECT id_item
                 FROM usuario_item
@@ -705,6 +705,71 @@ class TrackingModel {
             LIMIT :limit
         ");
         $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    public function getTopTitlesByType(string $type, int $limit = 10): array {
+        $sql = "
+            WITH item_engagement AS (
+                SELECT
+                    ui.id_item,
+                    COUNT(DISTINCT ui.id_usuario) AS tracked_users,
+                    COUNT(*) AS tracked_events
+                FROM usuario_item ui
+                WHERE ui.ts_cancelamento IS NULL
+                  AND ui.status IN ('assistindo', 'concluido', 'em_pausa', 'reassistindo')
+                GROUP BY ui.id_item
+            ),
+            episode_engagement AS (
+                SELECT
+                    e.id_item,
+                    COUNT(DISTINCT ue.id_usuario) AS watched_users,
+                    COUNT(*) AS watched_events
+                FROM usuario_episodio ue
+                JOIN episodio e ON e.id_episodio = ue.id_episodio
+                WHERE ue.ts_cancelamento IS NULL
+                GROUP BY e.id_item
+            )
+            SELECT
+                i.id_item,
+                i.tvmaze_id,
+                i.tmdb_id,
+                i.mal_id,
+                i.titulo,
+                i.tipo,
+                i.url_poster,
+                i.url_banner,
+                i.ano_lancamento,
+                i.data_lancamento,
+                i.total_episodios,
+                i.duracao_minutos,
+                i.generos,
+                i.provedores_streaming,
+                COALESCE(ie.tracked_users, 0) AS total_usuarios_lista,
+                COALESCE(ie.tracked_events, 0) AS total_interacoes_lista,
+                COALESCE(ee.watched_users, 0) AS total_usuarios_assistindo,
+                COALESCE(ee.watched_events, 0) AS total_eventos_assistidos
+            FROM item i
+            LEFT JOIN item_engagement ie ON ie.id_item = i.id_item
+            LEFT JOIN episode_engagement ee ON ee.id_item = i.id_item
+            WHERE i.tipo = :type
+              AND i.ts_cancelamento IS NULL
+              AND (
+                    COALESCE(ie.tracked_users, 0) > 0
+                 OR COALESCE(ee.watched_users, 0) > 0
+              )
+            ORDER BY
+                CASE WHEN :type = 'movie' THEN COALESCE(ie.tracked_users, 0) ELSE COALESCE(ee.watched_users, COALESCE(ie.tracked_users, 0)) END DESC,
+                CASE WHEN :type = 'movie' THEN COALESCE(ie.tracked_events, 0) ELSE COALESCE(ee.watched_events, COALESCE(ie.tracked_events, 0)) END DESC,
+                COALESCE(i.ano_lancamento, 0) DESC,
+                i.id_item DESC
+            LIMIT :limit
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':type', $type);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();

@@ -119,6 +119,8 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
   const expectedEpisodes = Number(displayItem.total_episodios || detail?.progress?.total_count || 0);
   const episodeDataPending = !isMovie && (enriching || (expectedEpisodes > 0 && !hasEpisodes));
   const canUseItemActions = !!(displayItem.id_item || displayItem.tmdb_id || displayItem.tvmaze_id || displayItem.mal_id);
+  const isDetailReady = !!detail && !loading && !enriching;
+  const canInteractWithItem = isDetailReady && canUseItemActions;
   const watchedCount = Number(detail?.progress?.watched_count || 0);
   const totalCount = Number(detail?.progress?.total_count || 0);
   const isWatched = isMovie ? displayItem.status_acompanhamento === 'concluido' : totalCount > 0 && watchedCount >= totalCount;
@@ -143,6 +145,7 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
   }
 
   async function doFavorite() {
+    if (!isDetailReady) return;
     if (favoriteSaving) return;
     if (favorite) {
       setConfirmRemoveFavorite(true);
@@ -300,7 +303,7 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
                 <View style={styles.backChevron} />
               </Pressable>
               
-              <Pressable disabled={favoriteSaving} onPress={doFavorite} style={[styles.bannerHeartButton, favorite && styles.bannerHeartButtonActive]}>
+              <Pressable disabled={!isDetailReady || favoriteSaving} onPress={doFavorite} style={[styles.bannerHeartButton, favorite && styles.bannerHeartButtonActive, (!isDetailReady || favoriteSaving) && styles.actionDisabled]}>
                 <HeartIcon filled={favorite} />
               </Pressable>
             </View>
@@ -360,12 +363,12 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
                 <Text style={styles.description}>{displayItem.descricao || 'Nenhuma sinopse disponivel.'}</Text>
 
                 <View style={styles.inlineActionRow}>
-                  <Pressable disabled={!canUseItemActions} onPress={() => setListOpen(true)} style={[styles.listFab, !canUseItemActions && styles.actionDisabled]}>
+                  <Pressable disabled={!canInteractWithItem} onPress={() => setListOpen(true)} style={[styles.listFab, !canInteractWithItem && styles.actionDisabled]}>
                     <ListPlusIcon />
                   </Pressable>
                   {isMovie ? (
-                    <Pressable disabled={!canUseItemActions || !released || isWatched || saving} onPress={markMainWatched} style={[styles.watchButton, (!canUseItemActions || !released || isWatched) && styles.watchButtonDisabled]}>
-                      {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.watchButtonText}>{canUseItemActions ? mainButtonLabel : 'Item indisponivel'}</Text>}
+                    <Pressable disabled={!canInteractWithItem || !released || isWatched || saving} onPress={markMainWatched} style={[styles.watchButton, (!canInteractWithItem || !released || isWatched) && styles.watchButtonDisabled]}>
+                      {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.watchButtonText}>{canInteractWithItem ? mainButtonLabel : 'Carregando item'}</Text>}
                     </Pressable>
                   ) : (
                     <Pressable disabled={!hasEpisodes} onPress={() => setActiveTab('episodes')} style={[styles.watchButton, !hasEpisodes && styles.watchButtonDisabled]}>
@@ -482,11 +485,11 @@ export function DetailScreen({ item, refreshKey = 0, onBack, onSelectItem, onSel
         </View>
 
           <View style={styles.bottomActionRow}>
-            <Pressable onPress={() => setListOpen(true)} style={styles.listFab}>
+            <Pressable disabled={!canInteractWithItem} onPress={() => setListOpen(true)} style={[styles.listFab, !canInteractWithItem && styles.actionDisabled]}>
               <ListPlusIcon />
             </Pressable>
             {isMovie ? (
-              <Pressable disabled={!released || isWatched || saving} onPress={markMainWatched} style={[styles.watchButton, (!released || isWatched) && styles.watchButtonDisabled]}>
+              <Pressable disabled={!canInteractWithItem || !released || isWatched || saving} onPress={markMainWatched} style={[styles.watchButton, (!canInteractWithItem || !released || isWatched) && styles.watchButtonDisabled]}>
                 {saving ? <ActivityIndicator color={colors.text} /> : <Text style={styles.watchButtonText}>{mainButtonLabel}</Text>}
               </Pressable>
             ) : (

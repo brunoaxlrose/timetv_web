@@ -54,6 +54,8 @@ class MobileController extends AbstractActionController {
             'calendario' => $calendar,
             'populares' => TmdbHelper::getPopular(10, $page),
             'em_breve' => TmdbHelper::getUpcoming(10, $page),
+            'top_10_filmes' => $this->trackingModel->getTopTitlesByType('movie', 10),
+            'top_10_series' => $this->trackingModel->getTopTitlesByType('series', 10),
             'pagina' => $page,
             'tem_mais_populares' => true,
             'tem_mais_em_breve' => true,
